@@ -69,6 +69,8 @@ class TestCardModel(unittest.TestCase):
         self.m.on_heard("see you at noon")
         self.assertEqual((self.m.view().kind, self.m.view().chip), ("heard", "see you at noon"))
         self.m.on_ui(messages.make(messages.MODE, mode="pointer"))     # "dictate off"
+        self.assertEqual((self.m.view().kind, self.m.view().pill), ("command", "Dictation off"))
+        self.clock.t += 1.3
         self.assertEqual(self.m.view().kind, "hidden")
 
     def test_the_old_behaviour_is_a_setting(self):

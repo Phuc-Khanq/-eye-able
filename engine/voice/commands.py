@@ -198,6 +198,22 @@ KEY_SHORTCUTS: dict[str, str] = {
     "key_backspace": "backspace",
 }
 
+# What the card flashes when a command runs ("Volume up"), so the user sees it was heard. Commands with their own
+# feedback (clicks: the ring; questions and dictation: the card's panel; modes: the pill) aren't here.
+COMMAND_LABELS: dict[str, str] = {
+    "volume_up": "Volume up", "volume_down": "Volume down", "mute": "Mute",
+    "brightness_up": "Brightness up", "brightness_down": "Brightness down",
+    "key_copy": "Copy", "key_paste": "Paste", "key_cut": "Cut", "key_select_all": "Select all", "key_save": "Save",
+    "key_find": "Find", "key_new_tab": "New tab", "key_close_tab": "Close tab", "key_reopen_tab": "Reopen tab",
+    "key_next_tab": "Next tab", "key_previous_tab": "Previous tab", "key_refresh": "Refresh",
+    "key_forward": "Forward", "key_switch_window": "Switch window", "key_minimize": "Minimize",
+    "key_maximize": "Maximize", "key_show_desktop": "Show desktop", "key_zoom_in": "Zoom in",
+    "key_zoom_out": "Zoom out", "key_page_up": "Page up", "key_page_down": "Page down", "key_top": "Top",
+    "key_bottom": "Bottom", "key_enter": "Enter", "key_tab": "Tab", "key_backspace": "Backspace",
+    "scroll_up": "Scroll up", "scroll_down": "Scroll down", "go_back": "Back", "escape": "Escape",
+    "undo": "Undo", "new_line": "New line",
+}
+
 # System commands -> the os.system action (os_output: volume by media keys, brightness through Windows)
 SYSTEM_COMMANDS = {"volume_up", "volume_down", "mute", "brightness_up", "brightness_down"}
 

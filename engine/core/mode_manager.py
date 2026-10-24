@@ -85,6 +85,20 @@ TICK_S = 0.25
 REPEAT_CLICK_S = 3.0      # "click Send" again this soon after Send was clicked is a repeat, not a new click
 
 
+
+def launch_label(payload: dict) -> str:
+    """What the card flashes for os.launch: "Open Chrome", "Open youtube.com", "Search: cats"."""
+    from urllib.parse import parse_qs, urlparse
+
+    if payload.get("app"):
+        return f"Open {str(payload['app']).title()}"
+    u = urlparse(str(payload.get("url", "")))
+    q = parse_qs(u.query).get("q")
+    if u.path.startswith("/search") and q:
+        return f"Search: {q[0]}"[:40]
+    host = u.netloc[4:] if u.netloc.startswith("www.") else u.netloc
+    return f"Open {host}"
+
 class Mode(Enum):
     POINTER = "pointer"
     DICTATION = "dictation"
@@ -319,6 +333,7 @@ class ModeManager:
                 if payload:                   # "open Chrome": no question, it only opens things
                     done = True
                     if ("launch", str(payload)) != last:
+                        self._ui(messages.COMMAND, label=launch_label(payload))
                         self._os(topics.OS_LAUNCH, **payload)
                     last = ("launch", str(payload))
                     i += 1
@@ -478,6 +493,9 @@ class ModeManager:
     # ----------------------------------------------------------------- intents
     def _do(self, cmd: Command) -> None:
         name, m = cmd.name, self.mode
+        label = commands.COMMAND_LABELS.get(name)
+        if label and not (name == "undo" and self.preview):   # "scratch that" on a preview: the preview shows it
+            self._ui(messages.COMMAND, label=label)           # the card flashes it: the user sees it was heard
 
         if name == "click_here":
             if self.question or self.preview or self.search:

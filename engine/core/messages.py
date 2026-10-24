@@ -34,6 +34,8 @@ DICTATION_PREVIEW = "dictation_preview"  # words: [{"text": str, "conf": float}]
                                          # With the clean-up on, also cleaned: true|false; when true, words holds the
                                          # cleaned text and original the user's own words (a string)
 STATUS = "status"                        # level: "info" | "warn" | "error", text (show it, then let it fade)
+COMMAND = "command"                      # label ("Volume up", "New tab", "Brightness 60%"): a voice command just ran.
+                                         # The card flashes it for a moment, so the user sees it was heard
 CONFIRM = "confirm"                      # id ("q1"), prompt, state: "open" | "confirmed" | "cancelled" | "expired",
                                          # expires_in_s (12.0 when open, 0 otherwise). Same id from open to the end
 
@@ -59,6 +61,7 @@ FIELDS: dict[str, tuple[set[str], set[str]]] = {
     DICTATION_PREVIEW: ({"words"}, {"cleaned", "original"}),
     STATUS: ({"level", "text"}, set()),
     CONFIRM: ({"id", "prompt", "state", "expires_in_s"}, set()),
+    COMMAND: ({"label"}, set()),
 }
 
 # UI -> engine

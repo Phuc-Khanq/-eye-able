@@ -88,9 +88,13 @@ class OsOutput:
         def run() -> None:
             from engine.eyes.system_controls import BrightnessUnsupported
             try:
-                self._status("info", self.system(action, self.os))
+                text = self.system(action, self.os)
+                self._status("info", text)
+                if action.startswith("brightness"):   # the new level ("Brightness 60%") replaces the card's flash
+                    self.bus.publish(topics.TO_UI, messages.make(messages.COMMAND, label=text))
             except BrightnessUnsupported as exc:
                 self._status("warn", f"Can't change the brightness: {exc}")
+                self.bus.publish(topics.TO_UI, messages.make(messages.COMMAND, label="Can't change brightness"))
         self._safely(action.replace("_", " "), run)
 
     def on_launch(self, p: dict) -> None:

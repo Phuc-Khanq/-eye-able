@@ -55,6 +55,7 @@ class Settings:
                                           # hides it from OBS, so set false while recording the demo video
     card_heard_outside_dictation: bool = False  # the card shows what the mic hears only in Dictation mode
                                                 # (true: also in Pointer mode, as before Oct 24 evening)
+    card_command_flash: bool = True   # the card's pill shows a command's name ("Volume up") for a moment when it runs
     dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py): the snap click's
                                    # spinner and flash, and the dwell fill; no Electron UI needed
     sensitivity: float = 1.0

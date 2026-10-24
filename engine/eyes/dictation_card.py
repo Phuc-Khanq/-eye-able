@@ -41,6 +41,8 @@ from engine.core import messages, topics
 
 HEARD_S = 2.5             # your words stay in the chip this long after a command
 DONE_S = 1.2              # "Typed" / "Dropped" stays this long
+FLASH_S = 1.2             # a command's name ("Volume up") stays in the pill this long
+LEAVE_FLASH = {"dictation": "Dictation off", "scroll": "Scroll off", "paused": "Resumed", "menu": "Menu closed"}
 LISTEN_HOLD_S = 0.4       # the waveform stays a moment after the mic goes quiet, so it doesn't flicker
 SHAKY_CONF = 0.6          # a word under this confidence is drawn in amber, underlined
 CHIP_MAX_CHARS = 70
@@ -80,7 +82,8 @@ MODE_HINTS = {"dictation": "say “dictate off” to stop", "scroll": "tilt your
 
 @dataclass
 class View:
-    kind: str                                  # "preview" | "done" | "heard" | "listening" | "mode" | "hidden"
+    kind: str                                  # "confirm" | "preview" | "done" | "command" | "heard" | "listening" |
+                                               # "mode" | "hidden" ("command": the pill alone, with the command's name)
     pill: str = ""                             # the pill's text (the mode)
     pill_hint: str = ""
     listening: bool = False                    # the pill shows the waveform
@@ -123,8 +126,13 @@ class Question:
 class CardModel:
     """What the card shows; no Tk, so the tests can drive it."""
 
-    def __init__(self, clock=time.monotonic, heard_outside_dictation: bool = False) -> None:
+    def __init__(self, clock=time.monotonic, heard_outside_dictation: bool = False,
+                 command_flash: bool = True) -> None:
         self.clock = clock
+        # A command that just ran ("Volume up", "New tab") shows in the pill for FLASH_S, in every mode: the user
+        # sees it was heard without the card showing their words. Off: command_flash=False.
+        self.command_flash = command_flash
+        self._flash, self._flash_at = "", float("-inf")
         # The mic is always on, but what it hears (the waveform, the "Heard" chip) only shows in Dictation mode:
         # in Pointer mode speech is only checked for commands. Questions, a one-shot "dictate <words>" preview
         # and the Scroll / Paused / Menu pill still show in every mode.
@@ -148,7 +156,11 @@ class CardModel:
             if msg.get("speaking"):
                 self._listening_until = now + LISTEN_HOLD_S
         elif kind == messages.MODE:
-            self.mode = str(msg.get("mode", "pointer"))
+            before, self.mode = self.mode, str(msg.get("mode", "pointer"))
+            if self.mode == "pointer" and before in LEAVE_FLASH:
+                self._set_flash(LEAVE_FLASH[before], now)   # back home: say what just ended
+        elif kind == messages.COMMAND:
+            self._set_flash(str(msg.get("label", "")), now)
         elif kind == messages.DICTATION_PREVIEW:
             words = list(msg.get("words") or [])
             if not words and self.preview:
@@ -158,6 +170,10 @@ class CardModel:
             self._last_typed = False
         elif kind == messages.CONFIRM:
             self._on_confirm(msg, now)
+
+    def _set_flash(self, label: str, now: float) -> None:
+        if self.command_flash and label.strip():
+            self._flash, self._flash_at = shorten(label, 32), now
 
     def _on_confirm(self, msg: dict, now: float) -> None:
         qid, state = str(msg.get("id", "")), msg.get("state")
@@ -211,6 +227,8 @@ class CardModel:
                         actions=["type", "drop"] + (["original"] if self.original else []), keys=True, **base)
         if now - self._done_at <= DONE_S:
             return View("done", body=self._done, **base)
+        if now - self._flash_at <= FLASH_S and self._flash:
+            return View("command", pill=self._flash)
         if show_heard and now - self._heard_at <= HEARD_S and self.heard:
             return View("heard", label="Heard", chip=shorten(self.heard), **base)
         if listening:
@@ -222,9 +240,9 @@ class CardModel:
 
 class DictationCard:
     def __init__(self, bus, clock=time.monotonic, hide_from_capture: bool = True, opacity: float = 0.82,
-                 position: str = "top", heard_outside_dictation: bool = False) -> None:
+                 position: str = "top", heard_outside_dictation: bool = False, command_flash: bool = True) -> None:
         self.bus = bus
-        self.model = CardModel(clock, heard_outside_dictation=heard_outside_dictation)
+        self.model = CardModel(clock, heard_outside_dictation=heard_outside_dictation, command_flash=command_flash)
         self.hide_from_capture = hide_from_capture
         self.opacity = min(1.0, max(0.3, float(opacity)))
         self.position = position

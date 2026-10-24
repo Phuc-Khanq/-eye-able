@@ -364,7 +364,7 @@ class ModeManager:
             if self.search and now >= self.search.expires_at:
                 s, self.search = self.search, None
                 if s.snap is not None:
-                    self._ui(messages.TARGET_NONE, label=s.label, snap=True)
+                    self._ui(messages.TARGET_NONE, label=s.label, snap=True, timeout=True)   # no click
                     self._status("warn", "UI-Venus didn't answer in time (still loading?), so nothing was "
                                          "clicked. Try again")
                 else:

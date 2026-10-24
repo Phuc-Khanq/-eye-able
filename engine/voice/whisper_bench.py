@@ -33,40 +33,20 @@ def gpu_memory_used_mb() -> int | None:
     return int(out.splitlines()[0].strip())
 
 
-def _record(sd, seconds: float, mic: int | None):
-    """Record at the mic's own rate and channel count; return (audio, rate)."""
-    info = sd.query_devices(mic, kind="input")
-    rate = int(info["default_samplerate"])
-    channels = max(1, min(int(info["max_input_channels"]), 2))
-    print(f"Recording {seconds:.0f} s from '{info['name']}' at {rate} Hz. Speak a normal sentence now...")
-    audio = sd.rec(int(seconds * rate), samplerate=rate, channels=channels, dtype="float32", device=mic)
-    sd.wait()
-    return audio, rate
-
-
 def record_clip(seconds: float, mic: int | None):
-    """Record from a mic, mix to mono and resample to 16 kHz, all in memory."""
+    """Record from a mic into memory, as 16 kHz mono (engine/voice/mic.py picks a format that opens)."""
     import numpy as np
-    import sounddevice as sd
 
-    tries = [mic] if mic is not None else [None, 0, 4]
-    last_error = None
-    for device in tries:
-        try:
-            audio, rate = _record(sd, seconds, device)
-            break
-        except Exception as exc:  # this mic refused the format; try the next one
-            print(f"Mic {device if device is not None else 'default'} failed: {exc}")
-            last_error = exc
-    else:
-        raise SystemExit(f"No mic worked. Run 'python -m sounddevice' and pass --mic N. Last error: {last_error}")
+    from engine.voice import mic as mic_mod
 
-    audio = audio.mean(axis=1)
-    if rate != SAMPLE_RATE:
-        n_out = int(len(audio) * SAMPLE_RATE / rate)
-        audio = np.interp(np.linspace(0, len(audio) - 1, n_out), np.arange(len(audio)), audio)
-    print(f"Loudest level: {np.abs(audio).max():.3f} (under 0.01 means the mic heard almost nothing)")
-    return audio.astype(np.float32)
+    print(f"Recording {seconds:.0f} s. Speak a normal sentence now...")
+    try:
+        audio = mic_mod.record(seconds, preferred=mic)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc))
+    level = float(np.abs(audio).max()) if len(audio) else 0.0
+    print(f"Loudest level: {level:.3f} (under 0.01 means the mic heard almost nothing)")
+    return audio
 
 
 def main() -> int:

@@ -115,5 +115,45 @@ class TestClickWhileDictating(Base):
         self.assertEqual(cut("um click send"), [("um click send", True)])   # fillers don't split
 
 
+class TestTriggerWordsOnlyBeforeACommand(Base):
+    """Fix 3: "my computer is slow today" typed "my is slow today"."""
+
+    def dictate(self, text):
+        self.say("start dictation")
+        self.say(text)
+
+    def test_the_word_stays_when_no_command_follows(self):
+        for text in ["my computer is slow today", "tell Venus I said hi", "I love my computer",
+                     "Computer science is fun.", "my computer, the old one, broke"]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.dictate(text)
+                self.assertEqual(self.mm._preview_text(), text)
+                self.assertEqual(self.os(), [])
+
+    def test_a_command_after_the_word_still_runs(self):
+        self.dictate("hello team")
+        self.say("Venus, scroll down")
+        self.assertEqual(self.os(), [(topics.OS_SCROLL, {"direction": "down"})])
+        self.assertEqual(self.mm._preview_text(), "hello team")
+
+    def test_mid_sentence_trigger_still_works(self):
+        # Khang's example, no punctuation: the trigger counts because a command follows
+        self.dictate("see you at noon computer stop dictation")
+        self.assertEqual(self.mm._preview_text(), "see you at noon")
+        self.assertEqual(self.questions(), [('Insert "see you at noon" before stopping?', "open")])
+
+    def test_split_clauses_puts_the_word_back(self):
+        from engine.voice.commands import split_clauses
+
+        def cut(text):
+            return [(c.text, c.triggered) for c in split_clauses([{"text": w, "conf": 1.0} for w in text.split()])]
+        self.assertEqual(cut("my computer is slow today"), [("my computer is slow today", False)])
+        self.assertEqual(cut("I love my computer"), [("I love my computer", False)])
+        self.assertEqual(cut("Hey Venus, scroll down."), [("Hey", False), ("scroll down.", True)])
+        self.assertEqual(cut("see you at noon computer stop dictation"),
+                         [("see you at noon", False), ("stop dictation", True)])
+
+
 if __name__ == "__main__":
     unittest.main()

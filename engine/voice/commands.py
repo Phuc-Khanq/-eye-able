@@ -171,13 +171,18 @@ def split_clauses(words: list[dict]) -> list[Clause]:
     cur: list[dict] = []
     triggered = pending = False
     starts = True
+    trigger: dict | None = None          # the trigger word waiting for its clause
+    glued = False                        # the clause before it was cut only by that trigger word
+    trigger_of: dict[int, tuple[dict, bool]] = {}
 
-    def close(after_punct: bool) -> None:
+    def close(after_punct: bool) -> bool:
         nonlocal cur, triggered, starts
+        closed = bool(cur)
         if cur:
             clauses.append(Clause(" ".join(w["text"].strip() for w in cur), cur, triggered, starts))
             starts = after_punct
         cur, triggered = [], False
+        return closed
 
     for w in words:
         raw = str(w.get("text", "")).strip()
@@ -185,18 +190,39 @@ def split_clauses(words: list[dict]) -> list[Clause]:
         if not bare:
             continue
         if bare in TRIGGER_WORDS:
-            close(after_punct=False)
-            pending = True
+            glued = close(after_punct=False)
+            pending, trigger = True, w
             continue
         if bare == "click" and cur and normalize(" ".join(str(x.get("text", "")) for x in cur)):
             close(after_punct=False)
         if not cur and pending:
             triggered, pending = True, False
+            trigger_of[len(clauses)] = (trigger, glued)
         cur.append(w)
         if _END.search(raw):
             close(after_punct=True)
     close(after_punct=False)
-    return clauses
+    if pending:                          # a trigger word at the very end: nothing follows it
+        trigger_of[len(clauses)] = (trigger, glued)
+        clauses.append(Clause("", [], True, starts))
+    return _untrigger(clauses, trigger_of)
+
+
+def _untrigger(clauses: list[Clause], trigger_of: dict[int, tuple[dict, bool]]) -> list[Clause]:
+    """A trigger word only counts when a command follows it ("Venus, scroll down"). Otherwise it is
+    just a word ("my computer is slow today"): put it back in its place in the text."""
+    out: list[Clause] = []
+    for i, c in enumerate(clauses):
+        if not c.triggered or (c.words and parse(c.text) is not None):
+            out.append(c)
+            continue
+        word, glued = trigger_of[i]
+        words, starts = [word] + c.words, c.starts_sentence
+        if glued and out:                # "my | computer | is slow today" was one clause
+            prev = out.pop()
+            words, starts = prev.words + words, prev.starts_sentence
+        out.append(Clause(" ".join(w["text"].strip() for w in words), words, False, starts))
+    return out
 
 
 def _collapse(clean: str) -> str:

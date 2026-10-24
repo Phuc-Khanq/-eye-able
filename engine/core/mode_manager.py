@@ -197,7 +197,9 @@ class ModeManager:
             if self.mode == Mode.DICTATION:
                 whole = commands.parse(transcript["text"], allow_targets=True,
                                        target_verbs=commands.DICTATION_TARGET_VERBS)
-                if whole and whole.name != "type_text" and len(clauses) <= 1:
+                if (whole and whole.name != "type_text" and len(clauses) <= 1
+                        and not (whole.name == "target"
+                                 and len(whole.label.split()) > commands.DICTATION_MAX_LABEL_WORDS)):
                     self._do(whole)
                     return
             done, last, i = False, None, 0
@@ -224,9 +226,12 @@ class ModeManager:
     def _clause_command(self, c) -> Command | None:
         if c.triggered or self.mode == Mode.POINTER:
             return commands.parse(c.text, allow_targets=self.mode in (Mode.POINTER, Mode.DICTATION))
-        if self.mode == Mode.DICTATION:   # untriggered: only "click <name>"
+        if self.mode == Mode.DICTATION:   # untriggered: only "click <name>", as its own short sentence
             cmd = commands.parse(c.text, allow_targets=True, target_verbs=commands.DICTATION_TARGET_VERBS)
-            return cmd if cmd and cmd.name == "target" else None
+            if (cmd and cmd.name == "target" and c.starts_sentence
+                    and len(cmd.label.split()) <= commands.DICTATION_MAX_LABEL_WORDS):
+                return cmd
+            return None
         cmd = commands.parse(c.text, allow_targets=False)   # Menu
         return None if cmd and cmd.name == "type_text" else cmd
 

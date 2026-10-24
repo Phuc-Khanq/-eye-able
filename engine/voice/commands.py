@@ -83,7 +83,9 @@ FIXED_COMMANDS: dict[str, str] = {
 
 # Verbs that start a look-and-say target request.
 TARGET_VERBS = ("click", "open", "select")
-DICTATION_TARGET_VERBS = ("click",)   # while dictating, only "click <name>" is a command
+DICTATION_TARGET_VERBS = ("click",)   # while dictating, only "click <name>" is a command...
+DICTATION_MAX_LABEL_WORDS = 3          # ...as its own sentence with a short name ("click send", not
+                                       # "I'll click the link later" or "click save before you close it")
 TRIGGER_WORDS = ("venus", "computer")  # "Venus, click send": what follows is always a command
 TYPE_VERBS = ("type", "dictate")      # "type see you at noon": one-shot dictation
 
@@ -154,22 +156,27 @@ class Clause:
     text: str
     words: list[dict]          # Whisper words ({"text", "conf"}) in this clause
     triggered: bool = False    # came right after a trigger word: always read as a command
+    starts_sentence: bool = True   # starts the utterance or follows sentence punctuation (not cut mid-sentence)
 
 
 _END = re.compile(r"[.!?,;:]+[\"')\]]*$")
 
 
 def split_clauses(words: list[dict]) -> list[Clause]:
-    """Cut one utterance into clauses: after sentence punctuation, before every "click" that isn't
-    the first word, and at a trigger word (dropped; the clause after it is triggered)."""
+    """Cut one utterance into clauses: after sentence punctuation, before every "click" that has real
+    words before it (fillers like "um" don't count), and at a trigger word (dropped; the clause after
+    it is triggered). Each clause knows if it starts a sentence: a "click" cut out of the middle of
+    one ("I'll click the link later") doesn't."""
     clauses: list[Clause] = []
     cur: list[dict] = []
     triggered = pending = False
+    starts = True
 
-    def close() -> None:
-        nonlocal cur, triggered
+    def close(after_punct: bool) -> None:
+        nonlocal cur, triggered, starts
         if cur:
-            clauses.append(Clause(" ".join(w["text"].strip() for w in cur), cur, triggered))
+            clauses.append(Clause(" ".join(w["text"].strip() for w in cur), cur, triggered, starts))
+            starts = after_punct
         cur, triggered = [], False
 
     for w in words:
@@ -178,17 +185,17 @@ def split_clauses(words: list[dict]) -> list[Clause]:
         if not bare:
             continue
         if bare in TRIGGER_WORDS:
-            close()
+            close(after_punct=False)
             pending = True
             continue
-        if bare == "click" and cur:
-            close()
+        if bare == "click" and cur and normalize(" ".join(str(x.get("text", "")) for x in cur)):
+            close(after_punct=False)
         if not cur and pending:
             triggered, pending = True, False
         cur.append(w)
         if _END.search(raw):
-            close()
-    close()
+            close(after_punct=True)
+    close(after_punct=False)
     return clauses
 
 

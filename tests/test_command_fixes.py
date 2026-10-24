@@ -73,5 +73,47 @@ class TestOkayAndSureAreNotYes(Base):
         self.assertEqual(parse("Okay, send it.").name, "send_it")
 
 
+class TestClickWhileDictating(Base):
+    """Fix 2: "I'll click the link later" searched UI-Venus for "Link Later" and lost the words."""
+
+    def dictate(self, text):
+        self.say("start dictation")
+        self.say(text)
+
+    def test_click_inside_a_sentence_stays_text(self):
+        for text in ["I'll click the link later", "Remember to click save before you close it.",
+                     "you just click it and wait"]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.dictate(text)
+                self.assertEqual(self.searches(), [])
+                self.assertEqual(self.mm._preview_text(), text)
+
+    def test_a_long_label_stays_text_even_at_the_start(self):
+        self.dictate("Click save before you close it.")
+        self.assertEqual(self.searches(), [])
+        self.assertEqual(self.mm._preview_text(), "Click save before you close it.")
+
+    def test_click_as_its_own_sentence_still_clicks(self):
+        cases = {"click send": ("Send", ""), "see you at noon. click send": ("Send", "see you at noon."),
+                 "Okay, click send": ("Send", "Okay,"), "um click send": ("Send", ""),
+                 "click on the send button": ("Send Button", ""), "Done for today! Click save.": ("Save", "Done for today!")}
+        for text, (label, preview) in cases.items():
+            with self.subTest(text=text):
+                self.setUp()
+                self.dictate(text)
+                self.assertEqual(self.searches(), [label])
+                self.assertEqual(self.mm._preview_text(), preview)
+
+    def test_split_clauses_marks_sentence_starts(self):
+        from engine.voice.commands import split_clauses
+
+        def cut(text):
+            return [(c.text, c.starts_sentence) for c in split_clauses([{"text": w, "conf": 1.0} for w in text.split()])]
+        self.assertEqual(cut("I'll click the link later"), [("I'll", True), ("click the link later", False)])
+        self.assertEqual(cut("see you at noon. click send"), [("see you at noon.", True), ("click send", True)])
+        self.assertEqual(cut("um click send"), [("um click send", True)])   # fillers don't split
+
+
 if __name__ == "__main__":
     unittest.main()

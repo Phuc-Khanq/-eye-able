@@ -12,18 +12,24 @@ Gaze is fast but jittery; the head is slow but steady. So:
   - Between jumps, small head turns move the cursor from that spot, FINE_PX_PER_DEG per degree.
   - With no gaze at all (not calibrated, or gaze switched off), the head alone drives the cursor:
     the neutral pose is the screen center, and FULL_YAW_DEG / FULL_PITCH_DEG reach the edges.
-Sensitivity from the settings scales head motion in both modes. Smoothing stays in smoothing.py.
+Sensitivity from the settings scales head motion in both modes. Head angles pass through a light
+One Euro filter first (the filter itself is Khang's, in smoothing.py), because 0.4 degrees of
+tracking noise would otherwise shake the cursor by 8 px at FINE_PX_PER_DEG. Gaze smoothing stays
+in the caller.
 """
 import numpy as np
 
 from engine.config import settings
 from engine.core.types import GazePoint, HeadPose
+from engine.eyes.smoothing import OneEuroFilter
 
 JUMP_PX = 150            # gaze this far from the cursor moves it in one jump
 SETTLE_MS = 300          # after a jump, follow gaze this long before head fine-tuning takes over
 FINE_PX_PER_DEG = 20.0   # head fine-tune speed after a jump
 FULL_YAW_DEG = 15.0      # head-only mode: turn that reaches a side edge
 FULL_PITCH_DEG = 10.0    # head-only mode: tilt up or down that reaches the top or bottom edge
+FILTER_MIN_CUTOFF = 0.8  # Hz; lower = steadier at rest, more lag
+FILTER_BETA = 0.05       # higher = less lag during fast head motion
 
 
 class HeadPointer:
@@ -38,6 +44,8 @@ class HeadPointer:
         self.anchor_xy: tuple[float, float] | None = None
         self.anchor_pose: HeadPose | None = None
         self.cursor: tuple[float, float] = ((screen_w - 1) / 2, (screen_h - 1) / 2)
+        self._yaw_filter = OneEuroFilter(FILTER_MIN_CUTOFF, FILTER_BETA)
+        self._pitch_filter = OneEuroFilter(FILTER_MIN_CUTOFF, FILTER_BETA)
 
     def _clamp(self, x: float, y: float) -> tuple[float, float]:
         return float(np.clip(x, 0, self.screen_w - 1)), float(np.clip(y, 0, self.screen_h - 1))
@@ -53,6 +61,8 @@ class HeadPointer:
         self.anchor_xy = None
         self.anchor_pose = None
         self.jump_ms = None
+        self._yaw_filter.reset()
+        self._pitch_filter.reset()
 
     def to_cursor(self, pose: HeadPose) -> tuple[float, float]:
         sens = max(settings.sensitivity, 0.1)
@@ -69,6 +79,9 @@ class HeadPointer:
 
     def update(self, pose: HeadPose, gaze: GazePoint | None = None) -> GazePoint:
         """Feed every frame. Pass the smoothed gaze when there is one; returns the cursor point."""
+        t_s = pose.t_ms / 1000.0
+        pose = HeadPose(t_ms=pose.t_ms, yaw=self._yaw_filter(t_s, pose.yaw),
+                        pitch=self._pitch_filter(t_s, pose.pitch), roll=pose.roll)
         if gaze is not None and np.isfinite(gaze.x) and np.isfinite(gaze.y):
             cx, cy = self.cursor
             settling = self.jump_ms is not None and pose.t_ms - self.jump_ms < self.settle_ms

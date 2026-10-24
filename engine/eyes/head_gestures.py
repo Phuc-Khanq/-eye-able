@@ -16,7 +16,9 @@ head was a fixed time ago, so a slow drift or a head that settles at a new heigh
           only when roll drops under 70% of tilt_deg, so a noisy frame can't restart the hold.
 Each pose goes through a 3-frame median first, which removes one-frame tracking glitches. A gap of
 more than MAX_GAP_MS (the face was lost) clears the history, so two motions are never stitched
-together. After any gesture the detector stays quiet for COOLDOWN_MS so one motion fires once.
+together. After any gesture the detector stays quiet for COOLDOWN_MS, and then a nod or shake waits
+until the head is calm again, so shaking for three seconds is one shake, not four. A tilt fires once
+and the head has to come back under the release level before another tilt can fire.
 """
 from collections import deque
 
@@ -46,6 +48,8 @@ LEAD_IN_FRACTION = 0.5    # ...within this share of nod_deg
 RETURN_FRACTION = 0.6     # a nod must come back this share of nod_deg
 RETURN_OF_RISE = 0.4      # ...and this share of how far it went
 CROSS_AXIS_FRACTION = 0.8  # the other axis may move at most this share of the threshold
+CALM_MS = 250             # after a nod or shake, the head must be this still before the next one counts
+CALM_DEG = 3.0            # ...moving no more than this in yaw and pitch
 TILT_RELEASE = 0.7        # a tilt ends when roll falls under this share of tilt_deg
 
 
@@ -97,6 +101,8 @@ class GestureDetector:
         self.quiet_until_ms = -1
         self.tilt_since_ms: int | None = None
         self.tilt_side = ""
+        self._tilt_latched = False   # a tilt fired; wait for the head to come back
+        self._needs_calm = False     # a nod or shake fired; wait for the head to settle
 
     def set_thresholds(self, nod_deg: float | None = None, shake_deg: float | None = None,
                        tilt_deg: float | None = None) -> None:
@@ -130,11 +136,28 @@ class GestureDetector:
         if pose.t_ms < self.quiet_until_ms:
             return None
 
-        gesture = self._tilt(self.history[-1]) or self._nod() or self._shake()
+        gesture = self._tilt(self.history[-1])
+        if gesture is None and self._calm():
+            gesture = self._nod() or self._shake()
         if gesture is not None:
             self.quiet_until_ms = pose.t_ms + self.cooldown_ms
+            self._tilt_latched = gesture.type.startswith("tilt")
+            self._needs_calm = not self._tilt_latched
             self.reset()
         return gesture
+
+    def _calm(self) -> bool:
+        """True unless a nod or shake just fired and the head is still moving."""
+        if not self._needs_calm:
+            return True
+        t, yaw, pitch, _ = self._window(CALM_MS)
+        if len(t) < 4 or t[-1] - t[0] < CALM_MS * 0.7:
+            return False
+        if np.ptp(yaw) <= CALM_DEG and np.ptp(pitch) <= CALM_DEG:
+            self._needs_calm = False
+            self.history.clear()   # the swings that just ended must not count again
+            self._recent.clear()
+        return False
 
     def _window(self, ms: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         now = self.history[-1].t_ms
@@ -187,6 +210,11 @@ class GestureDetector:
         return Gesture(t_ms=int(t[-1]), type="shake")
 
     def _tilt(self, pose: HeadPose) -> Gesture | None:
+        if self._tilt_latched:
+            if abs(pose.roll) < TILT_RELEASE * self.tilt_deg:
+                self._tilt_latched = False
+                self.tilt_since_ms, self.tilt_side = None, ""
+            return None
         side = "tilt_right" if pose.roll > self.tilt_deg else "tilt_left" if pose.roll < -self.tilt_deg else ""
         if not side and self.tilt_side:
             release = TILT_RELEASE * self.tilt_deg

@@ -29,8 +29,23 @@ def main() -> None:
         ("cleaned preview", lambda: ui(messages.DICTATION_PREVIEW, words=[
             {"text": w, "conf": 0.95} for w in "See you at nine tomorrow.".split()], cleaned=True,
             original="um see you at nine tomorrow")),
+        ("question over the preview (\"send it\"), the seconds count down", lambda: ui(
+            messages.CONFIRM, id="q1", prompt='Insert "See you at nine tomorrow." and send?', state="open",
+            expires_in_s=12.0)),
+        ("question cancelled: the preview comes back", lambda: ui(
+            messages.CONFIRM, id="q1", prompt='Insert "See you at nine tomorrow." and send?', state="cancelled",
+            expires_in_s=0)),
         ("typed", lambda: (bus.publish(topics.OS_TYPE, {"text": "See you at nine tomorrow. "}),
                            ui(messages.DICTATION_PREVIEW, words=[]))),
+        ("question: Click Send?", lambda: ui(messages.CONFIRM, id="q2", prompt="Click Send?", state="open",
+                                             expires_in_s=12.0)),
+        ("question confirmed (\"Done\")", lambda: ui(messages.CONFIRM, id="q2", prompt="Click Send?",
+                                                     state="confirmed", expires_in_s=0)),
+        ("long question (wraps, dictation shortened)", lambda: ui(
+            messages.CONFIRM, id="q3", prompt='Insert "' + "this is a very long dictation that goes on " * 6
+            + '" and send?', state="open", expires_in_s=12.0)),
+        ("question cancelled (\"Cancelled\")", lambda: ui(messages.CONFIRM, id="q3", prompt="", state="cancelled",
+                                                          expires_in_s=0)),
         ("dictation mode", lambda: ui(messages.MODE, mode="dictation")),
         ("back to pointer (hidden)", lambda: ui(messages.MODE, mode="pointer")),
     ]

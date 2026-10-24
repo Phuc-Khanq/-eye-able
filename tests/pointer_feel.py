@@ -9,8 +9,12 @@ Keys (this window):
   1 = head (new)   2 = head-abs (old)   C = recenter (face the screen center, then press)
   SPACE = reach test: 8 targets, one at a time, near the corners and edges. Move the cursor onto
           the ring and hold it there for 0.3 s; the time is recorded. Do it once per mode.
+  E = edge test: push the cursor all the way to the lit edge (left, top, right, bottom, in a random order),
+      the way you normally would. Each counts when the real cursor gets within 3 px of it.
   + / - = faster / slower overall (sensitivity)   [ / ] = less / more acceleration (fast-turn gain)
   , / . = slower / faster fine aim (slow-turn gain)   Q or Esc = quit, prints the comparison and the values
+On quit it also prints your frame rate, how far your head turned (the comfortable range, in degrees) and what
+the head pointer dropped (glitch skips, long-blink holds, cut throws): send those lines to Khang.
 On quit, a numbers-only log (frame time, head angles, cursor position, mode, target) is written to
 calibration/pointer_logs/ (git ignores it), so the pointer can be tuned on real camera data.
 """
@@ -26,6 +30,8 @@ import numpy as np
 TARGETS = [(0.08, 0.08), (0.92, 0.08), (0.92, 0.92), (0.08, 0.92), (0.5, 0.06), (0.95, 0.5), (0.5, 0.94),
            (0.05, 0.5)]
 RADIUS = 50
+EDGES = ["left", "top", "right", "bottom"]
+EDGE_PX = 3          # the real cursor within this of the edge counts (its dead zone keeps it 2 px inside)
 HOLD_S = 0.3
 TIMEOUT_S = 10.0
 WINDOW = "Diseyeble pointer feel"
@@ -64,6 +70,8 @@ def main() -> None:
     firsts: dict[str, list[float]] = {"head": [], "head-abs": []}    # time until the cursor first touched the ring
     entries: dict[str, list[int]] = {"head": [], "head-abs": []}     # times it entered the ring (1 = no overshoot)
     test = None            # {"order": [...], "i": int, "t0": float, "inside_since": float | None}
+    edge = None            # {"order": [...], "i": int, "t0": float, "best": px}
+    edge_results: list[tuple[str, float | None, float]] = []   # (edge, seconds or None, closest px)
     frame_id, face, note = 0, None, "Face the screen center and press C, then move your head."
     log: list[tuple] = []   # (t_ms, mode, yaw, pitch, x, y, target index or -1, eyes usable 0/1)
     try:
@@ -89,6 +97,26 @@ def main() -> None:
             cv2.putText(img, note, (20, 66), cv2.FONT_HERSHEY_SIMPLEX, 0.6, QUIET, 1, cv2.LINE_AA)
             if face is None:
                 cv2.putText(img, "No face: face the camera", (20, 98), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (90, 90, 230), 1)
+
+            if edge is not None:
+                name = edge["order"][edge["i"]]
+                dist = {"left": cx, "top": cy, "right": W - 1 - cx, "bottom": H - 1 - cy}[name]
+                edge["best"] = min(edge["best"], dist)
+                now = time.monotonic()
+                bar = {"left": ((0, 0), (8, h)), "top": ((0, 0), (w, 8)), "right": ((w - 8, 0), (w, h)),
+                       "bottom": ((0, h - 8), (w, h))}[name]
+                cv2.rectangle(img, bar[0], bar[1], GOOD if dist <= EDGE_PX else RING, -1)
+                if dist <= EDGE_PX or now - edge["t0"] > TIMEOUT_S:
+                    secs = now - edge["t0"] if dist <= EDGE_PX else None
+                    edge_results.append((name, secs, edge["best"]))
+                    print(f"  edge {name:<6}: " + (f"{secs:.2f} s" if secs is not None else
+                                                  f"missed, closest {edge['best']:.0f} px"))
+                    edge["i"] += 1
+                    if edge["i"] == len(edge["order"]):
+                        edge = None
+                        note = "Edge test done. Press E again to repeat, Q to quit and print the numbers."
+                    else:
+                        edge.update(t0=now, best=float("inf"))
 
             if test is not None:
                 tx, ty = test["order"][test["i"]]
@@ -151,7 +179,13 @@ def main() -> None:
             elif k in (ord(","), ord(".")):
                 P.GAIN_SLOW = min(max(P.GAIN_SLOW + (2 if k == ord(".") else -2), 2.0), P.GAIN_FAST)
                 note = f"slow-turn gain {P.GAIN_SLOW:.0f} px/deg (fine aim)"
-            elif k == ord(" ") and test is None:
+            elif k == ord("e") and test is None and edge is None:
+                order = EDGES[:]
+                random.shuffle(order)
+                edge = {"order": order, "i": 0, "t0": time.monotonic(), "best": float("inf")}
+                note = f"Edge test ({mode}): push the cursor all the way to the lit edge."
+                print(f"Edge test, mode {mode}:")
+            elif k == ord(" ") and test is None and edge is None:
                 order = TARGETS[:]
                 random.shuffle(order)
                 test = {"order": order, "i": 0, "t0": time.monotonic(), "inside_since": None, "first": None,
@@ -172,6 +206,7 @@ def main() -> None:
                 f.write("t_ms,mode,yaw,pitch,x,y,target,eyes\n")
                 f.writelines(",".join(map(str, row)) + "\n" for row in log)
             print(f"Log (numbers only): {path}")
+        print_head_report(log, pointer.rel.stats, edge_results)
         print("\n=== Reach test (time to reach and hold each target) ===")
         for m, r in results.items():
             if r and firsts[m]:
@@ -186,6 +221,35 @@ def main() -> None:
                       f"timed out {sum(x >= TIMEOUT_S for x in r)}")
         print(f"  values at the end: sensitivity {settings.sensitivity:.1f}, GAIN_SLOW {P.GAIN_SLOW:.0f}, "
               f"GAIN_FAST {P.GAIN_FAST:.0f}  (send these to Khang to make them the default)")
+
+
+def print_head_report(log, stats, edge_results) -> None:
+    """Frame rate, the head's turning range in head mode, and what the head pointer dropped (H2)."""
+    rows = [r for r in log if r[1] == "head"]
+    if len(rows) < 30:
+        return
+    dts = [b[0] - a[0] for a, b in zip(rows, rows[1:]) if 0 < b[0] - a[0] < 1000]
+    yaws, pitches = sorted(r[2] for r in rows), sorted(r[3] for r in rows)
+
+    def pct(xs, q):
+        return xs[min(len(xs) - 1, int(q * len(xs)))]
+
+    print("\n=== Head pointer (send these lines to Khang) ===")
+    print(f"  frames {len(rows)}, median {statistics.median(dts):.0f} ms per frame "
+          f"({1000 / statistics.median(dts):.0f} fps), {sum(d > 50 for d in dts) / len(dts):.0%} of frames over 50 ms")
+    print(f"  head range (5th..95th percentile): yaw {pct(yaws, 0.05):+.1f}..{pct(yaws, 0.95):+.1f} deg "
+          f"(- = left), pitch {pct(pitches, 0.05):+.1f}..{pct(pitches, 0.95):+.1f} deg (- = up); "
+          f"extremes yaw {yaws[0]:+.1f}..{yaws[-1]:+.1f}, pitch {pitches[0]:+.1f}..{pitches[-1]:+.1f}")
+    print(f"  dropped: {stats.glitch_skips} glitch frames skipped, {stats.glitch_rebases} glitch restarts "
+          f"({stats.glitch_dropped_deg:.0f} deg), {stats.hold_rebases} long-blink holds ({stats.hold_dropped_deg:.0f} deg); "
+          f"fast throws cut {stats.capped_px:.0f} px, {stats.edge_px:.0f} px of it given back at edges")
+    for name in EDGES:
+        got = [r for r in edge_results if r[0] == name]
+        if got:
+            hits = [r[1] for r in got if r[1] is not None]
+            print(f"  edge {name:<6}: reached {len(hits)}/{len(got)}"
+                  + (f", median {statistics.median(hits):.2f} s" if hits else "")
+                  + (f", closest miss {min(r[2] for r in got if r[1] is None):.0f} px" if len(hits) < len(got) else ""))
 
 
 if __name__ == "__main__":

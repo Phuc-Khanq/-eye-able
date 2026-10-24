@@ -8,7 +8,8 @@ import unittest
 
 from engine.core import messages, topics
 from engine.core.mode_manager import Mode
-from engine.eyes.dictation_card import HEARD_S, CardModel, DictationCard, layout_words
+from engine.eyes.dictation_card import (DONE_S, HEARD_S, PROMPT_MAX_CHARS, CardModel, DictationCard,
+                                        layout_words)
 from tests.helpers import FakeBus
 from tests.test_mode_manager import Base
 
@@ -23,6 +24,11 @@ class Clock:
 
 def preview(*words, conf=0.95, **extra):
     return messages.make(messages.DICTATION_PREVIEW, words=[{"text": w, "conf": conf} for w in words], **extra)
+
+
+def confirm(qid, state, prompt="Send?"):
+    return messages.make(messages.CONFIRM, id=qid, prompt=prompt, state=state,
+                         expires_in_s=12.0 if state == "open" else 0)
 
 
 class TestCardModel(unittest.TestCase):
@@ -102,6 +108,104 @@ class TestCardModel(unittest.TestCase):
         self.assertIn("stop dictation", v.pill_hint)
 
 
+class TestConfirmQuestion(unittest.TestCase):
+    """The engine's yes/no questions ("Insert ... and send?", "Click Send?") on the card."""
+
+    def setUp(self):
+        self.clock = Clock()
+        self.m = CardModel(self.clock)
+
+    def test_an_open_question_shows_its_prompt_and_the_hint(self):
+        self.m.on_ui(confirm("q1", "open", 'Insert "see you at noon" and send?'))
+        v = self.m.view()
+        self.assertEqual((v.kind, v.label, v.body, v.panel), ("confirm", "Question",
+                                                              'Insert "see you at noon" and send?', True))
+        self.assertTrue(v.keys)
+        self.assertEqual((v.hint_yes, v.hint_no), ("", "to cancel"))
+        self.assertEqual((v.time_left, v.time_total), (12, 12))
+        self.clock.t += 4.5
+        self.assertEqual(self.m.view().time_left, 8)
+
+    def test_the_preview_keeps_its_hint_wording(self):
+        self.m.on_ui(preview("hello"))
+        v = self.m.view()
+        self.assertEqual((v.hint_yes, v.hint_no, v.time_total), ("to type", "to drop it", 0))
+
+    def test_confirmed_flashes_done_then_hides(self):
+        self.m.on_ui(confirm("q1", "open"))
+        self.m.on_ui(confirm("q1", "confirmed"))
+        v = self.m.view()
+        self.assertEqual((v.kind, v.body), ("done", "Done"))
+        self.clock.t += DONE_S + 0.1
+        self.assertEqual(self.m.view().kind, "hidden")
+
+    def test_cancelled_and_expired_flash_cancelled(self):
+        for state in ("cancelled", "expired"):
+            self.m.on_ui(confirm("q1", "open"))
+            self.m.on_ui(confirm("q1", state))
+            self.assertEqual(self.m.view().body, "Cancelled", state)
+            self.clock.t += DONE_S + 0.1
+
+    def test_a_newer_question_replaces_the_old_one(self):
+        self.m.on_ui(confirm("q1", "open", "Send?"))
+        self.m.on_ui(confirm("q1", "cancelled", "Send?"))     # the engine closes the old one first
+        self.m.on_ui(confirm("q2", "open", "Click Send?"))
+        v = self.m.view()
+        self.assertEqual((v.kind, v.body), ("confirm", "Click Send?"))
+
+    def test_a_newer_question_wins_even_without_the_old_ones_end(self):
+        self.m.on_ui(confirm("q1", "open", "Send?"))
+        self.m.on_ui(confirm("q2", "open", "Click Send?"))
+        self.assertEqual(self.m.view().body, "Click Send?")
+        self.m.on_ui(confirm("q1", "cancelled", "Send?"))     # late end of the old one: q2 stays
+        self.assertEqual(self.m.view().body, "Click Send?")
+
+    def test_the_question_beats_the_preview_and_the_preview_comes_back(self):
+        self.m.on_ui(preview("see", "you", "at", "noon"))
+        self.m.on_ui(confirm("q1", "open", 'Insert "see you at noon" and send?'))
+        self.assertEqual(self.m.view().kind, "confirm")
+        self.m.on_ui(confirm("q1", "cancelled"))
+        v = self.m.view()
+        self.assertEqual(v.kind, "preview")
+        self.assertEqual(v.words, [("see", False), ("you", False), ("at", False), ("noon", False)])
+
+    def test_an_end_for_a_question_that_is_not_open_changes_nothing(self):
+        self.m.on_ui(confirm("q7", "confirmed"))
+        self.assertEqual(self.m.view().kind, "hidden")
+        self.m.on_ui(confirm("q1", "open", "Send?"))
+        self.m.on_ui(confirm("q2", "confirmed"))
+        v = self.m.view()
+        self.assertEqual((v.kind, v.body), ("confirm", "Send?"))
+
+    def test_send_it_says_typed_once(self):
+        # "send it" -> yes: the engine closes the question, types the preview, then closes the preview
+        self.m.on_ui(preview("see", "you"))
+        self.m.on_ui(confirm("q1", "open", 'Insert "see you" and send?'))
+        self.m.on_ui(confirm("q1", "confirmed"))
+        self.m.on_typed()
+        self.m.on_ui(messages.make(messages.DICTATION_PREVIEW, words=[]))
+        self.assertEqual(self.m.view().body, "Typed")
+
+    def test_done_does_not_replace_a_typed_flash(self):
+        self.m.on_ui(confirm("q1", "open"))
+        self.m.on_typed()                                      # typed first, then the question's end
+        self.m.on_ui(confirm("q1", "confirmed"))
+        self.assertEqual(self.m.view().body, "Typed")
+
+    def test_a_long_dictation_inside_the_prompt_is_shortened(self):
+        long = "word " * 80
+        self.m.on_ui(confirm("q1", "open", f'Insert "{long}" and send?'))
+        body = self.m.view().body
+        self.assertLessEqual(len(body), PROMPT_MAX_CHARS)
+        self.assertTrue(body.endswith('" and send?'))
+        self.assertIn("…", body)
+
+    def test_a_question_whose_end_never_came_goes_away(self):
+        self.m.on_ui(confirm("q1", "open"))
+        self.clock.t += 12.0 + 3.0
+        self.assertEqual(self.m.view().kind, "hidden")
+
+
 class TestLayout(unittest.TestCase):
     class Mono:
         def measure(self, text):
@@ -163,6 +267,47 @@ class TestCardOnTheBus(unittest.TestCase):
         bus.publish(topics.OS_TYPE, {"text": "see you "})
         bus.publish(topics.TO_UI, messages.make(messages.DICTATION_PREVIEW, words=[]))
         self.assertEqual(card.view()[0].body, "Typed")
+
+    def test_shows_the_engines_question(self):
+        bus, clock = FakeBus(), Clock()
+        card = DictationCard(bus, clock=clock)
+        bus.publish(topics.TO_UI, confirm("q1", "open", "Click Send?"))
+        self.assertEqual(card.view()[0].kind, "confirm")
+        bus.publish(topics.TO_UI, confirm("q1", "confirmed", "Click Send?"))
+        self.assertEqual(card.view()[0].body, "Done")
+
+
+class TestQuestionsFromTheModeManager(Base):
+    """The real mode manager's questions, fed to the card: it shows each one and ends it."""
+
+    def card(self):
+        m = CardModel(Clock())
+        for t, msg in self.bus.log:
+            if t == topics.TO_UI:
+                m.on_ui(msg)
+            elif t == topics.OS_TYPE:
+                m.on_typed()
+        return m
+
+    def test_send_it_shows_the_question(self):
+        self.say("Dictate see you at noon")
+        self.say("send it")
+        v = self.card().view()
+        self.assertEqual(v.kind, "confirm")
+        self.assertIn("see you at noon", v.body)
+
+    def test_send_it_then_yes_ends_with_typed(self):
+        self.say("Dictate see you at noon")
+        self.say("send it")
+        self.say("yes")
+        v = self.card().view()
+        self.assertEqual((v.kind, v.body), ("done", "Typed"))
+
+    def test_send_it_then_no_brings_the_preview_back(self):
+        self.say("Dictate see you at noon")
+        self.say("send it")
+        self.say("no")
+        self.assertEqual(self.card().view().kind, "preview")
 
 
 class TestDictateFixes(Base):

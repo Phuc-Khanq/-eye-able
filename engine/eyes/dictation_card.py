@@ -6,17 +6,20 @@ an action row, and a hint field with key caps.
 
 Route: Khang (Nhi's Electron bubble can replace it later: dictation_card false in settings)
 Publishes: nothing
-Subscribes: topics.TO_UI, read only: listening, mode, dictation_preview; topics.TRANSCRIPT (what was heard);
+Subscribes: topics.TO_UI, read only: listening, mode, dictation_preview, confirm; topics.TRANSCRIPT (what was heard);
             topics.OS_TYPE (so it can say "Typed" rather than "Dropped")
 APIs: tkinter Canvas, as a Toplevel on the click ring's Tk thread (engine/eyes/dwell_meter.py), so the engine
       has one Tk thread; Windows ctypes for click-through, never focused, out of the taskbar, and out of
       screenshots (SetWindowDisplayAffinity), so UI-Venus never reads the card as part of the page
 
 States, first match wins:
+  confirm    "Question": the engine's yes/no question ("Insert "..." and send?", "Click Send?") in large text,
+             the seconds left as a thin bar, and "blink or say yes · say no to cancel" in the hint field. It
+             contains the preview's text, so it beats the preview. Stays until the engine closes it.
   preview    "Will type": the words waiting to be typed (unsure words in amber, underlined), your own words in
              the chip, "Type it / Drop it / Use original", and "blink or say yes" in the hint field. Stays until
              it is typed or dropped.
-  done       "Typed" or "Dropped" for a moment after a preview closes
+  done       "Typed" or "Dropped" for a moment after a preview closes; "Done" or "Cancelled" after a question
   heard      for HEARD_S after anything is heard: your words in the chip, so every command gets feedback
   listening  the pill only, with a moving waveform, as soon as the mic hears speech (before Whisper finishes)
   mode       the pill only, in Dictation, Scroll or Paused mode
@@ -26,6 +29,8 @@ Out of screenshots also means out of OBS: set card_hide_from_capture false while
 """
 from __future__ import annotations
 
+import math
+import re
 import sys
 import threading
 import time
@@ -39,6 +44,9 @@ DONE_S = 1.2              # "Typed" / "Dropped" stays this long
 LISTEN_HOLD_S = 0.4       # the waveform stays a moment after the mic goes quiet, so it doesn't flicker
 SHAKY_CONF = 0.6          # a word under this confidence is drawn in amber, underlined
 CHIP_MAX_CHARS = 70
+QUOTE_MAX_CHARS = 120     # the dictated text quoted inside a question is shortened to this
+PROMPT_MAX_CHARS = 180    # and the whole question to this, so the card never grows past the screen
+CONFIRM_GRACE_S = 2.0     # a question whose end message never came is dropped this long after it expires
 WAVE_BARS = 14
 CHIP_GAP = 24             # px between the gray label and the blue chip
 
@@ -82,15 +90,34 @@ class View:
     body: str = ""                             # plain large text (done)
     actions: list = field(default_factory=list)  # ["type", "drop", "original"]
     keys: bool = False                         # the hint field with "yes" / "no" key caps
+    hint_yes: str = "to type"                  # after the "yes" key cap
+    hint_no: str = "to drop it"                # after the "no" key cap
+    time_left: int = 0                         # confirm: whole seconds left (0 = no bar)
+    time_total: int = 0                        # confirm: seconds the question was open for
 
     @property
     def panel(self) -> bool:
-        return self.kind in ("preview", "done", "heard")
+        return self.kind in ("confirm", "preview", "done", "heard")
 
 
 def shorten(text: str, n: int = CHIP_MAX_CHARS) -> str:
     text = " ".join(text.split())
     return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+def shorten_prompt(prompt: str) -> str:
+    """'Insert "<a long dictation>" and send?' -> the quoted text shortened, so the question part stays."""
+    prompt = re.sub(r'"(.*)"', lambda m: f'"{shorten(m.group(1), QUOTE_MAX_CHARS)}"', " ".join(prompt.split()),
+                    count=1, flags=re.S)
+    return shorten(prompt, PROMPT_MAX_CHARS)
+
+
+@dataclass
+class Question:
+    id: str
+    prompt: str
+    opened_at: float
+    expires_in_s: float
 
 
 class CardModel:
@@ -107,6 +134,7 @@ class CardModel:
         self.levels: deque[float] = deque([0.0] * WAVE_BARS, maxlen=WAVE_BARS)
         self._done, self._done_at = "", float("-inf")
         self._last_typed = False
+        self.question: Question | None = None
 
     def on_ui(self, msg: dict) -> None:
         kind = msg.get("type")
@@ -124,6 +152,21 @@ class CardModel:
             self.preview = words
             self.original = str(msg.get("original", "")) if msg.get("cleaned") else ""
             self._last_typed = False
+        elif kind == messages.CONFIRM:
+            self._on_confirm(msg, now)
+
+    def _on_confirm(self, msg: dict, now: float) -> None:
+        qid, state = str(msg.get("id", "")), msg.get("state")
+        if state == "open":
+            self.question = Question(qid, str(msg.get("prompt", "")), now,
+                                     max(0.0, float(msg.get("expires_in_s", 0) or 0)))
+            return
+        if self.question is None or self.question.id != qid:
+            return                                       # not the open question: nothing to end
+        self.question = None
+        if now - self._done_at <= DONE_S and self._done == "Typed":
+            return                                       # "Typed" already says it for this moment
+        self._done, self._done_at = ("Done" if state == "confirmed" else "Cancelled"), now
 
     def on_typed(self) -> None:
         """os.type went out: the preview that closes next was typed, not dropped."""
@@ -147,6 +190,14 @@ class CardModel:
         if listening:
             pill, hint = "Listening", ""
         base = dict(pill=pill, pill_hint=hint, listening=listening)
+        q = self.question
+        if q and q.expires_in_s and now > q.opened_at + q.expires_in_s + CONFIRM_GRACE_S:
+            self.question = q = None                     # its end message never came: don't look frozen
+        if q:
+            left = math.ceil(q.opened_at + q.expires_in_s - now) if q.expires_in_s else 0
+            return View("confirm", label="Question", body=shorten_prompt(q.prompt), keys=True, hint_yes="",
+                        hint_no="to cancel", time_left=max(0, left), time_total=math.ceil(q.expires_in_s),
+                        **base)
         if self.preview:
             chip = self.original or (self.heard if now - self._heard_at <= 30 else "")
             return View("preview", label="Will type", chip=shorten(chip),
@@ -329,6 +380,13 @@ def draw(c, v: View, levels, fonts) -> int:
     if v.label:
         c.create_text(x0 + PAD, y + 14, text=v.label, fill=MUTED, font=fonts["label"], anchor="w")
         row_h = 28
+    if v.time_total:            # confirm: the seconds left, and a thin bar that empties
+        c.create_text(x0 + w - PAD, y + 14, text=f"{v.time_left} s", fill=MUTED, font=fonts["label"], anchor="e")
+        bx1, bx2 = x0 + PAD + fonts["label"].measure(v.label) + 14, x0 + w - PAD - fonts["label"].measure("00 s") - 10
+        c.create_rectangle(bx1, y + 13, bx2, y + 15, fill=PANEL_EDGE, outline="")
+        share = min(1.0, v.time_left / v.time_total)
+        if share > 0:
+            c.create_rectangle(bx1, y + 13, bx1 + (bx2 - bx1) * share, y + 15, fill=CHIP, outline="")
     if v.chip:
         room = inner - (fonts["label"].measure(v.label) + CHIP_GAP if v.label else 0)   # beside the label
         chip = fit(v.chip, fonts["chip"], room - 28)
@@ -346,9 +404,10 @@ def draw(c, v: View, levels, fonts) -> int:
                               font=fonts["shaky" if shaky else "body"], anchor="nw")
             y += line_h
         y += 10
-    if v.body:
-        c.create_text(x0 + PAD, y, text=v.body, fill=TEXT, font=fonts["body"], anchor="nw", width=inner)
-        y += fonts["body"].metrics("linespace") + 8
+    if v.body:                  # wraps to the panel; a long one adds lines (the model keeps it short)
+        item = c.create_text(x0 + PAD, y, text=v.body, fill=TEXT, font=fonts["body"], anchor="nw", width=inner)
+        box = c.bbox(item)
+        y += max(fonts["body"].metrics("linespace"), (box[3] - box[1]) if box else 0) + 8
     if v.actions:
         ax = x0 + PAD
         ay = y + 14
@@ -367,8 +426,9 @@ def draw(c, v: View, levels, fonts) -> int:
         fh = 40
         field_start = len(c.find_all())
         sx, sy = x0 + PAD + 16, fy + fh // 2
-        for text, is_key in (("Blink or say", False), ("yes", True), ("to type", False),
-                             ("·  say", False), ("no", True), ("to drop it", False)):
+        hints = (("Blink or say", False), ("yes", True), (v.hint_yes, False),
+                 ("·  say", False), ("no", True), (v.hint_no, False))
+        for text, is_key in (h for h in hints if h[0]):
             if is_key:
                 kw = fonts["key"].measure(text) + 16
                 round_rect(c, sx, sy - 11, sx + kw, sy + 11, 8, fill=KEYCAP, outline=PANEL_EDGE)

@@ -1,6 +1,9 @@
 """The head pointer's feel: head as a mouse with acceleration (engine/eyes/pointer.py, 'head' mode).
-Run: python -m unittest tests.test_pointer"""
+Run: python -m unittest tests.test_pointer
+The edge sweep (where turns of 10-25 degrees at each speed and frame rate end):  python -m tests.test_pointer --sweep
+"""
 import random
+import sys
 import unittest
 
 from engine.core.types import EyeFeatures, HeadPose
@@ -10,19 +13,20 @@ W, H = 1920, 1080
 
 
 class Head:
-    def __init__(self):
+    def __init__(self, fps=30):
         self.p = HeadRelPointer(W, H)
         self.t = 0
+        self.fps = fps
         self.yaw = self.pitch = 0.0
 
     def go(self, d_yaw=0.0, d_pitch=0.0, seconds=0.5, noise=0.0, settle=0.3):
         """Turn by d_yaw, d_pitch degrees at an even speed over `seconds`, then hold still for `settle`."""
-        n = max(1, int(seconds * 30))
-        for i in range(n + int(settle * 30)):
+        n = max(1, round(seconds * self.fps))
+        for i in range(n + round(settle * self.fps)):
             if i < n:
                 self.yaw += d_yaw / n
                 self.pitch += d_pitch / n
-            self.t += 33
+            self.t += round(1000 / self.fps)
             pt = self.p.update(HeadPose(self.t, self.yaw + random.gauss(0, noise),
                                         self.pitch + random.gauss(0, noise), 0.0))
         return pt.x, pt.y
@@ -127,5 +131,78 @@ class TestHeadMouse(unittest.TestCase):
         self.assertAlmostEqual(pt.y, (H - 1) / 2, delta=3)
 
 
+class TestEdges(unittest.TestCase):
+    """H2: the cursor didn't reach the left and top edges. The sweep (--sweep) found the pointer math is the same
+    in every direction, but (1) a hard throw moved the cursor LESS than a medium one (MAX_STEP_PX cut it), and
+    (2) at a low frame rate (Hung's webcam at 8 fps in dim light, or dropped frames) fast turns were cut more or
+    taken for glitches, so the cursor didn't move at all."""
+
+    def setUp(self):
+        random.seed(5)
+
+    def throw(self, d_yaw=0.0, d_pitch=0.0, speed=150.0, fps=30):
+        h = Head(fps)
+        h.go(seconds=0.5)
+        return h, h.go(d_yaw, d_pitch, seconds=max(abs(d_yaw), abs(d_pitch)) / speed, noise=0.03, settle=0.7)
+
+    def test_a_hard_throw_reaches_the_left_and_top_edges(self):
+        for speed in (60, 100, 150):
+            self.assertLessEqual(self.throw(d_yaw=-22, speed=speed)[1][0], 4, f"left at {speed} deg/s")
+            self.assertLessEqual(self.throw(d_pitch=-16, speed=speed)[1][1], 4, f"top at {speed} deg/s")
+            self.assertGreaterEqual(self.throw(d_yaw=22, speed=speed)[1][0], W - 5, f"right at {speed} deg/s")
+
+    def test_a_hard_throw_that_ends_on_the_screen_is_cut_as_before(self):
+        _, (x, _) = self.throw(d_yaw=-10, speed=150)                 # the middle keeps its feel
+        self.assertGreater(x, 959.5 - 330)
+        self.assertLess(x, 959.5 - 150)
+
+    def test_at_8_fps_a_fast_turn_still_moves(self):
+        _, (x, _) = self.throw(d_yaw=-15, speed=100, fps=8)          # before: not at all (taken for glitches)
+        self.assertLess(x, 959.5 - 250)
+        _, (x, _) = self.throw(d_yaw=-25, speed=60, fps=8)           # before: stopped at x 664
+        self.assertLessEqual(x, 2)
+
+    def test_turning_back_drops_the_rest_of_the_throw(self):
+        h = Head()
+        h.go(seconds=0.5)
+        h.go(d_yaw=-25, seconds=25 / 150, settle=0.0)                 # thrown at the left edge...
+        x_mid = h.p.cursor[0]
+        x, _ = h.go(d_yaw=8, seconds=0.3, settle=0.5)                 # ...and right back
+        self.assertGreater(x_mid, 100)
+        self.assertGreater(x, x_mid)
+
+    def test_frame_limits_are_unchanged_at_25_fps_and_up(self):
+        for dt in (1 / 60, 1 / 30, 1 / 25):
+            self.assertEqual(HeadRelPointer.frame_scale(dt), 1.0)
+        self.assertGreater(HeadRelPointer.frame_scale(1 / 8), 3.0)
+
+
+def sweep() -> None:
+    """Print where the cursor ends after turns from the center, and after a slow (5 deg/s) turn back."""
+    random.seed(1)
+    speeds = (5, 20, 60, 100, 150, 300)
+    for fps in (30, 15, 8):
+        print(f"\n{fps} fps. Each cell: cursor x (yaw) or y (pitch) after the turn / after a slow turn back. "
+              f"Edges: x 0..{W - 1}, y 0..{H - 1}")
+        print("               " + "".join(f"{s:>5} deg/s  " for s in speeds))
+        for axis, sign, name in (("yaw", -1, "left"), ("pitch", -1, "up"), ("yaw", 1, "right"), ("pitch", 1, "down")):
+            for deg in (10, 15, 20, 25):
+                cells = []
+                for speed in speeds:
+                    h = Head(fps)
+                    h.go(seconds=0.5)
+                    d = sign * deg
+                    kw = {"d_yaw": d} if axis == "yaw" else {"d_pitch": d}
+                    out = h.go(seconds=deg / speed, noise=0.03, settle=0.7, **kw)
+                    kw = {k: -v for k, v in kw.items()}
+                    back = h.go(seconds=deg / 5, noise=0.03, settle=0.3, **kw)
+                    i = 0 if axis == "yaw" else 1
+                    cells.append(f"{out[i]:5.0f}/{back[i]:5.0f} ")
+                print(f"  {name:<5} {deg:2d} deg " + " ".join(cells))
+
+
 if __name__ == "__main__":
-    unittest.main()
+    if "--sweep" in sys.argv:
+        sweep()
+    else:
+        unittest.main()

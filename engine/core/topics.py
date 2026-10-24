@@ -13,6 +13,9 @@ GESTURE = "eyes.gesture"            # Gesture (nod, shake, tilt_left, tilt_right
 DWELL_DONE = "eyes.dwell_done"      # GazePoint where a dwell finished (the cursor rested dwell_ms)
 CALIBRATE = "eyes.calibrate"        # {"action": "start" | "cancel"}
 MOUTH = "eyes.mouth"                # MouthSample, every frame with a face (engine/eyes/mouth.py reads it)
+DWELL = "eyes.dwell"                # {"on": bool} (mode manager -> eyes service): "stop clicking" / "start
+                                    # clicking" turn dwell, the left click, off / on; EyesService.set_dwell
+                                    # shows the "Dwell clicking on/off" status
 
 # Voice route
 UTTERANCE = "voice.utterance"       # numpy float32 array, 16 kHz mono (audio_in -> dictation)

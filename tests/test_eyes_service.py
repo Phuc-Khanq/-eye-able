@@ -172,6 +172,13 @@ class TestEyesService(unittest.TestCase):
         self.assertAlmostEqual(g.x, (W - 1) / 2, delta=3)   # sitting turned 3 deg reads as the center
         self.assertAlmostEqual(g.y, (H - 1) / 2, delta=3)
 
+    def test_stop_and_start_clicking_switch_dwell(self):
+        rig = Rig()
+        rig.bus.publish(topics.DWELL, {"on": False})
+        self.assertFalse(rig.eyes.dwell.enabled)
+        rig.bus.publish(topics.DWELL, {"on": True})
+        self.assertTrue(rig.eyes.dwell.enabled)
+
     def test_publishes_the_mouth_every_frame(self):
         n = len(self.r.bus.of(topics.MOUTH))
         self.r.frames(10)

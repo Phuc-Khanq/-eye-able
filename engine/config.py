@@ -46,6 +46,11 @@ class Settings:
     mouth_min_moving: float = 0.3      # share of face frames with a moving mouth; lower it for weak movement
     mouth_pad_ms: float = 150.0        # widen each word's time window by this much on both sides
     mouth_status_every_s: float = 10.0  # "Ignored speech while your mouth wasn't moving", at most this often
+    # An eyebrow raise while the mouth is moving is talking, not a yes or a right click
+    brow_ignore_while_talking: bool = True
+    brow_talk_window_ms: float = 600.0  # look this far back from the raise
+    brow_talk_min_moving: float = 0.3   # share of face frames with a moving mouth that counts as talking
+    scroll_idle_s: float = 10.0         # scroll mode ends by itself after this long with no scrolling
     # Dictation clean-up: a small local model tidies the preview before it's typed (engine/voice/rewrite.py)
     rewrite_dictation: bool = True
     rewrite_model: str = "Qwen/Qwen2.5-1.5B-Instruct"   # Apache 2.0; about 3.1 GB, downloaded once

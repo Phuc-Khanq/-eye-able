@@ -353,9 +353,11 @@ class TestEyebrowRaise(Base):
         self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 410, 220))
         self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 410, "y": 220})])
 
-    def test_with_nothing_waiting_does_nothing_and_says_nothing(self):
+    def test_with_nothing_waiting_right_clicks_at_the_cursor(self):
+        # Task 6 (team decision): with nothing waiting, a raise is the right click (dwell is the left)
+        self.look(500, 300)
         self.gesture("brow_raise")
-        self.assertEqual(self.os(), [])
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 500, "y": 300, "button": "right"})])
         self.assertEqual(self.bus.ui(messages.STATUS), [])
 
     def test_ignored_while_paused(self):

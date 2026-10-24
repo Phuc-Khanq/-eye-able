@@ -11,14 +11,21 @@ APIs: plain Python (enum, threading)
 Only this module asks os_input to click or type, so stray signals can't act alone.
 
 What each input means (one table per mode: GESTURES below):
-  Pointer    dwell = click at the cursor, tilt left/right = scroll up/down, eyebrow raise = yes,
-             "click/open/select <name>" = look-and-say, "type <words>" = one-shot dictation
-             (the words go to the preview; "yes" types them)
+  Pointer    dwell (rest the cursor 1 s) = LEFT click at the cursor; eyebrow raise = yes when a
+             question, preview or search is waiting, otherwise the RIGHT click at the cursor;
+             tilt left/right = scroll up/down; "click/open/select <name>" = look-and-say,
+             "type <words>" = one-shot dictation (the words go to the preview; "yes" types them)
+             An eyebrow raise made while the mouth is moving is ignored (talking, not a click).
   Dictation  speech -> preview bubble; eyebrow raise, nod or "yes" inserts, shake or "no" discards;
              "click <name>" still clicks (only "click": "open the door..." stays text)
   Menu       tilts and nods go to the UI's radial menu; shake closes it;
              the UI sends menu_select with the item
   Paused     everything is ignored except "resume" and the UI's set_mode
+  Scroll     "scroll" (or "help me scroll", "computer scroll"; never from Dictation): the eyes service
+             holds the cursor and scrolls with the head. "stop", "done", "stop scrolling" or an eyebrow
+             raise go back; any other command goes back and then runs; "scroll up/down" glide and stay;
+             other speech is ignored. Ends by itself after scroll_idle_s with no scrolling (the eyes
+             service's "scroll" UI message says how fast it is scrolling). No dwell clicks.
 
 Preview, then confirm:
   * "send it", look-and-say clicks and "delete my voice data" always ask first
@@ -59,19 +66,27 @@ class Mode(Enum):
     DICTATION = "dictation"
     MENU = "menu"
     PAUSED = "paused"
+    SCROLL = "scroll"
 
 
 # Gesture -> intent, per mode. Change the controls here, in one place.
 GESTURES: dict[Mode, dict[str, str]] = {
+    # brow_raise = "gesture_yes": yes if something waits, else the right click (Pointer only)
     Mode.POINTER:   {"tilt_left": "scroll_up", "tilt_right": "scroll_down", "brow_raise": "gesture_yes"},
     Mode.DICTATION: {"nod": "yes", "shake": "no", "brow_raise": "gesture_yes"},
     Mode.MENU:      {"tilt_left": "menu_gesture", "tilt_right": "menu_gesture", "brow_raise": "menu_gesture",
                      "nod": "menu_gesture", "shake": "close_menu"},
     Mode.PAUSED:    {},
+    # the head scrolls in Scroll mode (the eyes service), so its gestures mean nothing here
+    Mode.SCROLL:    {"brow_raise": "leave_scroll"},
 }
 
 # Voice commands that still work while paused.
 PAUSED_COMMANDS = {"resume"}
+
+# Scroll mode: these go back (only in Scroll mode: elsewhere "stop" and "done" mean what they always did)
+SCROLL_EXIT = {"stop", "done", "stop scrolling"}
+SCROLL_ACTIVE_RATE = 0.5   # notches/s: slower than this (inside the head's dead zone) isn't scrolling
 
 
 @dataclass
@@ -94,11 +109,21 @@ class _Search:
 
 class ModeManager:
     def __init__(self, bus, clock: Callable[[], float] = time.monotonic,
-                 rewrite_wait_s: float | None = None) -> None:
+                 rewrite_wait_s: float | None = None, mouth=None, settings=None, log=print) -> None:
         """rewrite_wait_s: the dictation clean-up is on (engine/voice/rewrite.py's RewriteWorker is
-        running) and "yes" waits at most this long for it. None (the default): off, exactly as before."""
+        running) and "yes" waits at most this long for it. None (the default): off, exactly as before.
+        mouth: engine.eyes.mouth.MouthTracker. With it, an eyebrow raise made while the user is talking
+        is ignored (see _raised_while_talking). None (the default): no guard, exactly as before."""
         self.bus = bus
         self.clock = clock
+        self.mouth = mouth
+        self._brow_guard = bool(getattr(settings, "brow_ignore_while_talking", True))
+        self._brow_window_ms = float(getattr(settings, "brow_talk_window_ms", 600))
+        self._brow_min_moving = float(getattr(settings, "brow_talk_min_moving", 0.3))
+        self._brow_warned = float("-inf")   # clock time of the last "tracker failed" warning
+        self._log = log                     # console lines for tuning
+        self._scroll_idle_s = float(getattr(settings, "scroll_idle_s", 10.0))
+        self._scroll_seen = 0.0             # clock time scroll mode started or the head last scrolled
         self.mode = Mode.POINTER
         self._return_mode = Mode.POINTER   # where Menu and Paused go back to
         self.preview: list[dict] = []      # words waiting for nod / shake
@@ -128,6 +153,7 @@ class ModeManager:
         bus.subscribe(topics.from_ui(messages.TARGET), self.on_ui_target)
         bus.subscribe(topics.from_ui(messages.CONFIRM_ANSWER), self.on_ui_confirm_answer)
         bus.subscribe(topics.REWRITE_RESULT, self.on_rewrite_result)
+        bus.subscribe(topics.TO_UI, self.on_ui_out)   # read only: the eyes service's scroll speed
 
     def start(self) -> None:
         """Start the timer thread that expires old questions and searches."""
@@ -154,6 +180,9 @@ class ModeManager:
     def on_gesture(self, gesture: Gesture) -> None:
         with self._lock:
             self.tick()
+            if gesture.type == "brow_raise" and (self.question or self.mode != Mode.PAUSED):
+                if self._raised_while_talking(gesture.t_ms):
+                    return
             if self.question:
                 if gesture.type in ("nod", "brow_raise"):
                     self._answer(True)
@@ -164,15 +193,38 @@ class ModeManager:
             if intent == "menu_gesture":
                 self._ui(messages.GESTURE, gesture=gesture.type)
             elif intent == "gesture_yes":
-                # An eyebrow raise only answers something that is waiting. With nothing waiting it does
-                # nothing, because a raise can also happen while talking (about 0.8 a minute in Hung's test).
+                # An eyebrow raise answers whatever is waiting. With nothing waiting it is the RIGHT
+                # click in Pointer mode (dwell is the left click), at the cursor: the eyes service
+                # freezes the cursor during a raise, so the last gaze is where it froze. A raise while
+                # talking never gets here (_raised_while_talking).
                 if self.preview:
                     self._insert_preview()
                 elif self.search:
                     self.search.preconfirmed = True
                     self._status("info", f"Will click {self.search.label} as soon as it's found")
+                elif self.mode == Mode.POINTER:
+                    self._right_click()
             elif intent:
                 self._do(Command(name=intent))
+
+    def _raised_while_talking(self, t_ms: float) -> bool:
+        """An eyebrow raise made while the mouth was moving is talking, not a yes or a click: people
+        raise their brows when they talk (about 0.8 a minute in Hung's test). Fails open: no face
+        (None) or a broken tracker lets the raise through."""
+        if self.mouth is None or not self._brow_guard:
+            return False
+        try:
+            f = self.mouth.moving_fraction(t_ms - self._brow_window_ms, t_ms)
+        except Exception as exc:
+            now = self.clock()
+            if now - self._brow_warned >= 60:
+                self._brow_warned = now
+                self._log(f"[brow] the mouth tracker failed ({exc}); not ignoring raises")
+            return False
+        if f is not None and f >= self._brow_min_moving:
+            self._log(f"[brow] ignored: you were talking ({f:.2f})")
+            return True
+        return False
 
     def on_transcript(self, transcript: dict) -> None:
         """One utterance can hold several things ("Click search box. Yeah."), so it is cut into
@@ -187,6 +239,9 @@ class ModeManager:
             self.tick()
             words = transcript.get("words") or [{"text": w, "conf": 1.0} for w in transcript["text"].split()]
             clauses = commands.split_clauses(words)
+            if self.mode == Mode.SCROLL:
+                self._scroll_transcript(transcript, clauses)
+                return
             if self.mode == Mode.PAUSED:
                 for c in clauses:
                     cmd = commands.parse(c.text, allow_targets=False)
@@ -197,7 +252,7 @@ class ModeManager:
             if self.mode == Mode.DICTATION:
                 whole = commands.parse(transcript["text"], allow_targets=True,
                                        target_verbs=commands.DICTATION_TARGET_VERBS)
-                if (whole and whole.name != "type_text" and len(clauses) <= 1
+                if (whole and whole.name not in ("type_text", "scroll_mode") and len(clauses) <= 1
                         and not (whole.name == "target"
                                  and len(whole.label.split()) > commands.DICTATION_MAX_LABEL_WORDS)):
                     if whole.name in ("yes", "no") and not (self.question or self.preview or self.search):
@@ -229,6 +284,11 @@ class ModeManager:
     def _clause_command(self, c) -> Command | None:
         if c.triggered or self.mode == Mode.POINTER:
             cmd = commands.parse(c.text, allow_targets=self.mode in (Mode.POINTER, Mode.DICTATION))
+            if cmd and cmd.name == "scroll_mode" and self.mode == Mode.DICTATION:
+                return None   # never from Dictation: "scroll" is just a word there
+            if (cmd is None and self.mode == Mode.POINTER and (c.starts_sentence or c.triggered)
+                    and commands.wants_scroll(c.text)):
+                return Command(name="scroll_mode")   # "help me scroll", "I want to scroll"
             if cmd and not c.triggered and not c.starts_sentence:
                 return None   # cut from mid-sentence: "I said click it" is talk, not a yes
             return cmd
@@ -266,6 +326,8 @@ class ModeManager:
                 self._ui(messages.CONFIRM, id=q.id, prompt=q.prompt, state="expired",
                          expires_in_s=0)
                 q.on_no()
+            if self.mode == Mode.SCROLL and now - self._scroll_seen >= self._scroll_idle_s:
+                self._leave_scroll()   # nothing scrolled for a while: back to where it started
             if self.search and now >= self.search.expires_at:
                 s, self.search = self.search, None
                 self._ui(messages.TARGET_NONE, label=s.label)
@@ -392,6 +454,20 @@ class ModeManager:
                       on_yes=lambda: self.bus.publish(topics.DELETE_VOICE_DATA, {}))
         elif name == "target":
             self._look_and_say(cmd.label)
+        elif name == "scroll_mode":
+            if m == Mode.POINTER:
+                self._return_mode = Mode.POINTER
+                self._enter_scroll()
+            elif m == Mode.MENU:
+                self._enter_scroll()   # back to where the menu was opened, afterwards
+            elif m == Mode.SCROLL:
+                self._scroll_seen = self.clock()
+        elif name == "leave_scroll":
+            if m == Mode.SCROLL:
+                self._leave_scroll()
+        elif name in ("dwell_off", "dwell_on"):
+            # the eyes service switches dwell (the left click) and shows the status itself
+            self.bus.publish(topics.DWELL, {"on": name == "dwell_on"})
         elif name == "use_original":
             if self.preview and self._use_clean:
                 self._use_clean = False
@@ -407,6 +483,51 @@ class ModeManager:
                 self._show_preview()
 
     # ------------------------------------------------------------ look-and-say
+    # ------------------------------------------------------------- scroll mode
+    def _enter_scroll(self) -> None:
+        self._scroll_seen = self.clock()
+        self._set_mode(Mode.SCROLL)
+
+    def _leave_scroll(self) -> None:
+        self._set_mode(self._return_mode if self._return_mode != Mode.SCROLL else Mode.POINTER)
+
+    def _scroll_transcript(self, transcript: dict, clauses) -> None:
+        """Scroll mode: "stop" / "done" / "stop scrolling" go back; "scroll up/down" glide and stay;
+        any other command goes back and then runs as usual; other speech is ignored."""
+        if commands.normalize(transcript["text"]) in SCROLL_EXIT:
+            self._leave_scroll()
+            return
+        cmd = commands.parse(transcript["text"], allow_targets=True)
+        for c in clauses:
+            if cmd is not None:
+                break
+            if c.starts_sentence or c.triggered:
+                cmd = commands.parse(c.text, allow_targets=True)
+        if cmd is None:
+            return
+        if cmd.name in ("scroll_up", "scroll_down", "scroll_mode"):
+            if cmd.name != "scroll_mode":
+                self._do(cmd)
+            self._scroll_seen = self.clock()
+            return
+        self._leave_scroll()
+        self.on_transcript(transcript)   # now in the mode it went back to: runs as usual
+
+    def on_ui_out(self, msg: dict) -> None:
+        """The eyes service's "scroll" message (about 10 a second in Scroll mode): still scrolling?"""
+        if msg.get("type") != messages.SCROLL:
+            return
+        with self._lock:
+            if self.mode == Mode.SCROLL and abs(float(msg.get("rate", 0.0))) >= SCROLL_ACTIVE_RATE:
+                self._scroll_seen = self.clock()
+
+    def _right_click(self) -> None:
+        g = self.last_gaze
+        if g is None:
+            self._status("info", "Can't right-click yet: the cursor position isn't known")
+            return
+        self._os(topics.OS_CLICK, x=int(g.x), y=int(g.y), button="right")
+
     def _click_target(self, label: str, x: int, y: int) -> None:
         self._last_click = (label, self.clock())
         self._os(topics.OS_CLICK, x=x, y=y)

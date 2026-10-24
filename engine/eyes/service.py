@@ -144,6 +144,7 @@ class EyesService:
         bus.subscribe(topics.from_ui(messages.CALIBRATE), self.on_calibrate)
         bus.subscribe(topics.from_ui(messages.SETTINGS), self.on_settings)
         bus.subscribe(topics.OS_CLICK, self.on_click)
+        bus.subscribe(topics.DWELL, lambda m: self.set_dwell(bool(m.get("on"))))   # "stop/start clicking"
 
     # ------------------------------------------------------------------ setup
     @staticmethod

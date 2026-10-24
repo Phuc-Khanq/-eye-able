@@ -44,7 +44,8 @@ class Engine:
             self.rewrite = RewriteWorker(bus, rewriter or Rewriter(settings), settings=settings)
         # 1. core: the mode manager turns gaze, gestures and transcripts into actions
         self.mode_manager = ModeManager(
-            bus, rewrite_wait_s=float(getattr(settings, "rewrite_wait_s", 1.5)) if rewrite else None)
+            bus, settings=settings,
+            rewrite_wait_s=float(getattr(settings, "rewrite_wait_s", 1.5)) if rewrite else None)
         # 2. eyes (Khang and Hung): camera -> face_mesh -> eye_features / head_pose -> pointer ->
         #    the cursor, plus head_gestures; UI-Venus answers target requests; os_output carries out
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
@@ -60,6 +61,7 @@ class Engine:
             self.os_output = OsOutput(bus, driver=self.eyes.driver, scroller=self.eyes.scroller)
             # Was the user's mouth moving? For the voice route's "only the user's voice" gate.
             self.mouth = MouthTracker(bus)
+            self.mode_manager.mouth = self.mouth     # an eyebrow raise while talking is ignored
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
         #    (without eyes, mouth is None: no gate, every word counts)
         self.dictation = DictationWorker(bus, dictation or Dictation(settings), mouth=self.mouth,

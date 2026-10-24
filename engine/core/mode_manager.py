@@ -296,6 +296,15 @@ class ModeManager:
             done, last, i = False, None, 0
             while i < len(clauses):
                 c = clauses[i]
+                if (self.mode == Mode.POINTER and c.starts_sentence
+                        and commands.normalize(c.text) in commands.TYPE_VERBS):
+                    # "Dictate. See you at noon.": Whisper's period cut the verb off its words
+                    rest = [w for later in clauses[i + 1:] for w in later.words]
+                    if rest:
+                        self._add_to_preview(rest)
+                    else:
+                        self._status("info", 'Say what to type right after "dictate"')
+                    return
                 cmd = self._clause_command(c)
                 if cmd is None:
                     if self.mode == Mode.DICTATION:

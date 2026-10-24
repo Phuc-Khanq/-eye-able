@@ -306,5 +306,43 @@ class TestClickItSomethingIsYes(Base):
         self.assertEqual(parse("click it now please").name, "click_here")
 
 
+class TestDictateWithAPeriod(Base):
+    """"Dictate. See you at noon." typed nothing: Whisper's period cut "Dictate." off its words."""
+
+    def test_the_words_after_the_period_are_the_one_shot(self):
+        for text, want in [("Dictate. See you at noon.", "See you at noon."),
+                           ("Type. See you at noon.", "See you at noon."),
+                           ("Dictate, see you at noon.", "see you at noon."),
+                           ("Um, dictate. Running late. Sorry!", "Running late. Sorry!")]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.say(text)
+                self.assertEqual(self.mm._preview_text(), want)
+                self.assertEqual(self.os(), [])                        # a preview: "yes" types it
+                self.say("yes")
+                self.assertEqual(self.os(), [(topics.OS_TYPE, {"text": want + " "})])
+
+    def test_a_bare_dictate_says_what_to_do(self):
+        self.say("Dictate.")
+        self.assertEqual(self.mm.preview, [])
+        self.assertEqual(self.bus.ui(messages.STATUS)[-1]["text"], 'Say what to type right after "dictate"')
+
+    def test_while_dictating_it_stays_text(self):
+        self.say("start dictation")
+        self.say("Type. See you at noon.")
+        self.assertEqual(self.mm._preview_text(), "Type. See you at noon.")
+
+    def test_mid_sentence_and_ordinary_speech_stay_ordinary(self):
+        for text in ["I said dictate. See you.", "Type of food matters.", "I like to type. Every day."]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.say(text)
+                self.assertEqual(self.mm.preview, [])
+
+    def test_without_a_period_as_before(self):
+        self.say("dictate see you at noon")
+        self.assertEqual(self.mm._preview_text(), "see you at noon")
+
+
 if __name__ == "__main__":
     unittest.main()

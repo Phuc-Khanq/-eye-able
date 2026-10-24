@@ -14,8 +14,9 @@ APIs: re, urllib.parse (standard library only)
 Short list, strict matching:
   * "open / start / launch <app>" only for a name in settings.launch_apps (or settings.launch_aliases).
     Any other name returns None, so "open compose" stays look-and-say (UI-Venus finds a button).
-  * "go to <site>": one clean host name ("youtube.com", "YouTube dot com", "youtube" -> youtube.com),
-    optionally with a path. Only ever https://.
+  * "go to <site>": one clean host name ("youtube.com", "YouTube dot com"), optionally with a path, or a
+    one-word name from settings.launch_sites ("youtube" -> youtube.com). Any other word with no dot is
+    not a site: "go to sleep" is None. Only ever https://.
   * "search for <words>" / "search <words>": settings.launch_search_url with the words url-encoded.
   * The WHOLE utterance must be the command, like commands.py: "I want to open Chrome tomorrow" is None.
   * Fixed commands always win: "open menu", "start dictation", "go back" are never launches.
@@ -74,12 +75,14 @@ def _app(rest: list[str], settings) -> dict | None:
     return {"app": name} if name in apps else None
 
 
-def _site(rest: list[str]) -> dict | None:
+def _site(rest: list[str], settings) -> dict | None:
     if len(rest) != 1 or not _HOST.match(rest[0]):
         return None
     host, _, path = rest[0].partition("/")
-    if "." not in host:
-        host += ".com"                                           # "go to youtube" -> youtube.com
+    if "." not in host:                                          # "go to youtube" -> youtube.com
+        host = str((getattr(settings, "launch_sites", {}) or {}).get(host, ""))
+        if not _HOST.match(host) or "." not in host:
+            return None                                          # "go to sleep": not a site
     return {"url": f"https://{host}" + (f"/{path}" if path else "")}
 
 
@@ -111,7 +114,7 @@ def match(text: str, settings=None) -> dict | None:
     if first in VERBS:
         return _app(rest, settings)
     if first == "go" and rest[0] == "to":
-        return _site(rest[1:])
+        return _site(rest[1:], settings)
     if first == "search":
         return _search(rest, settings)
     return None

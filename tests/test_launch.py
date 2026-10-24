@@ -86,6 +86,8 @@ class TestSites(unittest.TestCase):
             "go to YouTube.com.": "https://youtube.com", "um, go to gmail.com please": "https://gmail.com",
             "go to youtube.com/feed/trending": "https://youtube.com/feed/trending",
             "go to my-site.org": "https://my-site.org",
+            "go to Gmail": "https://mail.google.com", "Go to Google.": "https://google.com",
+            "go to Wikipedia": "https://wikipedia.org",
         }
         for text, url in cases.items():
             with self.subTest(text=text):
@@ -97,6 +99,18 @@ class TestSites(unittest.TestCase):
                      "go to you tube dot com", "go to youtube..com"]:
             with self.subTest(text=text):
                 self.assertIsNone(match(text, S))
+
+    def test_a_word_with_no_dot_is_a_site_only_if_listed(self):
+        for text in ["go to sleep", "Go to bed.", "go to work", "go to school", "go to youtub", "go to sleep/now"]:
+            with self.subTest(text=text):
+                self.assertIsNone(match(text, S))
+        mine = SimpleNamespace(launch_apps={}, launch_aliases={}, launch_search_url=S.launch_search_url,
+                               launch_sites={"news": "bbc.co.uk", "bad": "not a host", "nodot": "localhost"})
+        self.assertEqual(match("go to news", mine), {"url": "https://bbc.co.uk"})
+        self.assertIsNone(match("go to youtube", mine))
+        self.assertIsNone(match("go to bad", mine))
+        self.assertIsNone(match("go to nodot", mine))
+        self.assertEqual(match("go to youtube.com", mine), {"url": "https://youtube.com"})   # a dot needs no list
 
     def test_only_https(self):
         for text in ["go to youtube.com", "go to youtube", "search for cats"]:

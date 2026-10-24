@@ -100,6 +100,14 @@ class Settings:
         "email": "mail",
         "outlook": "mail",
     })
+    launch_sites: dict = field(default_factory=lambda: {   # "go to YouTube": one-word sites that need no ".com";
+        "youtube": "youtube.com",                          # any other word with no dot is not a site
+        "google": "google.com",                            # ("go to sleep" opens nothing)
+        "gmail": "mail.google.com",
+        "wikipedia": "wikipedia.org",
+        "facebook": "facebook.com",
+        "netflix": "netflix.com",
+    })
     launch_search_url: str = "https://www.google.com/search?q={q}"   # "search for <words>"; {q} = the words
 
     # Engine <-> UI

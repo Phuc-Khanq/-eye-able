@@ -9,6 +9,7 @@ plus the asyncio loop for the WebSocket server. Run with: python -m engine.main
                                            # they go straight to voice.transcript, so the mouth gate never sees them)
     python -m engine.main --confirm nod    # say yes with a nod instead of an eyebrow raise (or "both")
     python -m engine.main --no-dwell       # resting the cursor doesn't click (dwell = left click is on by default)
+    python -m engine.main --no-rewrite     # type dictation as heard, without the clean-up model
 """
 from __future__ import annotations
 
@@ -30,12 +31,20 @@ class Engine:
 
     def __init__(self, bus, settings=settings, dictation=None, sd=None, mic_settings=None,
                  vad=None, warm_up: bool = True, eyes: bool = False, pointer: str = "head",
-                 dwell: bool = True, confirm: str = "brow") -> None:
+                 dwell: bool = True, confirm: str = "brow", rewrite: bool = False, rewriter=None) -> None:
         self.bus = bus
         self.warm_up = warm_up
         # Start order matters only for subscriptions; nothing is published until start().
+        # 0. dictation clean-up (Khoi): a small local model (Qwen2.5-1.5B on the GPU) tidies the preview
+        #    before it's typed; "yes" waits at most rewrite_wait_s for it. Off by default (rewrite=False),
+        #    so tests never load a model; run() turns it on from settings.rewrite_dictation.
+        self.rewrite = None
+        if rewrite:
+            from engine.voice.rewrite import Rewriter, RewriteWorker
+            self.rewrite = RewriteWorker(bus, rewriter or Rewriter(settings), settings=settings)
         # 1. core: the mode manager turns gaze, gestures and transcripts into actions
-        self.mode_manager = ModeManager(bus)
+        self.mode_manager = ModeManager(
+            bus, rewrite_wait_s=float(getattr(settings, "rewrite_wait_s", 1.5)) if rewrite else None)
         # 2. eyes (Khang and Hung): camera -> face_mesh -> eye_features / head_pose -> pointer ->
         #    the cursor, plus head_gestures; UI-Venus answers target requests; os_output carries out
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
@@ -66,6 +75,8 @@ class Engine:
             self.targets.start()                     # UI-Venus loads on its own worker thread
             self.eyes.start()                        # camera thread and the cursor glide
         self.dictation.start(warm_up=self.warm_up)   # Whisper loads on its own thread
+        if self.rewrite:
+            self.rewrite.start(warm_up=self.warm_up)  # the clean-up model loads on its own thread
         if listen:
             try:
                 self.audio_in.start()
@@ -75,6 +86,8 @@ class Engine:
     def stop(self) -> None:
         self.audio_in.stop()
         self.dictation.stop()
+        if self.rewrite:
+            self.rewrite.stop()
         self.mode_manager.stop()
         if self.eyes:
             self.eyes.stop()
@@ -133,6 +146,8 @@ def log_to_console(bus) -> None:
         elif t == messages.DICTATION_PREVIEW and m["words"]:
             text = " ".join(w["text"] for w in m["words"])
             print(f"[preview] {text}   (raise your eyebrows or say \"yes\" to type it, \"no\" to drop it)")
+            if m.get("cleaned"):
+                print(f"          cleaned up from: {m.get('original', '')!r}   (\"use original\" types your own words)")
         elif t == messages.CALIB_RESULT:
             print(f"[calibrate] {'done' if m['ok'] else 'canceled'}")
 
@@ -143,6 +158,8 @@ def log_to_console(bus) -> None:
     bus.subscribe(topics.OS_TYPE, lambda p: print(f"[type] {p['text']!r}"))
     bus.subscribe(topics.OS_KEY, lambda p: print(f"[key] {p['key']}"))
     bus.subscribe(topics.OS_SCROLL, lambda p: print(f"[scroll] {p['direction']}"))
+    bus.subscribe(topics.REWRITE_RESULT, lambda r: print(
+        f"[clean-up] {'used' if r['used'] else 'not used (kept your words)'} in {r['ms']:.0f} ms"))
 
 
 def read_stdin(bus, stop: threading.Event, delay_s: float = 3.0) -> None:
@@ -161,7 +178,7 @@ def read_stdin(bus, stop: threading.Event, delay_s: float = 3.0) -> None:
 
 
 async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head", dwell: bool = True,
-              stdin: bool = False, confirm: str = "brow") -> None:
+              stdin: bool = False, confirm: str = "brow", rewrite: bool = False) -> None:
     bus = EventBus()
     relay = WebSocketRelay(bus)
     await relay.start(settings.ws_host, settings.ws_port)
@@ -178,11 +195,11 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
         except Exception as exc:
             raise SystemExit(f"Can't load the speech detector: {exc}")
         engine = Engine(bus, settings, mic_settings=MicSettings(-1, wav, "file", rate, channels), vad=vad,
-                        eyes=eyes, pointer=pointer, dwell=dwell, confirm=confirm)
+                        eyes=eyes, pointer=pointer, dwell=dwell, confirm=confirm, rewrite=rewrite)
         engine.start(listen=False)
         threading.Thread(target=play_wav, args=(engine.audio_in, data, rate, stop), daemon=True).start()
     else:
-        engine = Engine(bus, settings, eyes=eyes, pointer=pointer, dwell=dwell, confirm=confirm)
+        engine = Engine(bus, settings, eyes=eyes, pointer=pointer, dwell=dwell, confirm=confirm, rewrite=rewrite)
         engine.start()
     if stdin:
         threading.Thread(target=read_stdin, args=(bus, stop), daemon=True).start()
@@ -207,10 +224,14 @@ def main() -> None:
     p.add_argument("--stdin", action="store_true", help="typed lines count as heard speech (testing)")
     p.add_argument("--confirm", choices=["brow", "nod", "both"], default="brow",
                    help="what says yes besides your voice: eyebrow raise (default), nod, or either")
+    p.add_argument("--rewrite", action=argparse.BooleanOptionalAction,
+                   default=bool(getattr(settings, "rewrite_dictation", True)),
+                   help="clean up dictated text with a small local model before it's typed (Qwen2.5-1.5B on the "
+                        "GPU, downloaded once, about 3 GB); on by default (rewrite_dictation), --no-rewrite turns it off")
     args = p.parse_args()
     try:
         asyncio.run(run(args.wav, eyes=not args.no_eyes, pointer=args.pointer, dwell=args.dwell,
-                        stdin=args.stdin, confirm=args.confirm))
+                        stdin=args.stdin, confirm=args.confirm, rewrite=args.rewrite))
     except KeyboardInterrupt:
         print("Engine stopped.")
     except OSError as exc:

@@ -4,6 +4,7 @@ thread, the mode manager and audio_in, with fakes only for Whisper, the mic and 
 Run with: python -m unittest tests.test_engine
 """
 import threading
+import time
 import unittest
 from types import SimpleNamespace
 
@@ -112,6 +113,47 @@ class TestEngine(unittest.TestCase):
         try:
             play_wav(engine.audio_in, speech, 16000, threading.Event(), realtime=False)
             self.assertTrue(rec.utterances.acquire(timeout=5))
+        finally:
+            engine.stop()
+
+    def test_dictation_clean_up_is_off_unless_asked(self):
+        engine = make_engine(EventBus(), sd=FakeSD())
+        self.assertIsNone(engine.rewrite)
+        self.assertIsNone(engine.mode_manager.rewrite_wait_s)
+
+    def test_dictation_clean_up_wired_end_to_end(self):
+        """rewrite=True: the preview shows the clean-up, and "yes" types the clean text."""
+        from tests.test_rewrite_worker import FakeRewriter   # upper-cases the text
+
+        bus = EventBus()
+        engine = make_engine(bus, sd=FakeSD(), rewrite=True, rewriter=FakeRewriter())
+        rec = Recorder(bus)
+        results = threading.Semaphore(0)
+        bus.subscribe(topics.REWRITE_RESULT, lambda r: results.release())
+        engine.start()
+        try:
+            self.assertEqual(engine.mode_manager.rewrite_wait_s, 1.5)
+            for text in ("start dictation", "hello world"):
+                bus.publish(topics.UTTERANCE, text)
+                self.assertTrue(rec.transcripts.acquire(timeout=5))
+            self.assertTrue(results.acquire(timeout=5))
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:   # the result reaches the mode manager on the worker's thread
+                previews = [p for t, p in rec.log if t == topics.TO_UI and p["type"] == messages.DICTATION_PREVIEW]
+                if previews and previews[-1].get("cleaned"):
+                    break
+                time.sleep(0.02)
+            last = previews[-1]
+            self.assertTrue(last.get("cleaned"))
+            self.assertEqual(" ".join(w["text"] for w in last["words"]), "HELLO WORLD")
+            self.assertEqual(last["original"], "hello world")
+            bus.publish(topics.UTTERANCE, "yes")
+            self.assertTrue(rec.transcripts.acquire(timeout=5))
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not any(t == topics.OS_TYPE for t, _ in rec.os_actions()):
+                time.sleep(0.02)
+            typed = [p["text"] for t, p in rec.os_actions() if t == topics.OS_TYPE]
+            self.assertEqual(typed, ["HELLO WORLD "])
         finally:
             engine.stop()
 

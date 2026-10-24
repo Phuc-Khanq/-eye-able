@@ -182,5 +182,21 @@ class TestPointerChatter(Base):
         self.assertEqual(self.searches(), ["Send", "Compose"])
 
 
+class TestTypeOf(Base):
+    """Fix 5: "Type of food matters." made a one-shot preview "of food matters."."""
+
+    def test_type_of_is_ordinary_speech(self):
+        for text in ["Type of food matters.", "type of thing I like", "dictate of course"]:
+            with self.subTest(text=text):
+                self.assertIsNone(parse(text))
+        self.say("Type of food matters.")
+        self.assertEqual(self.mm.preview, [])
+
+    def test_one_shot_typing_still_works(self):
+        self.assertEqual(parse("Type see you at noon.").label, "see you at noon")
+        self.say("type offer accepted")                       # "of..." as part of a word is fine
+        self.assertEqual(self.mm._preview_text(), "offer accepted")
+
+
 if __name__ == "__main__":
     unittest.main()

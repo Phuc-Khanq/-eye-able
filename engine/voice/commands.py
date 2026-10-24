@@ -236,6 +236,8 @@ def _collapse(clean: str) -> str:
 
 def _type(clean: str) -> Command | None:
     first, _, rest = clean.partition(" ")
+    if rest.split(" ", 1)[0] == "of":      # "type of food", "dictate of course": ordinary speech
+        return None
     return Command(name="type_text", label=rest) if first in TYPE_VERBS and rest else None
 
 

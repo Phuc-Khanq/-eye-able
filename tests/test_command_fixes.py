@@ -6,7 +6,7 @@ fix: the exact phrase that went wrong, and near-misses both ways so the feature 
 import unittest
 
 from engine.core import messages, topics
-from engine.core.mode_manager import ModeManager
+from engine.core.mode_manager import Mode, ModeManager
 from engine.core.types import GazePoint, TargetResult
 from engine.voice.commands import parse
 from engine.voice.dictation import Dictation, DictationWorker
@@ -322,10 +322,15 @@ class TestDictateWithAPeriod(Base):
                 self.say("yes")
                 self.assertEqual(self.os(), [(topics.OS_TYPE, {"text": want + " "})])
 
-    def test_a_bare_dictate_says_what_to_do(self):
+    def test_a_bare_dictate_starts_dictation(self):
+        # Khang's rule (974960b): "dictate" alone is start dictation; only words after it make the one-shot
         self.say("Dictate.")
+        self.assertEqual(self.mm.mode, Mode.DICTATION)
         self.assertEqual(self.mm.preview, [])
-        self.assertEqual(self.bus.ui(messages.STATUS)[-1]["text"], 'Say what to type right after "dictate"')
+
+    def test_a_yes_at_the_end_answers_like_without_the_period(self):
+        self.say("Dictate. How are you. Yes.")
+        self.assertEqual(self.os(), [(topics.OS_TYPE, {"text": "How are you. "})])
 
     def test_while_dictating_it_stays_text(self):
         self.say("start dictation")

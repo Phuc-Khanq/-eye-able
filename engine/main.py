@@ -16,7 +16,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
+import sys
 import threading
+
+# Quieter console: MediaPipe's C++ warnings and the model loading bars are noise in a live run (and PowerShell
+# shows every stderr line in red). Real errors still print. Set before MediaPipe or transformers load.
+os.environ.setdefault("GLOG_minloglevel", "2")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 
 from engine.config import settings
 from engine.core import messages, topics
@@ -51,7 +60,7 @@ class Engine:
         #    the cursor, plus head_gestures; UI-Venus answers target requests; os_output carries out
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
         #    the cursor or the keyboard; run() turns it on.
-        self.eyes = self.targets = self.os_output = self.mouth = self.meter = None
+        self.eyes = self.targets = self.os_output = self.mouth = self.meter = self.card = None
         if eyes:
             from engine.eyes.mouth import MouthTracker
             from engine.eyes.os_output import OsOutput
@@ -63,9 +72,16 @@ class Engine:
             # Was the user's mouth moving? For the voice route's "only the user's voice" gate.
             self.mouth = MouthTracker(bus)
             self.mode_manager.mouth = self.mouth     # an eyebrow raise while talking is ignored
-            if getattr(settings, "dwell_meter", True):
+            card = bool(getattr(settings, "dictation_card", True))
+            if getattr(settings, "dwell_meter", True) or card:
                 from engine.eyes.dwell_meter import DwellMeter
                 self.meter = DwellMeter(bus)         # the dwell ring at the cursor, without the Electron UI
+            if card:
+                from engine.eyes.dictation_card import DictationCard
+                self.card = DictationCard(bus, hide_from_capture=bool(getattr(settings, "card_hide_from_capture", True)),
+                                          opacity=float(getattr(settings, "card_opacity", 0.82)),
+                                          position=str(getattr(settings, "card_position", "top")))
+                self.meter.add_window(self.card.attach)   # what was heard and what will be typed, on screen
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
         #    (without eyes, mouth is None: no gate, every word counts)
         self.dictation = DictationWorker(bus, dictation or Dictation(settings), mouth=self.mouth,
@@ -149,8 +165,12 @@ def log_to_console(bus) -> None:
             print(f"[snap] click at ({m['x']}, {m['y']})" if m.get("snap")
                   else f"[ui-venus] found '{m['label']}' at ({m['x']}, {m['y']})")
         elif t == messages.TARGET_NONE:
-            print("[snap] nothing to snap to: clicking where the cursor is" if m.get("snap")
-                  else f"[ui-venus] couldn't find '{m['label']}'")
+            if m.get("snap") and m.get("timeout"):
+                print("[snap] gave up waiting for UI-Venus: no click")
+            elif m.get("snap"):
+                print("[snap] nothing to snap to: clicking where the cursor is")
+            else:
+                print(f"[ui-venus] couldn't find '{m['label']}'")
         elif t == messages.CONFIRM:
             hint = (f"   (raise your eyebrows, or say \"yes\" / \"click it\", within {CONFIRM_TIMEOUT_S:.0f} s; "
                     "\"no\" or a head shake cancels)" if m["state"] == "open" else "")
@@ -245,6 +265,11 @@ def main() -> None:
                    help="clean up dictated text with a small local model before it's typed (Qwen2.5-1.5B on the "
                         "GPU, downloaded once, about 3 GB); on by default (rewrite_dictation), --no-rewrite turns it off")
     args = p.parse_args()
+    for stream in (sys.stdout, sys.stderr):   # a word the Windows console can't show prints as "?", never crashes
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     settings.blink_click = args.blink
     try:
         asyncio.run(run(args.wav, eyes=not args.no_eyes, pointer=args.pointer, dwell=args.dwell,

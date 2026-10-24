@@ -6,7 +6,7 @@ Each laptop can override any setting in config.local.json at the repo root
      "whisper_compute_type": "int8", "use_ui_venus": false}
 """
 import json
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 
@@ -30,13 +30,22 @@ class Settings:
     brow_click: str = "left"       # "left": a raise with nothing waiting is the snap left click; "right": the old right click
     snap_trust_cursor: bool = True  # already on a link or button: click there without asking UI-Venus
     snap_max_px: int = 150         # UI-Venus may move a snap click at most this far
-    blink_click: bool = False      # a long, deliberate blink (0.4 to 1.2 s, both eyes) = the same click as an eyebrow
-                                   # raise; off until tests.blink_click_check passes on your face (or run with --blink)
-    mouth_click: bool = True       # open the mouth and close it again (0.3 to 1.5 s) = right click
+    blink_click: bool = True       # a long, deliberate blink (0.4 to 1.2 s, both eyes) = the same click as an eyebrow
+                                   # raise (on since Khang's live test, Oct 24; --no-blink turns it off)
+    blink_rise: float = 0.20       # the blink click: how far over your open level the eyes must close; and how
+    blink_closed_abs: float = 0.55  # shut they must get (tests.blink_record + tests.blink_replay suggest yours)
+    mouth_click: bool = False      # open the mouth and close it again (0.3 to 1.5 s) = right click; off: it fired
+                                   # while talking in the live test (Oct 24). Right click is "right click" by voice
     dwell_ms: int = 1000           # with --dwell: rest the cursor this long = left click (off by default)
     dwell_clickable_only: bool = True   # Windows: dwell only on links, buttons, tabs... (engine/eyes/clickable.py);
                                         # false for canvas apps and games, which show neither
     dwell_uia: bool = True         # also ask Windows UI Automation (native buttons, text boxes; pip install uiautomation)
+    dictation_card: bool = True    # the box at the bottom of the screen: what was heard and what will be typed
+                                   # (engine/eyes/dictation_card.py); false once Nhi's Electron bubble shows it
+    card_opacity: float = 0.82     # 0.3 to 1: lower = more see-through
+    card_position: str = "top"     # "top" or "bottom" center of the screen
+    card_hide_from_capture: bool = True   # keep the card out of screenshots so UI-Venus never reads it; this also
+                                          # hides it from OBS, so set false while recording the demo video
     dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py): the snap click's
                                    # spinner and flash, and the dwell fill; no Electron UI needed
     sensitivity: float = 1.0
@@ -71,6 +80,27 @@ class Settings:
     rewrite_device: str = "cuda"       # "cpu" works but is slow (seconds per sentence)
     rewrite_wait_s: float = 1.5        # "yes" waits at most this long for the clean-up, then types what's showing
     rewrite_max_s: float = 3.0         # a clean-up that takes longer is cut off and not used
+
+    # Opening apps and sites by voice (engine/voice/launch.py; engine/eyes/os_output.py starts them)
+    # "open Chrome" starts an app only if its name is here; any other name stays look-and-say.
+    launch_apps: dict = field(default_factory=lambda: {
+        "chrome": "chrome.exe",            # os.startfile finds these through Windows App Paths
+        "edge": "msedge.exe",
+        "notepad": "notepad.exe",
+        "file explorer": "explorer.exe",
+        "settings": "ms-settings:",        # Windows Settings
+        "mail": "mailto:",                 # the default mail app
+    })
+    launch_aliases: dict = field(default_factory=lambda: {   # other ways to say a launch_apps name
+        "google chrome": "chrome",
+        "microsoft edge": "edge",
+        "explorer": "file explorer",
+        "files": "file explorer",
+        "my files": "file explorer",
+        "email": "mail",
+        "outlook": "mail",
+    })
+    launch_search_url: str = "https://www.google.com/search?q={q}"   # "search for <words>"; {q} = the words
 
     # Engine <-> UI
     ws_host: str = "127.0.0.1"

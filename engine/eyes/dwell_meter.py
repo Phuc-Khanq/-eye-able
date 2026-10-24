@@ -73,7 +73,12 @@ class DwellMeter:
         self._searching_since: float | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._extras = []    # other on-screen windows sharing this Tk thread (the dictation card)
         bus.subscribe(topics.TO_UI, self.on_ui)
+
+    def add_window(self, attach) -> None:
+        """attach(root) is called on the Tk thread once the root exists, before start() returns windows."""
+        self._extras.append(attach)
 
     def on_ui(self, msg: dict) -> None:
         """Any thread; only sets fields that the Tk thread reads."""
@@ -126,6 +131,12 @@ class DwellMeter:
             canvas.pack()
             root.update_idletasks()
             hwnd = _click_through(root)
+            for attach in self._extras:
+                try:
+                    attach(root)
+                except Exception as exc:
+                    self.bus.publish(topics.TO_UI, messages.make(
+                        messages.STATUS, level="warn", text=f"An on-screen window failed ({type(exc).__name__}: {exc})"))
         except Exception as exc:
             self.bus.publish(topics.TO_UI, messages.make(
                 messages.STATUS, level="warn", text=f"No dwell ring on screen ({type(exc).__name__}: {exc})"))

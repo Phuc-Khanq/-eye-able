@@ -214,7 +214,13 @@ class DictationWorker:
                 audio, span = self._queue.get(timeout=0.2)
             except queue.Empty:
                 continue
-            self.process(audio, span)
+            try:
+                self.process(audio, span)
+            except Exception as exc:           # one bad utterance must never end the thread: before this,
+                try:                           # a word the Windows console couldn't print killed dictation
+                    self._error(f"Dictation hit an error and skipped one utterance: {type(exc).__name__}: {exc}")
+                except Exception:
+                    pass
 
     def process(self, audio, span: dict | None = None) -> None:
         """Transcribe one utterance and publish it. Tests call this directly."""

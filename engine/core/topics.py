@@ -41,6 +41,8 @@ OS_TYPE = "os.type"                 # {"text": str}
 OS_KEY = "os.key"                   # {"key": "enter" | "backspace"}
 OS_SCROLL = "os.scroll"             # {"direction": "up" | "down"}
 OS_UNDO = "os.undo"                 # {} (Ctrl+Z)
+OS_LAUNCH = "os.launch"             # {"app": str} (a key of settings.launch_apps) or {"url": str} (https only);
+                                    # engine/voice/launch.py's match() builds it from "open Chrome", "go to ..."
 
 # Engine <-> UI. events.serve_websocket sends every TO_UI payload (a messages.make()
 # dict) to the UI, and publishes each message from the UI on from_ui(its "type").

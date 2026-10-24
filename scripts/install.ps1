@@ -1,7 +1,9 @@
 # One-command setup. Run from the repo root:
 #   Set-ExecutionPolicy -Scope Process Bypass
-#   .\scripts\install.ps1
+#   .\scripts\install.ps1            # demo laptop: PyTorch for the RTX 5080 (2.8 GB)
+#   .\scripts\install.ps1 -CpuOnly   # coding laptops: small CPU-only PyTorch
 # Safe to rerun, for example after requirements change.
+param([switch]$CpuOnly)
 $ErrorActionPreference = "Stop"
 
 function Step($what, [scriptblock]$cmd) {
@@ -15,8 +17,17 @@ Step "Create .venv" { py -3.11 -m venv .venv }
 $py = ".\.venv\Scripts\python.exe"
 Step "Upgrade pip" { & $py -m pip install --upgrade pip }
 
-# PyTorch built for CUDA 12.8 (RTX 50-series GPUs need it; also runs on CPU-only laptops)
-Step "Install PyTorch (large download)" { & $py -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128 }
+# PyTorch: CUDA 12.8 build for the demo laptop (RTX 50-series needs it), small CPU build otherwise
+if ($CpuOnly) {
+    Step "Install PyTorch, CPU only" { & $py -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu }
+    if (-not (Test-Path "config.local.json")) {
+        '{"whisper_device": "cpu", "whisper_model": "small", "whisper_compute_type": "int8", "use_ui_venus": false}' |
+            Set-Content -Encoding ascii config.local.json
+        Write-Host "Created config.local.json for a CPU-only laptop"
+    }
+} else {
+    Step "Install PyTorch for CUDA 12.8 (large download)" { & $py -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128 }
+}
 
 # Exact versions from the demo laptop once they exist, otherwise the loose list
 if (Test-Path "requirements.lock.txt") {

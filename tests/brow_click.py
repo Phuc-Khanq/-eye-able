@@ -25,6 +25,9 @@ Keys (this window):
   C     = recenter (face the screen center, then press)
   + / - = raise threshold up / down (less / more sensitive)   [ / ] = hold time shorter / longer
   Q or Esc = quit: prints the summary and the values, and writes a numbers-only log to calibration/brow_logs/.
+
+Replay a log through the current dwell code (no camera): how many dwell clicks each part would get now.
+      .\\.venv\\Scripts\\python.exe -m tests.brow_click --replay calibration\\brow_logs\\<file>.csv
 """
 import argparse
 import math
@@ -66,7 +69,11 @@ TALK_TEXT = [
 def main() -> None:
     p = argparse.ArgumentParser(description="Eyebrow raise as a click: hits, drift and false clicks")
     p.add_argument("--camera", type=int, default=None)
+    p.add_argument("--replay", default=None, help="a log from calibration/brow_logs: re-count dwell clicks")
     args = p.parse_args()
+    if args.replay:
+        replay(args.replay)
+        return
 
     from engine.eyes import os_input
     from engine.eyes.brow_gesture import BrowRaiseDetector
@@ -146,10 +153,13 @@ def main() -> None:
                         dwell.disarm(*cursor)   # a right click: its menu opens under the cursor
                     phase = ("click" if test else "talk" if talk else "dwell" if dtest else "read" if read
                              else "-")
+                    live = test or dtest
+                    bxy = live["buttons"][live["i"]] if live else ("", "")
                     log.append((face.t_ms, round(cursor[0], 1), round(cursor[1], 1),
                                 round(brows.score, 3) if brows.score is not None else "",
                                 round(brows.rest, 3) if brows.rest is not None else "", int(raised), int(fired),
-                                phase, round(dwell.progress, 2), int(dwell_at is not None)))
+                                phase, round(dwell.progress, 2), int(dwell_at is not None),
+                                *(round(v, 1) if v != "" else "" for v in bxy)))
                 else:
                     brows.update(t_ms, {})
             now = time.monotonic()
@@ -324,7 +334,7 @@ def main() -> None:
             folder.mkdir(parents=True, exist_ok=True)
             path = folder / time.strftime("%Y%m%d-%H%M%S.csv")
             with open(path, "w", encoding="utf-8") as f:
-                f.write("t_ms,x,y,score,rest,raised,fired,phase,dwell,dwell_fired\n")
+                f.write("t_ms,x,y,score,rest,raised,fired,phase,dwell,dwell_fired,button_x,button_y\n")
                 f.writelines(",".join(map(str, row)) + "\n" for row in log)
             print(f"Log (numbers only): {path}")
         print("\n=== Eyebrow click ===")
@@ -355,6 +365,46 @@ def summary_line(rs: list[dict], freeze: bool) -> str:
                if drifts else "")
             + (f", {lost} buttons where the raise slid off" if lost else "")
             + (f", {dwell_first} dwell clicks before the raise" if dwell_first else ""))
+
+
+def replay(path: str) -> None:
+    """Feed a log's cursor through DwellClicker the way main() does and count dwell clicks per part."""
+    import csv
+
+    from engine.eyes.dwell_click import DwellClicker
+
+    names = {"click": "raise test (dwell before the raise)", "dwell": "dwell test", "read": "reading test",
+             "talk": "talk test", "-": "between tests"}
+    dwell, blocked = DwellClicker(), True
+    then: dict[str, int] = {}
+    now: dict[str, int] = {}
+    on_button: dict[str, int] = {}
+    with open(path, encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            t, x, y, phase = int(float(r["t_ms"])), float(r["x"]), float(r["y"]), r["phase"]
+            then[phase] = then.get(phase, 0) + int(r.get("dwell_fired") or 0)
+            if int(r["raised"]):
+                blocked = True
+                dwell.reset()
+                continue
+            if blocked:
+                blocked = False
+                dwell.disarm(x, y)
+            at = dwell.update(t, x, y)
+            if at is not None:
+                now[phase] = now.get(phase, 0) + 1
+                if r.get("button_x"):
+                    bx, by = float(r["button_x"]), float(r["button_y"])
+                    inside = abs(at[0] - bx) <= BUTTON / 2 and abs(at[1] - by) <= BUTTON / 2
+                    on_button[phase] = on_button.get(phase, 0) + int(inside)
+            if int(r["fired"]):
+                dwell.disarm(x, y)
+    print(f"Dwell clicks in {path}  (radius {dwell.radius_px:.0f} px, {dwell.dwell_ms} ms)")
+    print(f"  {'part':<38} {'when recorded':>13} {'current code':>13}")
+    for phase in ("dwell", "read", "talk", "click", "-"):
+        if phase in then or phase in now:
+            extra = f"   ({on_button[phase]} on the button)" if phase in on_button else ""
+            print(f"  {names.get(phase, phase):<38} {then.get(phase, 0):>13} {now.get(phase, 0):>13}{extra}")
 
 
 def dwell_line(rs: list[dict]) -> str:

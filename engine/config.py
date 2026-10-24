@@ -53,6 +53,8 @@ class Settings:
     card_position: str = "top"     # "top" or "bottom" center of the screen
     card_hide_from_capture: bool = True   # keep the card out of screenshots so UI-Venus never reads it; this also
                                           # hides it from OBS, so set false while recording the demo video
+    card_heard_outside_dictation: bool = False  # the card shows what the mic hears only in Dictation mode
+                                                # (true: also in Pointer mode, as before Oct 24 evening)
     dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py): the snap click's
                                    # spinner and flash, and the dwell fill; no Electron UI needed
     sensitivity: float = 1.0

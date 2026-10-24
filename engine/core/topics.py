@@ -41,6 +41,8 @@ OS_TYPE = "os.type"                 # {"text": str}
 OS_KEY = "os.key"                   # {"key": "enter" | "backspace"}
 OS_SCROLL = "os.scroll"             # {"direction": "up" | "down"}
 OS_UNDO = "os.undo"                 # {} (Ctrl+Z)
+OS_SYSTEM = "os.system"             # {"action": "volume_up" | "volume_down" | "mute" | "brightness_up" |
+                                    #  "brightness_down"} (media keys; the laptop screen's brightness)
 OS_LAUNCH = "os.launch"             # {"app": str} (a key of settings.launch_apps) or {"url": str} (https only);
                                     # engine/voice/launch.py's match() builds it from "open Chrome", "go to ..."
 

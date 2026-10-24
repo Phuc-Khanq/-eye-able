@@ -25,7 +25,15 @@ What each input means (one table per mode: GESTURES below):
              is a mouth gesture while the mic hears speech.
              brow_click "right" (settings) brings back the old raise = right click.
   Dictation  speech -> preview bubble; eyebrow raise, nod or "yes" inserts, shake or "no" discards;
-             "click <name>" still clicks (only "click": "open the door..." stays text)
+             "click <name>" still clicks (only "click": "open the door..." stays text). Ends with
+             "dictate off" / "stop dictation" (anywhere), or "close", "off", "turn off", "exit", "stop",
+             "done" said alone (commands.DICTATION_EXIT; only while dictating and no question is open)
+  Always     the mic is always on. In Pointer mode every utterance is checked for a command and anything
+             else is ignored (the card shows nothing until "dictate"). System and shortcut commands
+             work in Pointer mode and as a whole utterance in Dictation: "volume up/down", "mute",
+             "brightness up/down" (os.system); "copy", "paste", "new tab", "close tab", "refresh",
+             "switch window", "zoom in", "page down", ... (commands.KEY_SHORTCUTS, os.key);
+             "close window" asks first
   Menu       tilts and nods go to the UI's radial menu; shake closes it;
              the UI sends menu_select with the item
   Paused     everything is ignored except "resume" and the UI's set_mode
@@ -282,6 +290,10 @@ class ModeManager:
                     if cmd and cmd.name in PAUSED_COMMANDS:
                         self._do(cmd)
                         return
+                return
+            if (self.mode == Mode.DICTATION and not self.question
+                    and commands.normalize(transcript["text"]) in commands.DICTATION_EXIT):
+                self._do(Command(name="stop_dictation"))   # "Close." / "Off." / "Turn off." said alone
                 return
             if self.mode == Mode.DICTATION:
                 whole = commands.parse(transcript["text"], allow_targets=True,
@@ -561,6 +573,12 @@ class ModeManager:
             self._os(topics.OS_KEY, key="alt+left")
         elif name == "escape":
             self._os(topics.OS_KEY, key="esc")
+        elif name in commands.KEY_SHORTCUTS:          # "copy", "new tab", "refresh", "switch window", ...
+            self._os(topics.OS_KEY, key=commands.KEY_SHORTCUTS[name])
+        elif name in commands.SYSTEM_COMMANDS:        # "volume up", "mute", "brightness down", ...
+            self._os(topics.OS_SYSTEM, action=name)
+        elif name == "close_window":                  # Alt+F4 can close the wrong thing: ask first
+            self._ask("Close this window?", on_yes=lambda: self._os(topics.OS_KEY, key="alt+f4"))
         elif name in ("dwell_off", "dwell_on"):
             # the eyes service switches dwell (the left click) and shows the status itself
             self.bus.publish(topics.DWELL, {"on": name == "dwell_on"})

@@ -39,12 +39,48 @@ class TestCardModel(unittest.TestCase):
     def test_hidden_when_nothing_happens(self):
         self.assertEqual(self.m.view().kind, "hidden")
 
+    def dictating(self):
+        self.m.on_ui(messages.make(messages.MODE, mode="dictation"))
+
     def test_listening_shows_the_waveform_pill_only(self):
+        self.dictating()
         self.m.on_ui(messages.make(messages.LISTENING, level=0.5, speaking=True))
         v = self.m.view()
         self.assertEqual((v.kind, v.pill, v.listening, v.panel), ("listening", "Listening", True, False))
         self.clock.t += 1.0
+        self.assertEqual(self.m.view().kind, "mode")   # back to the Dictation pill
+
+    def test_outside_dictation_what_the_mic_hears_never_shows(self):
+        self.m.on_ui(messages.make(messages.LISTENING, level=0.5, speaking=True))
+        self.m.on_heard("volume up")
+        v = self.m.view()
+        self.assertEqual((v.kind, v.listening), ("hidden", False))
+        for mode in ("scroll", "paused", "menu"):
+            with self.subTest(mode=mode):
+                self.m.on_ui(messages.make(messages.MODE, mode=mode))
+                v = self.m.view()
+                self.assertNotIn(v.kind, ("heard", "listening"))
+                self.assertFalse(v.listening)
+
+    def test_saying_dictate_brings_the_card_and_what_it_hears(self):
+        self.m.on_heard("hello there")
         self.assertEqual(self.m.view().kind, "hidden")
+        self.dictating()
+        self.m.on_heard("see you at noon")
+        self.assertEqual((self.m.view().kind, self.m.view().chip), ("heard", "see you at noon"))
+        self.m.on_ui(messages.make(messages.MODE, mode="pointer"))     # "dictate off"
+        self.assertEqual(self.m.view().kind, "hidden")
+
+    def test_the_old_behaviour_is_a_setting(self):
+        m = CardModel(self.clock, heard_outside_dictation=True)
+        m.on_heard("new tab")
+        self.assertEqual(m.view().kind, "heard")
+
+    def test_questions_and_a_one_shot_preview_still_show_outside_dictation(self):
+        self.m.on_ui(preview("see", "you"))                  # "dictate see you" from Pointer mode
+        self.assertEqual(self.m.view().kind, "preview")
+        self.m.on_ui(confirm("q9", "open", "Close this window?"))
+        self.assertEqual(self.m.view().kind, "confirm")
 
     def test_the_waveform_scrolls_with_the_mic_level(self):
         self.m.on_ui(messages.make(messages.LISTENING, level=0.4, speaking=True))
@@ -55,11 +91,12 @@ class TestCardModel(unittest.TestCase):
         self.assertEqual(self.m.levels[-1], 0.0)
 
     def test_heard_words_show_in_the_chip_for_a_moment(self):
+        self.dictating()
         self.m.on_heard("new tab")
         v = self.m.view()
         self.assertEqual((v.kind, v.label, v.chip, v.panel), ("heard", "Heard", "new tab", True))
         self.clock.t += HEARD_S + 0.1
-        self.assertEqual(self.m.view().kind, "hidden")
+        self.assertEqual(self.m.view().kind, "mode")
 
     def test_preview_stays_with_actions_and_key_hint_and_marks_shaky_words(self):
         self.m.on_heard("Dictate meet at nine")
@@ -74,6 +111,7 @@ class TestCardModel(unittest.TestCase):
         self.assertTrue(v.keys)
 
     def test_preview_beats_listening_but_the_pill_still_shows_the_waveform(self):
+        self.dictating()
         self.m.on_ui(preview("hello"))
         self.m.on_ui(messages.make(messages.LISTENING, level=0.5, speaking=True))
         v = self.m.view()
@@ -105,7 +143,7 @@ class TestCardModel(unittest.TestCase):
         self.m.on_ui(messages.make(messages.MODE, mode="dictation"))
         v = self.m.view()
         self.assertEqual((v.kind, v.pill, v.panel), ("mode", "Dictation", False))
-        self.assertIn("stop dictation", v.pill_hint)
+        self.assertIn("dictate off", v.pill_hint)
 
 
 class TestConfirmQuestion(unittest.TestCase):
@@ -261,6 +299,7 @@ class TestCardOnTheBus(unittest.TestCase):
     def test_follows_the_engine_messages(self):
         bus, clock = FakeBus(), Clock()
         card = DictationCard(bus, clock=clock)
+        bus.publish(topics.TO_UI, messages.make(messages.MODE, mode="dictation"))
         bus.publish(topics.TRANSCRIPT, {"text": "new tab", "words": [], "ms": 1.0})
         self.assertEqual(card.view()[0].chip, "new tab")
         bus.publish(topics.TO_UI, preview("see", "you"))

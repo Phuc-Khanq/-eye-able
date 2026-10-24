@@ -38,9 +38,18 @@ FIXED_COMMANDS: dict[str, str] = {
     "dictation": "start_dictation",
     "dictate": "start_dictation",        # "dictate" alone; "dictate <words>" stays the one-shot
     "start typing": "start_dictation",
+    "dictate on": "start_dictation",
+    "dictation on": "start_dictation",
     "stop dictation": "stop_dictation",
     "stop typing": "stop_dictation",
     "done typing": "stop_dictation",
+    "dictate off": "stop_dictation",
+    "dictation off": "stop_dictation",
+    "stop dictating": "stop_dictation",
+    "end dictation": "stop_dictation",
+    "exit dictation": "stop_dictation",
+    "close dictation": "stop_dictation",
+    "turn off dictation": "stop_dictation",
     "pause": "pause",
     "paws": "pause",  # common Whisper mishearing
     "stop listening": "pause",
@@ -96,7 +105,106 @@ FIXED_COMMANDS: dict[str, str] = {
     "use original": "use_original",
     "use the original": "use_original",
     "clean it up": "clean_up",
+    # System controls (engine/eyes/os_output.py carries them out: media keys for volume, the laptop
+    # screen's brightness through Windows)
+    "volume up": "volume_up",
+    "turn it up": "volume_up",
+    "louder": "volume_up",
+    "volume down": "volume_down",
+    "turn it down": "volume_down",
+    "quieter": "volume_down",
+    "softer": "volume_down",
+    "mute": "mute",
+    "unmute": "mute",          # the mute key toggles
+    "brightness up": "brightness_up",
+    "brighter": "brightness_up",
+    "brightness down": "brightness_down",
+    "dimmer": "brightness_down",
+    "darker": "brightness_down",
+    # Keyboard shortcuts (KEY_SHORTCUTS below says which keys)
+    "copy": "key_copy",
+    "copy that": "key_copy",
+    "paste": "key_paste",
+    "paste it": "key_paste",
+    "cut": "key_cut",
+    "select all": "key_select_all",
+    "save": "key_save",
+    "save it": "key_save",
+    "find": "key_find",
+    "new tab": "key_new_tab",
+    "open new tab": "key_new_tab",
+    "close tab": "key_close_tab",
+    "reopen tab": "key_reopen_tab",
+    "next tab": "key_next_tab",
+    "previous tab": "key_previous_tab",
+    "last tab": "key_previous_tab",
+    "refresh": "key_refresh",
+    "reload": "key_refresh",
+    "refresh page": "key_refresh",
+    "go forward": "key_forward",
+    "switch window": "key_switch_window",
+    "switch windows": "key_switch_window",
+    "minimize": "key_minimize",
+    "minimize window": "key_minimize",
+    "maximize": "key_maximize",
+    "maximize window": "key_maximize",
+    "show desktop": "key_show_desktop",
+    "zoom in": "key_zoom_in",
+    "zoom out": "key_zoom_out",
+    "page up": "key_page_up",
+    "page down": "key_page_down",
+    "go to top": "key_top",
+    "go to the top": "key_top",
+    "go to bottom": "key_bottom",
+    "go to the bottom": "key_bottom",
+    "press enter": "key_enter",
+    "enter": "key_enter",
+    "press tab": "key_tab",
+    "backspace": "key_backspace",
+    "delete that": "key_backspace",
+    # Asks first: Alt+F4 can close the wrong thing (the mode manager asks "Close this window?")
+    "close window": "close_window",
+    "close this window": "close_window",
+    "close app": "close_window",
 }
+
+# Shortcut commands -> the keys os_input.combo presses (Windows; "cmd" is the Windows key)
+KEY_SHORTCUTS: dict[str, str] = {
+    "key_copy": "ctrl+c",
+    "key_paste": "ctrl+v",
+    "key_cut": "ctrl+x",
+    "key_select_all": "ctrl+a",
+    "key_save": "ctrl+s",
+    "key_find": "ctrl+f",
+    "key_new_tab": "ctrl+t",
+    "key_close_tab": "ctrl+w",
+    "key_reopen_tab": "ctrl+shift+t",
+    "key_next_tab": "ctrl+tab",
+    "key_previous_tab": "ctrl+shift+tab",
+    "key_refresh": "f5",
+    "key_forward": "alt+right",
+    "key_switch_window": "alt+tab",
+    "key_minimize": "cmd+down",
+    "key_maximize": "cmd+up",
+    "key_show_desktop": "cmd+d",
+    "key_zoom_in": "ctrl+=",
+    "key_zoom_out": "ctrl+-",
+    "key_page_up": "page_up",
+    "key_page_down": "page_down",
+    "key_top": "ctrl+home",
+    "key_bottom": "ctrl+end",
+    "key_enter": "enter",
+    "key_tab": "tab",
+    "key_backspace": "backspace",
+}
+
+# System commands -> the os.system action (os_output: volume by media keys, brightness through Windows)
+SYSTEM_COMMANDS = {"volume_up", "volume_down", "mute", "brightness_up", "brightness_down"}
+
+# Said alone while dictating, these end Dictation mode (the mode manager checks; anywhere else they are words
+# or nothing). Longer ways to say it ("dictate off", "stop dictation") are fixed commands and work everywhere.
+DICTATION_EXIT = {"close", "off", "turn off", "turn it off", "exit", "stop", "done", "close it", "that's all",
+                  "thats all", "i'm done", "im done"}
 
 # Answers Whisper mishears, read as the answer only while a question is open ("Click Send?" -> "Know."):
 # anywhere else "know" is just a word, and "I know" never matches
@@ -116,7 +224,11 @@ VERB_CUTOFF = 75
 EXACT_ONLY_BELOW = 6       # phrases shorter than this (chars) must match exactly
 # ...and these always: fuzzy matching made "I used the original" and "cleaning up" commands
 EXACT_ONLY = {"use original", "use the original", "clean it up", "stop clicking", "start clicking",
-              "scroll", "scroll mode", "start scrolling"}
+              "scroll", "scroll mode", "start scrolling",
+              # one word or close pairs: never fuzzy ("new tab" and "next tab", "louder" from "lower")
+              "new tab", "next tab", "last tab", "louder", "quieter", "softer", "brighter", "dimmer", "darker",
+              "refresh", "reload", "minimize", "maximize", "backspace", "go forward", "dictate on", "dictate off",
+              "dictation on", "dictation off"}
 SCROLL_WORDS = ("scroll", "scrolling")
 NOT_A_SCROLL_REQUEST = {"stop", "done", "don't", "dont", "no", "not", "never", "quit", "end"}
 MAX_COMMAND_WORDS = 5      # longer utterances are never fixed commands

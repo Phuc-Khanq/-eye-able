@@ -74,7 +74,7 @@ WDA_EXCLUDEFROMCAPTURE = 0x11
 OFF_SCREEN = "+-5000+-5000"
 MODE_NAMES = {"pointer": "Diseyeble", "dictation": "Dictation", "scroll": "Scroll", "paused": "Paused",
               "menu": "Menu"}
-MODE_HINTS = {"dictation": "say “stop dictation” to stop", "scroll": "tilt your head · say “stop”",
+MODE_HINTS = {"dictation": "say “dictate off” to stop", "scroll": "tilt your head · say “stop”",
               "paused": "say “resume”"}
 
 
@@ -123,8 +123,12 @@ class Question:
 class CardModel:
     """What the card shows; no Tk, so the tests can drive it."""
 
-    def __init__(self, clock=time.monotonic) -> None:
+    def __init__(self, clock=time.monotonic, heard_outside_dictation: bool = False) -> None:
         self.clock = clock
+        # The mic is always on, but what it hears (the waveform, the "Heard" chip) only shows in Dictation mode:
+        # in Pointer mode speech is only checked for commands. Questions, a one-shot "dictate <words>" preview
+        # and the Scroll / Paused / Menu pill still show in every mode.
+        self.heard_outside_dictation = heard_outside_dictation
         self.preview: list[dict] = []
         self.original = ""
         self.mode = "pointer"
@@ -187,6 +191,8 @@ class CardModel:
     def view(self) -> View:
         now = self.clock()
         pill, hint, listening = MODE_NAMES.get(self.mode, "Diseyeble"), MODE_HINTS.get(self.mode, ""), self.listening()
+        show_heard = self.heard_outside_dictation or self.mode == "dictation"
+        listening = listening and show_heard
         if listening:
             pill, hint = "Listening", ""
         base = dict(pill=pill, pill_hint=hint, listening=listening)
@@ -205,7 +211,7 @@ class CardModel:
                         actions=["type", "drop"] + (["original"] if self.original else []), keys=True, **base)
         if now - self._done_at <= DONE_S:
             return View("done", body=self._done, **base)
-        if now - self._heard_at <= HEARD_S and self.heard:
+        if show_heard and now - self._heard_at <= HEARD_S and self.heard:
             return View("heard", label="Heard", chip=shorten(self.heard), **base)
         if listening:
             return View("listening", **base)
@@ -216,9 +222,9 @@ class CardModel:
 
 class DictationCard:
     def __init__(self, bus, clock=time.monotonic, hide_from_capture: bool = True, opacity: float = 0.82,
-                 position: str = "top") -> None:
+                 position: str = "top", heard_outside_dictation: bool = False) -> None:
         self.bus = bus
-        self.model = CardModel(clock)
+        self.model = CardModel(clock, heard_outside_dictation=heard_outside_dictation)
         self.hide_from_capture = hide_from_capture
         self.opacity = min(1.0, max(0.3, float(opacity)))
         self.position = position

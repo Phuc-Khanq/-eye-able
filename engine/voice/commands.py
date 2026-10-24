@@ -75,6 +75,10 @@ FIXED_COMMANDS: dict[str, str] = {
     "nope": "no",
     "calibrate": "calibrate",
     "delete my voice data": "delete_voice_data",
+    # Scroll mode: tilt the head to scroll until "stop" (exact only: "scroll" used to fuzzy-match "scroll up")
+    "scroll": "scroll_mode",
+    "scroll mode": "scroll_mode",
+    "start scrolling": "scroll_mode",
     # Dwell (resting the cursor) is the left click: these turn it off / on
     "stop clicking": "dwell_off",
     "start clicking": "dwell_on",
@@ -97,7 +101,10 @@ FIXED_CUTOFF = 80
 VERB_CUTOFF = 75
 EXACT_ONLY_BELOW = 6       # phrases shorter than this (chars) must match exactly
 # ...and these always: fuzzy matching made "I used the original" and "cleaning up" commands
-EXACT_ONLY = {"use original", "use the original", "clean it up", "stop clicking", "start clicking"}
+EXACT_ONLY = {"use original", "use the original", "clean it up", "stop clicking", "start clicking",
+              "scroll", "scroll mode", "start scrolling"}
+SCROLL_WORDS = ("scroll", "scrolling")
+NOT_A_SCROLL_REQUEST = {"stop", "done", "don't", "dont", "no", "not", "never", "quit", "end"}
 MAX_COMMAND_WORDS = 5      # longer utterances are never fixed commands
 MAX_LABEL_WORDS = 5        # "click <up to 5 words>"
 
@@ -226,6 +233,14 @@ def _untrigger(clauses: list[Clause], trigger_of: dict[int, tuple[dict, bool]]) 
             words, starts = prev.words + words, prev.starts_sentence
         out.append(Clause(" ".join(w["text"].strip() for w in words), words, False, starts))
     return out
+
+
+def wants_scroll(text: str) -> bool:
+    """A short request that ends in "scroll" / "scrolling": "help me scroll", "I want to scroll".
+    Not "stop scrolling", "don't scroll", "scroll down" (a one-shot) or a longer sentence about it."""
+    words = normalize(text).split()
+    return (2 <= len(words) <= 4 and words[-1] in SCROLL_WORDS and words[0] not in NOT_A_SCROLL_REQUEST
+            and not {"up", "down"} & set(words))
 
 
 def _collapse(clean: str) -> str:

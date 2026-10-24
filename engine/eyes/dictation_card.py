@@ -243,7 +243,8 @@ class DictationCard:
                         y = TOP_GAP if self.position == "top" else sh - h - BOTTOM_GAP
                         win.geometry(f"{PANEL_W + 4}x{h}+{x}+{y}")
                         if hwnd:
-                            _keep_on_top(hwnd)   # above a full-screen video too
+                            win.update_idletasks()   # move it first: a SetWindowPos while Tk's move is still
+                            _keep_on_top(hwnd)       # pending loses the move (the card stayed off screen)
             except Exception:
                 pass
             win.after(POLL_MS, tick)

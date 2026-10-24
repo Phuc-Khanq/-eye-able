@@ -57,6 +57,41 @@ def run(yaw, pitch, roll=None, seed=0, drop=(), spike=None) -> list[str]:
     return found
 
 
+def run_timed(fps: float, yaw=None, pitch=None, roll=None, seconds: float = 4.0, drop_every: int = 0,
+              lost=(0, 0), seed=0) -> list[str]:
+    """Like run(), but motion is a function of time in ms, sampled at `fps`, with the tuned default
+    thresholds (nod 12, tilt 18). drop_every: every n-th frame is lost. lost: (from_ms, to_ms) face gone."""
+    rng = np.random.default_rng(seed)
+    det = GestureDetector()
+    found = []
+    for i in range(int(seconds * fps)):
+        t = i * 1000.0 / fps
+        if (drop_every and i % drop_every == drop_every - 1) or lost[0] <= t < lost[1]:
+            continue
+        noise = rng.normal(0, 0.3, 3)
+        y, p, r = ((f(t) if f else 0.0) for f in (yaw, pitch, roll))
+        g = det.update(HeadPose(t_ms=int(t), yaw=y + noise[0], pitch=p + noise[1], roll=r + noise[2]))
+        if g is not None:
+            found.append(g.type)
+    return found
+
+
+def nod_at(start_ms: float, ms: float = 500, size: float = 16):
+    return lambda t: size * np.sin(np.pi * (t - start_ms) / ms) if start_ms <= t <= start_ms + ms else 0.0
+
+
+def shake_at(start_ms: float, ms: float = 1000, size: float = 15):
+    return lambda t: size * np.sin(2 * np.pi * (t - start_ms) / ms) if start_ms <= t <= start_ms + ms else 0.0
+
+
+def tilt_at(start_ms: float, ms: float = 1200, size: float = 25):
+    return lambda t: size if start_ms <= t <= start_ms + ms else 0.0
+
+
+def two(f, g):
+    return lambda t: f(t) + g(t)
+
+
 flat = np.zeros(N)
 
 
@@ -114,6 +149,24 @@ SCENARIOS = [
         shake_track(200, 20, amp=6, cycles=2, frames=24)), ["shake"]),
     ("tilt right starts while the head is still in a shake's cooldown", lambda: run(shake_track(200, 20), np.zeros(200),
         tilt_track(200, 60, 30, 20)), ["shake", "tilt_right"]),
+    # A webcam in dim light slows to about 8 fps and skips frames; the same motions must still count.
+    ("slow camera (8 fps): still head fires nothing", lambda: run_timed(8, seconds=10), []),
+    ("slow camera (8 fps): nod", lambda: run_timed(8, pitch=nod_at(1500)), ["nod"]),
+    ("slow camera (8 fps): two nods 2 s apart", lambda: run_timed(8, pitch=two(nod_at(1000), nod_at(3000)),
+                                                                  seconds=5), ["nod", "nod"]),
+    ("slow camera (8 fps): shake", lambda: run_timed(8, yaw=shake_at(1500)), ["shake"]),
+    ("slow camera (8 fps): tilt right held", lambda: run_timed(8, roll=tilt_at(1000)), ["tilt_right"]),
+    ("slow camera (8 fps): nod, then shake", lambda: run_timed(8, yaw=shake_at(3000), pitch=nod_at(1000),
+                                                               seconds=5), ["nod", "shake"]),
+    ("slow camera (6 fps): tilt right held", lambda: run_timed(6, roll=tilt_at(1000)), ["tilt_right"]),
+    ("slow camera (6 fps): shake", lambda: run_timed(6, yaw=shake_at(1500)), ["shake"]),
+    ("10 fps: a quick nod isn't flattened by the median", lambda: run_timed(10, pitch=nod_at(1500, ms=400, size=15)),
+     ["nod"]),
+    ("8 fps, every 4th frame dropped: tilt", lambda: run_timed(8, roll=tilt_at(1000), drop_every=4), ["tilt_right"]),
+    ("8 fps, every 4th frame dropped: shake", lambda: run_timed(8, yaw=shake_at(1500), drop_every=4), ["shake"]),
+    ("8 fps, every 4th frame dropped: nod", lambda: run_timed(8, pitch=nod_at(1500, ms=600), drop_every=4), ["nod"]),
+    ("8 fps: face lost 0.6 s mid-nod fires nothing", lambda: run_timed(8, pitch=nod_at(1500, ms=1000),
+                                                                       lost=(1700, 2300)), []),
 ]
 
 

@@ -14,11 +14,14 @@ head was a fixed time ago, so a slow drift or a head that settles at a new heigh
           and back has only one turning point, so it isn't a shake.
   tilt  = roll held past tilt_deg for tilt_hold_ms (tilt_right = toward the right shoulder). It lets go
           only when roll drops under 70% of tilt_deg, so a noisy frame can't restart the hold.
-Each pose goes through a 3-frame median first, which removes one-frame tracking glitches. A gap of
-more than MAX_GAP_MS (the face was lost) clears the history, so two motions are never stitched
-together. After any gesture the detector stays quiet for COOLDOWN_MS, and then a nod or shake waits
-until the head is calm again, so shaking for three seconds is one shake, not four. A tilt fires once
-and the head has to come back under the release level before another tilt can fire.
+Each pose goes through a 3-frame median first, which removes one-frame tracking glitches; on a slow
+camera, where 3 frames span more than MEDIAN_MS, the pose is taken as it is, because the median would
+flatten a quick nod. A gap of more than MAX_GAP_MS (the face was lost) clears the history, so two
+motions are never stitched together. Every window, hold and wait is in milliseconds, not frames, so the
+same motions count on a webcam that slows to 8 fps in dim light and drops a frame now and then.
+After any gesture the detector stays quiet for COOLDOWN_MS, and then a nod or shake waits until the
+head is calm again, so shaking for three seconds is one shake, not four. A tilt fires once and the
+head has to come back under the release level before another tilt can fire.
 """
 from collections import deque
 
@@ -41,9 +44,10 @@ SHAKE_WINDOW_MS = 1200
 SHAKE_SWING_FACTOR = 1.8  # a swing is this many times shake_deg, turning point to turning point
 SHAKE_MIN_SPEED_DPS = 22.0  # average speed of every swing
 HISTORY_MS = 1200
-MAX_GAP_MS = 150          # longer without a pose = face lost
+MAX_GAP_MS = 400          # longer without a pose = face lost (an 8 fps webcam may skip a frame or two)
 MEDIAN_FRAMES = 3
-LEAD_IN_FRAMES = 3        # a nod starts from a head that was still for at least this many frames
+MEDIAN_MS = 150           # ...only when those frames are this recent (camera at about 14 fps or faster)
+LEAD_IN_MS = 90           # a nod starts from a head that was still for at least this long
 LEAD_IN_FRACTION = 0.5    # ...within this share of nod_deg
 RETURN_FRACTION = 0.6     # a nod must come back this share of nod_deg
 RETURN_OF_RISE = 0.4      # ...and this share of how far it went
@@ -125,11 +129,14 @@ class GestureDetector:
         if self.history and pose.t_ms - self.history[-1].t_ms > MAX_GAP_MS:
             self.reset()   # the face was lost; don't stitch two motions together
         self._recent.append(pose)
+        recent = [p for p in self._recent if pose.t_ms - p.t_ms <= MEDIAN_MS]
+        if len(recent) < MEDIAN_FRAMES:
+            recent = [pose]   # slow camera: a median over 3 far-apart frames would cut a nod's peak
         self.history.append(HeadPose(
             t_ms=pose.t_ms,
-            yaw=float(np.median([p.yaw for p in self._recent])),
-            pitch=float(np.median([p.pitch for p in self._recent])),
-            roll=float(np.median([p.roll for p in self._recent])),
+            yaw=float(np.median([p.yaw for p in recent])),
+            pitch=float(np.median([p.pitch for p in recent])),
+            roll=float(np.median([p.roll for p in recent])),
         ))
         while self.history and pose.t_ms - self.history[0].t_ms > HISTORY_MS:
             self.history.popleft()
@@ -149,8 +156,9 @@ class GestureDetector:
         """True unless a nod or shake just fired and the head is still moving."""
         if not self._needs_calm:
             return True
-        t, yaw, pitch, _ = self._window(CALM_MS)
-        if len(t) < 4 or t[-1] - t[0] < CALM_MS * 0.7:
+        # at least 3 frames, even when a slow camera puts fewer than that in CALM_MS
+        t, yaw, pitch, _ = self._window(max(CALM_MS, 2 * self._frame_ms()))
+        if len(t) < 3 or t[-1] - t[0] < CALM_MS * 0.7:
             return False
         if np.ptp(yaw) <= CALM_DEG and np.ptp(pitch) <= CALM_DEG:
             self._needs_calm = False
@@ -158,7 +166,12 @@ class GestureDetector:
             self._recent.clear()
         return False
 
-    def _window(self, ms: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _frame_ms(self) -> float:
+        """Median time between recent frames, 0 until there are two."""
+        t = [p.t_ms for p in list(self.history)[-10:]]
+        return float(np.median(np.diff(t))) if len(t) >= 2 else 0.0
+
+    def _window(self, ms: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         now = self.history[-1].t_ms
         recent = [p for p in self.history if now - p.t_ms <= ms]
         t = np.array([p.t_ms for p in recent], dtype=np.float64)
@@ -182,7 +195,7 @@ class GestureDetector:
                 continue
             # s = where the head left its resting level (20% of the way up), not just the lowest noisy sample
             s = int(np.nonzero(p[:k] <= p[k] - 0.8 * rise)[0][-1])
-            if s < LEAD_IN_FRAMES or np.ptp(p[:s + 1]) > LEAD_IN_FRACTION * self.nod_deg:
+            if t[s] - t[0] < LEAD_IN_MS or np.ptp(p[:s + 1]) > LEAD_IN_FRACTION * self.nod_deg:
                 continue                  # no still head before it: the move began earlier (a slow glance)
             if t[k] - t[s] > NOD_MAX_RISE_MS or t[-1] - t[s] < NOD_MIN_MS:
                 continue

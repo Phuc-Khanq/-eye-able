@@ -123,7 +123,11 @@ class EyesService:
         self.yes_nod = ConfirmNod()
         self.brows = BrowRaiseDetector()
         self.blink = (BlinkDetector(rise=float(getattr(settings, "blink_rise", 0.20)),
-                                    closed_abs=float(getattr(settings, "blink_closed_abs", 0.55)))
+                                    closed_abs=float(getattr(settings, "blink_closed_abs", 0.55)),
+                                    min_closed_ms=int(getattr(settings, "blink_min_ms", 400)),
+                                    max_closed_ms=int(getattr(settings, "blink_max_ms", 1600)),
+                                    left_gain=float(getattr(settings, "blink_left_gain", 1.0)),
+                                    right_gain=float(getattr(settings, "blink_right_gain", 1.0)))
                       if getattr(settings, "blink_click", False) else None)   # a long blink = click
         self.jaw = MouthOpenDetector() if getattr(settings, "mouth_click", True) else None   # open + close = right click
         self.dwell = DwellClicker(dwell_ms=getattr(settings, "dwell_ms", 1000)) if dwell else None

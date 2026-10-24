@@ -103,6 +103,47 @@ class TestCardModel(unittest.TestCase):
 
 
 class TestLayout(unittest.TestCase):
+    class Mono:
+        def measure(self, text):
+            return 10 * len(text)
+
+    def test_a_chip_that_is_too_long_is_cut_with_an_ellipsis_never_wrapped(self):
+        from engine.eyes.dictation_card import fit
+        self.assertEqual(fit("click", self.Mono(), 100), "click")
+        cut = fit("um I'll be there at nine tomorrow", self.Mono(), 100)
+        self.assertTrue(cut.endswith("\u2026"))
+        self.assertLessEqual(self.Mono().measure(cut), 100)
+
+    def test_the_heard_chip_fits_inside_its_panel(self):
+        from engine.eyes import dictation_card as D
+
+        class Canvas:
+            def __init__(self):
+                self.rects = []
+            def delete(self, _): pass
+            def find_all(self): return list(range(len(self.rects)))
+            def tag_lower(self, *a): pass
+            def create_polygon(self, pts, smooth=False, fill=None, outline=None):
+                self.rects.append((min(pts[0::2]), max(pts[0::2]), fill)); return len(self.rects)
+            def create_text(self, *a, **k): self.rects.append(None); return len(self.rects)
+            def create_oval(self, *a, **k): self.rects.append(None); return len(self.rects)
+            def create_rectangle(self, *a, **k): self.rects.append(None); return len(self.rects)
+            def create_line(self, *a, **k): self.rects.append(None); return len(self.rects)
+            def create_arc(self, *a, **k): self.rects.append(None); return len(self.rects)
+
+        class F:
+            def measure(self, t): return 8 * len(t)
+            def metrics(self, _): return 20
+        fonts = {k: F() for k in ("pill", "pill_hint", "label", "chip", "body", "shaky", "action", "hint", "key")}
+        for chip in ("click", "new tab", "open chrome and go to the library website please now"):
+            c = Canvas()
+            D.draw(c, D.View("heard", pill="Diseyeble", label="Heard", chip=chip), (0.0,) * D.WAVE_BARS, fonts)
+            boxes = [r for r in c.rects if r]
+            panel = next(r for r in boxes if r[2] == D.PANEL)
+            chip_box = next(r for r in boxes if r[2] == D.CHIP)
+            self.assertGreaterEqual(chip_box[0], panel[0])
+            self.assertLessEqual(chip_box[1], panel[1])
+
     def test_words_wrap_to_the_width(self):
         class Mono:
             def measure(self, text):

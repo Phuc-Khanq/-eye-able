@@ -5,7 +5,8 @@ Publishes: Gesture (type "blink"), through the eyes service
 Subscribes: FaceFrame.blendshapes, HeadPose.pitch
 APIs: MediaPipe blendshapes eyeBlinkLeft, eyeBlinkRight
 
-Both eyes must close (the lower of the two eyeBlink scores counts, so a wink or one squinting eye never does)
+Both eyes must close (the lower of the two eyeBlink scores counts, so a wink or one squinting eye never does;
+left_gain / right_gain scale a weak eye's score first)
 for MIN_CLOSED_MS to MAX_CLOSED_MS, and it fires when they open again. A normal blink is shorter, and resting
 the eyes is longer.
 
@@ -69,7 +70,10 @@ def _pct(values, q: float) -> float:
 
 class BlinkDetector:
     def __init__(self, min_closed_ms: int = MIN_CLOSED_MS, max_closed_ms: int = MAX_CLOSED_MS,
-                 rise: float = RISE, closed_abs: float = CLOSED_ABS) -> None:
+                 rise: float = RISE, closed_abs: float = CLOSED_ABS,
+                 left_gain: float = 1.0, right_gain: float = 1.0) -> None:
+        self.left_gain = max(float(left_gain), 0.1)    # a weak eye's score is scaled up before the two are compared
+        self.right_gain = max(float(right_gain), 0.1)
         self.min_closed_ms = min_closed_ms
         self.max_closed_ms = max_closed_ms
         self.rise = rise
@@ -129,7 +133,9 @@ class BlinkDetector:
         if self._last_t is not None and t_ms - self._last_t > MAX_GAP_MS:
             self._drop()
         self._last_t = t_ms
-        score = min(float(left), float(right))   # both eyes: a wink or a squint never counts
+        # both eyes: a wink or a squint never counts. Each eye's score is scaled by its own gain first (capped
+        # at 1), so a weak eye that only reaches 0.5 when shut can still count; an eye that is open stays low.
+        score = min(min(float(left) * self.left_gain, 1.0), min(float(right) * self.right_gain, 1.0))
         self.score = score
         open_level = self._open_level(pitch)
         self.open_level = open_level

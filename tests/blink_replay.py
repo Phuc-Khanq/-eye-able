@@ -5,7 +5,9 @@ It also runs the old fixed-threshold detector, so you can see what changed, and 
 Run:  python -m tests.blink_replay                       (every file in calibration/blink_data)
       python -m tests.blink_replay path\\to\\file.csv --rise 0.15 --closed-abs 0.5    (try other values)
 If the suggestions differ from the defaults, put them in config.local.json as "blink_rise" and
-"blink_closed_abs" and paste this output to Khang's chat.
+"blink_closed_abs" (and "blink_left_gain" / "blink_right_gain" when one eye closes less than the other;
+"blink_min_ms" / "blink_max_ms" set the shortest and longest close that clicks) and paste this output to
+Khang's chat.
 """
 import argparse
 import csv
@@ -45,8 +47,9 @@ def segments(frames):
     return segs
 
 
-def run_new(frames, rise, closed_abs):
-    d = B.BlinkDetector(rise=rise, closed_abs=closed_abs)
+def run_new(frames, rise, closed_abs, **kw):
+    """kw: min_closed_ms, max_closed_ms, left_gain, right_gain (same as BlinkDetector)."""
+    d = B.BlinkDetector(rise=rise, closed_abs=closed_abs, **kw)
     fired = []
     for i, f in enumerate(frames):
         bs = {"eyeBlinkLeft": f["L"], "eyeBlinkRight": f["R"]} if f["face"] else {}
@@ -78,9 +81,9 @@ def run_old(frames):
     return fired
 
 
-def report(frames, rise, closed_abs) -> dict:
+def report(frames, rise, closed_abs, **kw) -> dict:
     segs = segments(frames)
-    new, old = set(run_new(frames, rise, closed_abs)), set(run_old(frames))
+    new, old = set(run_new(frames, rise, closed_abs, **kw)), set(run_old(frames))
     # a click fires when the eyes open again, which can be just after its CLICK segment ends: count
     # fires up to 15 frames (0.5 s) after a click segment as that segment's
     table = defaultdict(lambda: {"want": 0, "new": 0, "old": 0, "false_new": 0, "false_old": 0})
@@ -130,21 +133,68 @@ def levels(frames):
     return out
 
 
+def eye_peaks(frames) -> tuple[float | None, float | None]:
+    """Median shut peak of the left and the right eye on their own, over the deliberate closes (CLICK phase
+    frames where both eyes are well over their open level). A big difference means one eye needs a gain."""
+    out = []
+    for key in ("L", "R"):
+        look = [f[key] for f in frames if f["face"] and f["phase"] == "look"]
+        if not look:
+            out.append(None)
+            continue
+        shut_from = statistics.median(look) + 0.15
+        peaks, cur = [], []
+        for f in frames + [{"face": False, "phase": ""}]:
+            s = f[key] if f["face"] and f["phase"] == "click" else None
+            if s is not None and s >= shut_from:
+                cur.append(s)
+            elif cur:
+                if len(cur) >= 5:
+                    peaks.append(max(cur))
+                cur = []
+        out.append(statistics.median(peaks) if peaks else None)
+    return out[0], out[1]
+
+
+def suggest_gains(left_peak: float | None, right_peak: float | None, closed_abs: float) -> tuple[float, float]:
+    """(left_gain, right_gain): scale the weaker eye so its shut peak reaches the stronger eye's, at most 1.8.
+    Gains of 1.0 when the eyes already agree (within 10%) or a peak is missing."""
+    if not left_peak or not right_peak:
+        return 1.0, 1.0
+    hi = max(left_peak, right_peak)
+    if min(left_peak, right_peak) >= 0.9 * hi:
+        return 1.0, 1.0
+    g = round(min(1.8, hi / min(left_peak, right_peak)), 2)
+    return (g, 1.0) if left_peak < right_peak else (1.0, g)
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Replay recorded blink scores through the detector")
     p.add_argument("files", nargs="*")
     p.add_argument("--rise", type=float, default=B.RISE)
     p.add_argument("--closed-abs", type=float, default=B.CLOSED_ABS)
+    p.add_argument("--min-ms", type=int, default=B.MIN_CLOSED_MS, help="shortest close that clicks")
+    p.add_argument("--max-ms", type=int, default=1600, help="longest close that clicks (the config default)")
+    p.add_argument("--left-gain", type=float, default=1.0)
+    p.add_argument("--right-gain", type=float, default=1.0)
     args = p.parse_args()
+    kw = dict(min_closed_ms=args.min_ms, max_closed_ms=args.max_ms, left_gain=args.left_gain,
+              right_gain=args.right_gain)
     files = [Path(f) for f in args.files] or sorted(DATA.glob("blink_*.csv"))
     if not files:
         raise SystemExit(f"No recordings in {DATA}. Run  python -m tests.blink_record  first.")
     lv_all = defaultdict(list)
+    eye_l, eye_r = [], []
     for path in files:
         frames = load(path)
         seen = sum(f["face"] for f in frames)
         print(f"\n=== {path.name}: {len(frames)} frames, face in {seen} ({100 * seen / max(1, len(frames)):.0f}%)")
-        t = report(frames, args.rise, args.closed_abs)
+        t = report(frames, args.rise, args.closed_abs, **kw)
+        lp, rp = eye_peaks(frames)
+        if lp is not None and rp is not None:
+            eye_l.append(lp)
+            eye_r.append(rp)
+            print(f"  shut peak per eye: left {lp:.2f}, right {rp:.2f}")
         print(f"{'where':<8} {'clicks found (new / old)':<26} {'wrong clicks (new / old)':<24}")
         for key in ("top", "middle", "bottom", "updown", "read"):
             if key in t:
@@ -156,6 +206,12 @@ def main() -> None:
             print(f"  {row:<7} head pitch {pitch:+5.1f} deg   open {open_s:.2f}   shut peak "
                   f"{'-' if peak is None else f'{peak:.2f}'} ({n} closes)")
     # suggestions
+    left_gain, right_gain = (suggest_gains(statistics.median(eye_l), statistics.median(eye_r), args.closed_abs)
+                             if eye_l else (1.0, 1.0))
+    if (left_gain, right_gain) != (1.0, 1.0):
+        print(f"\nOne eye closes less than the other. Suggested: \"blink_left_gain\": {left_gain}, "
+              f"\"blink_right_gain\": {right_gain}. Try them:  python -m tests.blink_replay --left-gain {left_gain} "
+              f"--right-gain {right_gain}")
     gaps = [peak - open_s for row in lv_all for open_s, peak in lv_all[row] if peak is not None]
     peaks = [peak for row in lv_all for _, peak in lv_all[row] if peak is not None]
     if gaps and peaks:

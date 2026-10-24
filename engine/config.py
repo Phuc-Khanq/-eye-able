@@ -34,6 +34,13 @@ class Settings:
                                    # raise (on since Khang's live test, Oct 24; --no-blink turns it off)
     blink_rise: float = 0.20       # the blink click: how far over your open level the eyes must close; and how
     blink_closed_abs: float = 0.55  # shut they must get (tests.blink_record + tests.blink_replay suggest yours)
+    blink_min_ms: int = 400        # the blink click: shut at least this long (a normal blink is shorter; raise it to
+                                   # 500 if tired, slow blinks click by accident)
+    blink_max_ms: int = 1600       # ...and not longer than this (longer is resting the eyes). Was 1200: deliberate
+                                   # closes of 1.2 to 1.6 s were ignored in Khang's live test
+    blink_left_gain: float = 1.0   # multiply each eye's blink score before the lower of the two counts. A weak eye
+    blink_right_gain: float = 1.0  # (Khang's right eye scores 0.43 to 0.62 when shut) gets a gain above 1;
+                                   # tests.blink_replay prints the suggestion. A wink still never clicks.
     mouth_click: bool = False      # open the mouth and close it again (0.3 to 1.5 s) = right click; off: it fired
                                    # while talking in the live test (Oct 24). Right click is "right click" by voice
     dwell_ms: int = 1000           # with --dwell: rest the cursor this long = left click (off by default)
@@ -49,6 +56,8 @@ class Settings:
     dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py): the snap click's
                                    # spinner and flash, and the dwell fill; no Electron UI needed
     sensitivity: float = 1.0
+    gpu_log_every_s: float = 10.0   # --gpu-log: print the GPU memory this often (engine/gpu_log.py)
+    gpu_warn_mb: int = 14000        # ...and warn above this (the 5080 has 16 GB; the demo needs room to spare)
 
     # UI-Venus
     use_ui_venus: bool = True

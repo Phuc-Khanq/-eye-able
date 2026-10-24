@@ -11,6 +11,8 @@ plus the asyncio loop for the WebSocket server. Run with: python -m engine.main
     python -m engine.main --dwell          # resting the cursor 1 s also left-clicks (off by default: the left
                                            # click is an eyebrow raise or "click", snapped by UI-Venus)
     python -m engine.main --no-rewrite     # type dictation as heard, without the clean-up model
+    python -m engine.main --record         # recording the demo video: the card shows up in OBS (see apply_record)
+    python -m engine.main --gpu-log        # print the GPU memory every few seconds and the peak at the end
 """
 from __future__ import annotations
 
@@ -151,6 +153,17 @@ def use_cpu_without_gpu(s, cuda_devices: int | None = None) -> bool:
     return True
 
 
+def apply_record(s, record: bool) -> bool:
+    """--record: show the dictation card to screen recorders (OBS) for this run only. The card is normally hidden
+    from screenshots so UI-Venus never reads it, which also hides it from the video. While recording, UI-Venus can
+    see the card, so keep the card clear of the buttons you click. config.py keeps its default (CONTRIBUTING 3)."""
+    if not record:
+        return False
+    s.card_hide_from_capture = False
+    print("Recording mode: the dictation card shows up in screen recordings (and UI-Venus can see it).")
+    return True
+
+
 def keep_rewrite_without_gpu(s, rewrite: bool, cuda_devices: int | None = None) -> bool:
     """The dictation clean-up model set to CUDA can't load without an NVIDIA GPU: it would
     download about 3 GB and then fail quietly. On the CPU it takes seconds per sentence, longer
@@ -254,7 +267,7 @@ def read_stdin(bus, stop: threading.Event, delay_s: float = 3.0) -> None:
 
 
 async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head", dwell: bool = False,
-              stdin: bool = False, confirm: str = "brow", rewrite: bool = False) -> None:
+              stdin: bool = False, confirm: str = "brow", rewrite: bool = False, gpu_log: bool = False) -> None:
     bus = EventBus()
     relay = WebSocketRelay(bus)
     await relay.start(settings.ws_host, settings.ws_port)
@@ -279,6 +292,11 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
     else:
         engine = Engine(bus, settings, eyes=eyes, pointer=pointer, dwell=dwell, confirm=confirm, rewrite=rewrite)
         engine.start()
+    gpu = None
+    if gpu_log:
+        from engine.gpu_log import GpuLog
+        gpu = GpuLog(float(getattr(settings, "gpu_log_every_s", 10.0)), int(getattr(settings, "gpu_warn_mb", 14000)))
+        gpu.start()
     if stdin:
         threading.Thread(target=read_stdin, args=(bus, stop), daemon=True).start()
     print(f"Diseyeble engine on ws://{settings.ws_host}:{relay.port}  (Ctrl+C to stop)")
@@ -286,6 +304,8 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
         await relay.serve_forever()
     finally:
         stop.set()
+        if gpu:
+            print(gpu.stop() or "[gpu] no reading")
         engine.stop()
         await relay.close()
 
@@ -310,6 +330,10 @@ def main() -> None:
                    default=bool(getattr(settings, "rewrite_dictation", True)),
                    help="clean up dictated text with a small local model before it's typed (Qwen2.5-1.5B on the "
                         "GPU, downloaded once, about 3 GB); on by default (rewrite_dictation), --no-rewrite turns it off")
+    p.add_argument("--record", action="store_true",
+                   help="recording the demo video: the dictation card is visible to OBS (card_hide_from_capture off)")
+    p.add_argument("--gpu-log", action="store_true",
+                   help="print the GPU memory in use every gpu_log_every_s seconds, and the peak when the engine stops")
     args = p.parse_args()
     for stream in (sys.stdout, sys.stderr):   # a word the Windows console can't show prints as "?", never crashes
         try:
@@ -317,10 +341,11 @@ def main() -> None:
         except (AttributeError, ValueError):
             pass
     settings.blink_click = args.blink
+    apply_record(settings, args.record)
     rewrite = keep_rewrite_without_gpu(settings, args.rewrite)
     try:
         asyncio.run(run(args.wav, eyes=not args.no_eyes, pointer=args.pointer, dwell=args.dwell,
-                        stdin=args.stdin, confirm=args.confirm, rewrite=rewrite))
+                        stdin=args.stdin, confirm=args.confirm, rewrite=rewrite, gpu_log=args.gpu_log))
     except KeyboardInterrupt:
         print("Engine stopped.")
     except OSError as exc:

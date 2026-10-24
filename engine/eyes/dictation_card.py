@@ -40,6 +40,7 @@ LISTEN_HOLD_S = 0.4       # the waveform stays a moment after the mic goes quiet
 SHAKY_CONF = 0.6          # a word under this confidence is drawn in amber, underlined
 CHIP_MAX_CHARS = 70
 WAVE_BARS = 14
+CHIP_GAP = 24             # px between the gray label and the blue chip
 
 # look
 PANEL_W = 560
@@ -260,6 +261,15 @@ def round_rect(c, x1, y1, x2, y2, r, **kw):
     return c.create_polygon(pts, smooth=True, **kw)
 
 
+def fit(text: str, font, max_w: float) -> str:
+    """The text, cut with an ellipsis so it fits max_w on one line (a chip never wraps)."""
+    if font.measure(text) <= max_w:
+        return text
+    while text and font.measure(text + "\u2026") > max_w:
+        text = text[:-1]
+    return text.rstrip() + "\u2026"
+
+
 def layout_words(words, font, shaky_font, max_w):
     """[(text, shaky)] -> [[(text, shaky, x)]] lines that fit max_w."""
     lines, line, x = [], [], 0
@@ -306,8 +316,7 @@ def draw(c, v: View, levels, fonts) -> int:
         return PILL_H + 6
     # --- panel contents first (to know its height), then the panel behind them
     if v.kind == "heard":       # a short line: a panel just wide enough, centered under the pill
-        cw = min(PANEL_W - 2 * PAD - 90, fonts["chip"].measure(v.chip) + 28)
-        w = min(PANEL_W, 2 * PAD + fonts["label"].measure(v.label) + 40 + cw)
+        w = min(PANEL_W, 2 * PAD + fonts["label"].measure(v.label) + CHIP_GAP + fonts["chip"].measure(v.chip) + 28)
         x0 = 2 + (PANEL_W - w) // 2
     elif v.kind == "done":
         w = max(240, 2 * PAD + fonts["body"].measure(v.body))
@@ -321,11 +330,12 @@ def draw(c, v: View, levels, fonts) -> int:
         c.create_text(x0 + PAD, y + 14, text=v.label, fill=MUTED, font=fonts["label"], anchor="w")
         row_h = 28
     if v.chip:
-        cw = min(inner - 90, fonts["chip"].measure(v.chip) + 28)
+        room = inner - (fonts["label"].measure(v.label) + CHIP_GAP if v.label else 0)   # beside the label
+        chip = fit(v.chip, fonts["chip"], room - 28)
+        cw = fonts["chip"].measure(chip) + 28
         cx2 = x0 + w - PAD
         round_rect(c, cx2 - cw, y, cx2, y + 28, 14, fill=CHIP, outline=CHIP)
-        c.create_text(cx2 - cw + 14, y + 14, text=v.chip, fill="#ffffff", font=fonts["chip"], anchor="w",
-                      width=cw - 20)
+        c.create_text(cx2 - cw + 14, y + 14, text=chip, fill="#ffffff", font=fonts["chip"], anchor="w")
         row_h = 28
     y += row_h + (10 if row_h else 0)
     if v.words:

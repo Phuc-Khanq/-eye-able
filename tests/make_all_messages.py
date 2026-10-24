@@ -1,6 +1,8 @@
 """Writes tests/recordings/all_messages.jsonl: every message the engine sends the UI, from one short
 session through the REAL pieces (Khang's Rig from tests/test_eyes_service.py: the real EyesService,
-ModeManager, TargetService and OsOutput with a simulated face; the real AudioIn with a test tone).
+ModeManager, TargetService and OsOutput with a simulated face and a fake "what's under the cursor" probe;
+the real AudioIn with a test tone). Gestures the face can't make yet in the rig (a long blink, mouth
+open-close, menu tilts) are published as the eyes' detectors publish them.
 Nothing is typed by hand, so the file shows exactly what the UI will get. No camera, mic or GPU.
 
     python -m tests.make_all_messages             # rewrites the recording
@@ -26,22 +28,29 @@ OUT = Path(__file__).resolve().parent / "recordings" / "all_messages.jsonl"
 GAZE_EVERY = 3          # keep every 3rd gaze message (about 10 a second instead of 30)
 WANTED = {
     messages.MODE: {"mode": {"pointer", "dictation", "menu", "paused", "scroll"}},
-    messages.GESTURE: {"gesture": {"nod", "brow_raise", "tilt_left", "tilt_right"}},
+    messages.GESTURE: {"gesture": {"nod", "shake", "brow_raise", "blink", "mouth_open", "tilt_left", "tilt_right"}},
+    messages.DWELL: {"ready": {True, False}},
+    messages.TARGET_SEARCHING: {"snap": {True, None}},     # None: a named search ("click search bar"), no snap
+    messages.TARGET_FOUND: {"snap": {True, None}},
+    messages.TARGET_NONE: {"snap": {True, None}},
     messages.CONFIRM: {"state": {"open", "confirmed", "cancelled", "expired"}},
     messages.STATUS: {"level": {"info", "warn", "error"}},
     messages.DICTATION_PREVIEW: {"cleaned": {True, False}},
     messages.LISTENING: {"speaking": {True, False}},
     messages.CALIB_RESULT: {"ok": {True, False}},
-    messages.DWELL: {}, messages.SCROLL: {}, messages.GAZE: {}, messages.CALIB_TARGET: {},
-    messages.TARGET_SEARCHING: {}, messages.TARGET_FOUND: {}, messages.TARGET_NONE: {},
+    messages.SCROLL: {}, messages.GAZE: {}, messages.CALIB_TARGET: {},
 }
 
 
 def session() -> list[tuple[float, dict]]:
     """[(t seconds from the start, message), ...] for one short session."""
+    from tests.test_dwell_click import ButtonOs
+    from tests.test_dwell_clickable import FakeProbe
     from tests.test_eyes_service import Rig, TargetResult
 
     r = Rig()
+    r.os = r.out.os = ButtonOs()         # records the button: left and right clicks
+    r.eyes.probe = FakeProbe()           # a link or button under every resting point: dwell shows ready
     r.mm.rewrite_wait_s = 1.5            # the dictation clean-up on, as in the app
     t0 = r.clock.t
     out: list[tuple[float, dict]] = []
@@ -64,10 +73,31 @@ def session() -> list[tuple[float, dict]]:
     r.bus.publish(topics.from_ui(messages.CALIBRATE), {"type": messages.CALIBRATE, "action": "cancel"})
     r.frames(60)
 
-    # 2. look somewhere and rest there: the dwell ring fills and clicks
+    # 2. dwell (off by default, like --dwell): rest on a button, the ring shows ready, fills and clicks
     r.say("start clicking")                          # dwell on (eyes.dwell)
     r.path(yaws=[1, 2, 3, 4, 5, 6, 6, 6])
     r.frames(45, yaw=6.0)
+    r.say("stop clicking")                           # back to the default
+    r.frames(10, yaw=6.0)
+
+    # 2b. the snap click: a raise, saying "click", a long blink; UI-Venus moves it onto the nearest button
+    r.raise_brows()
+    r.frames(10)
+    r.say("click")
+    r.out.flush()
+    r.frames(10)
+    r.bus.publish(topics.GESTURE, Gesture(t_ms=r.t_ms, type="blink"))   # the eyes' blink detector (--blink)
+    r.out.flush()
+    r.frames(10)
+
+    # 2c. right click: open and close the mouth, or say "right click"; then go back and escape
+    r.bus.publish(topics.GESTURE, Gesture(t_ms=r.t_ms, type="mouth_open"))   # the eyes' mouth detector
+    r.out.flush()
+    r.frames(10)
+    for text in ("right click", "go back", "escape"):
+        r.say(text)
+        r.out.flush()
+        r.frames(10)
 
     # 3. look and say: found, asked, a raise says yes (the demo's confirm)
     r.say("click search bar")
@@ -89,6 +119,8 @@ def session() -> list[tuple[float, dict]]:
     r.say("click the purple button")
     r.out.flush()
     r.frames(20)
+    r.raise_brows()                                  # a snap with nothing clickable near: clicks at the cursor
+    r.frames(10)
     r.finder.submit = submit
 
     # 5. dictation with the mic: the listening level, the preview, the clean-up, send it
@@ -151,12 +183,12 @@ def session() -> list[tuple[float, dict]]:
     # 9. things going wrong: a click that fails, the face lost and found again
     click = r.os.click
 
-    def broken_click(x, y):
+    def broken_click(x, y, button="left"):
         raise PermissionError("the window is run as administrator")
 
     r.os.click = broken_click
     r.path(yaws=[-1, -2, -3, -4, -5, -6, -6])
-    r.frames(45, yaw=-6.0)                               # dwell click: fails
+    r.raise_brows()                                      # the snap click: fails
     r.out.flush()
     r.os.click = click
     for _ in range(90):                                  # 3 s without a face

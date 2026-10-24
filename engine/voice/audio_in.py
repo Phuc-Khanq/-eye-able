@@ -80,11 +80,27 @@ def level_0_1(block) -> float:
     return round(min(1.0, max(0.0, 1.0 + 20.0 * np.log10(rms) / 60.0)), 3)
 
 
+class _ProbSpy:
+    """Wraps the Silero model to remember the last speech probability (for --debug)."""
+
+    def __init__(self, model) -> None:
+        self._model = model
+        self.last = 0.0
+
+    def __call__(self, x, sr):
+        p = self._model(x, sr)
+        self.last = float(p.item()) if hasattr(p, "item") else float(p)
+        return p
+
+    def __getattr__(self, name):
+        return getattr(self._model, name)
+
+
 def load_vad(pause_seconds: float):
     """Silero VAD (ONNX, small and bundled with the package; no download)."""
     from silero_vad import VADIterator, load_silero_vad  # heavy: import only when used
 
-    model = load_silero_vad(onnx=True)
+    model = _ProbSpy(load_silero_vad(onnx=True))
     return VADIterator(model, threshold=VAD_THRESHOLD, sampling_rate=RATE,
                        min_silence_duration_ms=int(pause_seconds * 1000),
                        speech_pad_ms=SPEECH_PAD_MS)
@@ -111,6 +127,8 @@ class AudioIn:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self.dropped_chunks = 0
+        self.chunks = 0                 # mic chunks received (live_check warns if this stalls)
+        self.level = 0.0                # last block's 0-1 level, after gain
         self._reset_stream_state()
         bus.subscribe(topics.from_ui(messages.SETTINGS), self.on_settings)
 
@@ -176,6 +194,7 @@ class AudioIn:
     # --------------------------------------------------------- sounddevice side
     def _callback(self, indata, frames, time_info, status) -> None:
         """Runs on PortAudio's thread: copy and return, nothing else."""
+        self.chunks += 1
         try:
             self._raw.put_nowait(indata.copy())
         except queue.Full:
@@ -212,8 +231,15 @@ class AudioIn:
             block, self._pending = self._pending[:BLOCK], self._pending[BLOCK:]
             self._block(block)
 
+    @property
+    def speech_prob(self) -> float:
+        """Silero's last speech probability (0-1), or -1 with a fake VAD."""
+        model = getattr(self._vad, "model", None)
+        return getattr(model, "last", -1.0)
+
     def _block(self, block) -> None:
         block = self._gain(block)
+        self.level = level_0_1(block)
         start_sample = self._blocks * BLOCK
         self._blocks += 1
         event = self._vad(block)
@@ -240,7 +266,7 @@ class AudioIn:
 
         if self._blocks % LEVEL_EVERY == 0:
             self.bus.publish(topics.TO_UI, messages.make(
-                messages.LISTENING, level=level_0_1(block), speaking=self.speaking))
+                messages.LISTENING, level=self.level, speaking=self.speaking))
 
     def _finish(self, end_sample: int | None) -> None:
         import numpy as np

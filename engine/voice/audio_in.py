@@ -1,339 +1,355 @@
 """16 kHz mono mic stream, automatic gain for quiet voices, speech start and end.
 
 Route: Khoi and Khoa (Khoa leads)
-Publishes: topics.UTTERANCE (float32, 16 kHz mono) to dictation; messages.LISTENING to the UI
-Subscribes: topics.from_ui(messages.SETTINGS) (pause_seconds)
-APIs: sounddevice InputStream (via mic.py), silero-vad (512-sample frames at 16 kHz)
+Publishes: listening, finished utterances (float32 audio) to dictation
+Subscribes: settings (pause_seconds)
+APIs: sounddevice InputStream (512-sample blocks), silero-vad VADIterator
 
-The mic callback only queues blocks; VAD and cutting run on this module's own thread
-(CONTRIBUTING rule 9). The source and the VAD are injectable, so tests and laptops
-without a working mic feed a WAV array instead:
+How audio flows:
+  sounddevice callback   copies each chunk onto a queue and returns (never blocks)
+  "audio-in" thread      mic.Resampler16k -> 512-sample blocks -> gain -> Silero VAD
+                         -> on speech end: topics.UTTERANCE (16 kHz mono float32)
 
-    python -m engine.voice.audio_in clip.wav     # print the utterances found in a file
-
-Audio stays in memory. Nothing here writes to disk (rule 10).
+An utterance ends after settings.pause_seconds of silence (the user picks 1 to 4 s),
+or at MAX_UTTERANCE_S, because Whisper only hears 30 s at a time.
+Audio stays in memory; nothing is written to disk (CONTRIBUTING rule 10).
 """
 
 from __future__ import annotations
 
-import math
 import queue
 import threading
 from collections import deque
 
-import numpy as np
-
 from engine.core import messages, topics
-from engine.voice.mic import TARGET_RATE, to_16k
+from engine.voice import mic
 
-FRAME = 512                     # Silero needs exactly 512 samples at 16 kHz (32 ms)
-FRAME_S = FRAME / TARGET_RATE
-START_PROB = 0.5                # speech starts at this VAD probability...
-STOP_PROB = 0.35                # ...and still counts as speech down to this one
-PRE_ROLL_S = 0.3                # keep this much before the start, so the first sound isn't cut
-TAIL_S = 0.25                   # and this much after the last speech frame
-MIN_SPEECH_S = 0.25             # shorter bursts are coughs and clicks
-MAX_UTTERANCE_S = 28.0          # Whisper's window is 30 s
-MIN_PAUSE_S, MAX_PAUSE_S = 1.0, 4.0
-TARGET_RMS = 0.08               # about -22 dBFS: where Whisper is happy
-MAX_AUTO_GAIN = 10.0            # +20 dB at most, so room noise isn't blown up
-LEVEL_EVERY_S = 0.1             # listening messages at 10 Hz
-MAX_QUEUED_BLOCKS = 200         # about 6 s; if the thread falls behind, drop the oldest
+BLOCK = 512                 # samples at 16 kHz = 32 ms, the size Silero VAD wants
+RATE = mic.TARGET_RATE
+VAD_THRESHOLD = 0.5
+SPEECH_PAD_MS = 150         # keep a little audio around speech so first/last sounds aren't cut
+PRE_ROLL_S = 0.3            # audio kept from before VAD noticed speech
+MIN_SPEECH_S = 0.25         # shorter blips (a cough, a click) are dropped
+MAX_UTTERANCE_S = 28.0
+LEVEL_EVERY = 3             # send a listening level every 3 blocks (about 10 per second)
+RAW_QUEUE_MAX = 200         # about 6 s of mic chunks; if we fall that far behind, drop audio
+
+# Gentle automatic gain: lift quiet voices toward TARGET_RMS, never turn anyone down.
+TARGET_RMS = 0.05           # about -26 dBFS, a normal speaking level
+MAX_GAIN = 8.0              # +18 dB at most
+NOISE_CEILING = 0.01        # never lift background noise above this
+GAIN_SMOOTHING = 0.05       # how fast the gain follows the voice (per loud block)
+LOUD_OVER_NOISE = 3.0       # a block this much above the noise floor counts as voice
 
 
-# ----------------------------------------------------------------------- VAD
-class SileroVad:
-    """Speech probability per 512-sample frame. Needs torch and silero-vad (demo laptop)."""
+class AutoGain:
+    """Slow automatic gain. Tracks the noise floor and the level of loud (voice) blocks."""
 
     def __init__(self) -> None:
-        import torch                              # heavy: import only when used (rule 6)
-        from silero_vad import load_silero_vad
+        self.noise = 0.002       # running noise floor (RMS)
+        self.voice = TARGET_RMS  # running voice level (RMS); starts neutral = gain 1
+        self.gain = 1.0
 
-        torch.set_num_threads(1)
-        self._torch = torch
-        self._model = load_silero_vad()
+    def __call__(self, block):
+        import numpy as np
 
-    def prob(self, frame: np.ndarray) -> float:
-        with self._torch.no_grad():
-            return float(self._model(self._torch.from_numpy(frame), TARGET_RATE))
+        rms = float(np.sqrt(np.mean(block * block))) if len(block) else 0.0
+        # noise floor falls fast and rises slowly, so it settles on the quiet parts
+        self.noise += (rms - self.noise) * (0.2 if rms < self.noise else 0.005)
+        self.noise = max(self.noise, 1e-5)
+        if rms > LOUD_OVER_NOISE * self.noise and rms > 1e-4:
+            self.voice += (rms - self.voice) * GAIN_SMOOTHING
+        wanted = min(MAX_GAIN, TARGET_RMS / max(self.voice, 1e-6),
+                     NOISE_CEILING / self.noise)
+        wanted = max(1.0, wanted)
+        self.gain += (wanted - self.gain) * 0.1
+        out = block * self.gain
+        peak = float(np.abs(out).max()) if len(out) else 0.0
+        if peak > 0.98:          # limiter: a sudden loud sound must not clip
+            out = out * (0.98 / peak)
+        return out.astype(np.float32)
 
-    def reset(self) -> None:
-        self._model.reset_states()
+
+def level_0_1(block) -> float:
+    """RMS as a 0-1 meter: -60 dBFS (or quieter) is 0, 0 dBFS is 1."""
+    import numpy as np
+
+    rms = float(np.sqrt(np.mean(block * block))) if len(block) else 0.0
+    if rms <= 1e-6:
+        return 0.0
+    return round(min(1.0, max(0.0, 1.0 + 20.0 * np.log10(rms) / 60.0)), 3)
 
 
-class EnergyVad:
-    """Loudness-only fallback for laptops without torch, and for tests."""
+def _silero_onnx_path():
+    """The ONNX model file inside the silero-vad package, found WITHOUT importing the package
+    (its __init__ imports torch, which alone takes about 4 s to load)."""
+    import importlib.util
+    from pathlib import Path
 
-    def __init__(self, threshold: float = 0.01) -> None:
+    spec = importlib.util.find_spec("silero_vad")
+    if spec is None or not spec.submodule_search_locations:
+        raise RuntimeError("silero-vad is not installed (pip install -r requirements.txt)")
+    path = Path(list(spec.submodule_search_locations)[0]) / "data" / "silero_vad.onnx"
+    if not path.exists():
+        raise RuntimeError(f"Silero VAD model not found at {path}")
+    return path
+
+
+class SileroOnnx:
+    """Silero VAD speech probability for one 512-sample block, with numpy + onnxruntime only.
+    Same model file and same input handling as silero_vad's OnnxWrapper (64-sample context)."""
+
+    CONTEXT = 64
+
+    def __init__(self) -> None:
+        import numpy as np
+        import onnxruntime  # comes with faster-whisper
+
+        opts = onnxruntime.SessionOptions()
+        opts.inter_op_num_threads = 1
+        opts.intra_op_num_threads = 1
+        self.session = onnxruntime.InferenceSession(str(_silero_onnx_path()), sess_options=opts,
+                                                    providers=["CPUExecutionProvider"])
+        self._sr = np.array(RATE, dtype=np.int64)
+        self.last = 0.0                  # last speech probability (live_check --debug)
+        self.reset_states()
+
+    def reset_states(self) -> None:
+        import numpy as np
+
+        self._state = np.zeros((2, 1, 128), dtype=np.float32)
+        self._context = np.zeros((1, self.CONTEXT), dtype=np.float32)
+
+    def __call__(self, block, sr: int = RATE) -> float:
+        import numpy as np
+
+        x = np.concatenate([self._context, np.asarray(block, dtype=np.float32).reshape(1, -1)], axis=1)
+        out, self._state = self.session.run(None, {"input": x, "state": self._state, "sr": self._sr})
+        self._context = x[:, -self.CONTEXT:]
+        self.last = float(out.reshape(-1)[0])
+        return self.last
+
+
+class VadIterator:
+    """Speech start / end events, the same rules as silero_vad.VADIterator:
+    start when probability >= threshold; end after min_silence_samples below threshold - 0.15.
+    Returns {"start": sample}, {"end": sample} or None for each 512-sample block."""
+
+    def __init__(self, model, threshold: float = VAD_THRESHOLD, min_silence_duration_ms: int = 100,
+                 speech_pad_ms: int = 30) -> None:
+        self.model = model
         self.threshold = threshold
+        self.min_silence_samples = RATE * min_silence_duration_ms // 1000
+        self.speech_pad_samples = RATE * speech_pad_ms // 1000
+        self.reset_states()
 
-    def prob(self, frame: np.ndarray) -> float:
-        return 1.0 if rms(frame) >= self.threshold else 0.0
+    def reset_states(self) -> None:
+        self.model.reset_states()
+        self.triggered = False
+        self.temp_end = 0
+        self.current_sample = 0
 
-    def reset(self) -> None:
-        pass
-
-
-def load_vad(warn=print):
-    try:
-        return SileroVad()
-    except (ImportError, OSError) as exc:     # no torch, or a broken CUDA / DLL install
-        warn(f"Silero VAD unavailable ({exc}); using a simple loudness check instead.")
-        return EnergyVad()
-
-
-# ------------------------------------------------------------------- sources
-class MicSource:
-    """The real mic, in whatever format Windows accepts (mic.open_settings)."""
-
-    def __init__(self, device: int | None = None) -> None:
-        self.device = device
-        self.rate = TARGET_RATE
-
-    def open(self, on_block):
-        import sounddevice as sd
-
-        from engine.voice.mic import open_settings
-
-        s = open_settings(sd, self.device, verbose=True)   # RuntimeError if nothing opens
-        self.rate = s.rate
-
-        def callback(indata, frames, time_info, status) -> None:
-            on_block(indata.mean(axis=1))                  # mono, and a copy of PortAudio's buffer
-
-        stream = sd.InputStream(device=s.device, samplerate=s.rate, channels=s.channels,
-                                dtype="float32", blocksize=int(s.rate * FRAME_S), callback=callback)
-        stream.start()
-        return stream                                       # has .close()
+    def __call__(self, block):
+        n = len(block)
+        self.current_sample += n
+        prob = self.model(block, RATE)
+        if prob >= self.threshold and self.temp_end:
+            self.temp_end = 0
+        if prob >= self.threshold and not self.triggered:
+            self.triggered = True
+            return {"start": max(0, self.current_sample - self.speech_pad_samples - n)}
+        if prob < self.threshold - 0.15 and self.triggered:
+            if not self.temp_end:
+                self.temp_end = self.current_sample
+            if self.current_sample - self.temp_end < self.min_silence_samples:
+                return None
+            end = self.temp_end + self.speech_pad_samples - n
+            self.temp_end = 0
+            self.triggered = False
+            return {"end": end}
+        return None
 
 
-class ArraySource:
-    """Audio already in memory (a test signal or a WAV file) instead of the mic."""
-
-    def __init__(self, audio, rate: int = TARGET_RATE, realtime: bool = False) -> None:
-        audio = np.asarray(audio, dtype=np.float32)
-        self.audio = audio.mean(axis=1) if audio.ndim == 2 else audio
-        self.rate = rate
-        self.realtime = realtime
-        self._stop = threading.Event()
-
-    @classmethod
-    def from_wav(cls, path, realtime: bool = False) -> "ArraySource":
-        from scipy.io import wavfile
-
-        rate, data = wavfile.read(path)
-        if data.dtype.kind in "iu":
-            data = data.astype(np.float32) / float(np.iinfo(data.dtype).max)
-        return cls(data, rate, realtime)
-
-    def blocks(self):
-        step = max(1, int(self.rate * FRAME_S))
-        for i in range(0, len(self.audio), step):
-            yield self.audio[i:i + step]
-
-    def open(self, on_block):
-        def run() -> None:
-            for block in self.blocks():
-                if self._stop.wait(FRAME_S if self.realtime else 0):
-                    return
-                on_block(block)
-
-        threading.Thread(target=run, name="array-source", daemon=True).start()
-        return self
-
-    def close(self) -> None:
-        self._stop.set()
+def load_vad(pause_seconds: float):
+    """Silero VAD (the ONNX model bundled with silero-vad; no download, no torch)."""
+    return VadIterator(SileroOnnx(), threshold=VAD_THRESHOLD,
+                       min_silence_duration_ms=int(pause_seconds * 1000),
+                       speech_pad_ms=SPEECH_PAD_MS)
 
 
-# ------------------------------------------------------------------- helpers
-def rms(audio: np.ndarray) -> float:
-    return float(np.sqrt(np.mean(np.square(audio, dtype=np.float64)))) if len(audio) else 0.0
-
-
-def auto_gain(audio: np.ndarray) -> np.ndarray:
-    """Bring a quiet utterance up toward TARGET_RMS without clipping. Loud ones are left alone."""
-    level = rms(audio)
-    if level < 1e-6:
-        return audio
-    peak = float(np.max(np.abs(audio)))
-    gain = min(TARGET_RMS / level, MAX_AUTO_GAIN, 0.95 / peak)
-    return (audio * gain).astype(np.float32) if gain > 1.0 else audio
-
-
-def level_0_1(audio: np.ndarray) -> float:
-    """-60 dBFS -> 0, 0 dBFS -> 1, for the UI's level bar."""
-    r = rms(audio)
-    return 0.0 if r <= 1e-6 else min(1.0, max(0.0, (20 * math.log10(r) + 60) / 60))
-
-
-# ------------------------------------------------------------------- AudioIn
 class AudioIn:
-    def __init__(self, bus, settings=None, source=None, vad=None) -> None:
+    """Mic -> utterances on the bus.
+
+    Tests pass `sd` (a fake sounddevice), `mic_settings` and `vad` to skip the real mic
+    and model, then call the stream's callback and drain() themselves.
+    """
+
+    def __init__(self, bus, settings=None, sd=None, mic_settings=None, vad=None) -> None:
         if settings is None:
             from engine.config import settings
         self.bus = bus
-        self.source = source
-        self.vad = vad
-        self.mic_gain = float(getattr(settings, "mic_gain", 1.0))
-        self.pause_seconds = _clamp_pause(getattr(settings, "pause_seconds", 1.5))
-        self.rate = getattr(source, "rate", TARGET_RATE)
-        self._queue: queue.Queue = queue.Queue(maxsize=MAX_QUEUED_BLOCKS)
-        self._stop = threading.Event()
+        self.settings = settings
+        self.pause_seconds = float(settings.pause_seconds)
+        self._sd = sd
+        self.mic_settings = mic_settings
+        self._vad = vad
+        self._raw: queue.Queue = queue.Queue(maxsize=RAW_QUEUE_MAX)
         self._stream = None
         self._thread: threading.Thread | None = None
-        self._reset_stream()
+        self._stop = threading.Event()
+        self.dropped_chunks = 0
+        self.chunks = 0                 # mic chunks received (live_check warns if this stalls)
+        self.level = 0.0                # last block's 0-1 level, after gain
+        self._reset_stream_state()
         bus.subscribe(topics.from_ui(messages.SETTINGS), self.on_settings)
 
-    def _reset_stream(self) -> None:
-        self._pending = np.zeros(0, dtype=np.float32)   # 16 kHz samples not yet in a frame
-        self._buf: deque[np.ndarray] = deque()           # source-rate audio, mono
-        self._buf_start = 0                              # source sample index of _buf[0][0]
-        self._n_in = 0                                   # source samples seen
-        self._t = 0.0                                    # stream time at the end of the last frame
-        self._speaking = False
-        self._start_s = self._last_speech_s = self._speech_s = 0.0
-        self._next_level_s = 0.0
+    def _reset_stream_state(self) -> None:
+        import numpy as np
 
-    # ----------------------------------------------------------------- control
-    def start(self) -> bool:
-        """Open the mic (or the injected source) and start the audio thread.
-        Returns False, with a status message for the UI, if no mic works."""
-        if self.vad is None:
-            self.vad = load_vad(lambda text: self._status("warn", text))
-        if self.source is None:
-            self.source = MicSource()
-        try:
-            self._stream = self.source.open(self._on_block)
-        except Exception as exc:
-            self._status("error", f"No microphone: {exc}")
-            return False
-        self.rate = self.source.rate
-        self._thread = threading.Thread(target=self._run, name="audio-in", daemon=True)
-        self._thread.start()
-        return True
+        self._resampler = None
+        self._pending = np.zeros(0, dtype=np.float32)  # 16 kHz samples not yet a full block
+        self._gain = AutoGain()
+        self._blocks = 0                               # blocks processed (sample clock / BLOCK)
+        self._pre = deque(maxlen=max(1, round(PRE_ROLL_S * RATE / BLOCK)))
+        self._speech: list = []                        # blocks of the current utterance
+        self._speech_start = 0                         # sample index of _speech[0]
+        self._voice_start = 0                          # sample index where VAD heard speech
+        self._vad_offset = 0                           # our sample index when the VAD clock was 0
+        self.speaking = False
+
+    # ------------------------------------------------------------------ control
+    def start(self, run_thread: bool = True) -> None:
+        """Open the mic and start the processing thread. Raises RuntimeError if no mic opens."""
+        if self._sd is None:
+            import sounddevice as sd  # heavy: import only when used
+
+            self._sd = sd
+        if self.mic_settings is None:
+            self.mic_settings = mic.open_settings(self._sd, verbose=True)
+        if self._vad is None:
+            self._vad = load_vad(self.pause_seconds)
+        self._resampler = mic.Resampler16k(self.mic_settings.rate)
+        s = self.mic_settings
+        native_block = max(BLOCK, round(BLOCK * s.rate / RATE))
+        self._stream = self._sd.InputStream(device=s.device, samplerate=s.rate,
+                                            channels=s.channels, dtype="float32",
+                                            blocksize=native_block, callback=self._callback)
+        self._stream.start()
+        self._stop.clear()
+        if run_thread:
+            self._thread = threading.Thread(target=self._run, name="audio-in", daemon=True)
+            self._thread.start()
 
     def stop(self) -> None:
         self._stop.set()
         if self._stream is not None:
-            self._stream.close()
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+            self._thread = None
 
     def on_settings(self, msg: dict) -> None:
-        if "pause_seconds" in msg:
-            self.pause_seconds = _clamp_pause(msg["pause_seconds"])
+        value = msg.get("pause_seconds")
+        if value is None:
+            return
+        self.pause_seconds = min(4.0, max(1.0, float(value)))
+        if self._vad is not None:
+            # VADIterator reads min_silence_samples on every block, so this applies right away
+            self._vad.min_silence_samples = int(self.pause_seconds * RATE)
 
-    def _on_block(self, block) -> None:
-        """The mic callback: queue and return right away."""
+    # --------------------------------------------------------- sounddevice side
+    def _callback(self, indata, frames, time_info, status) -> None:
+        """Runs on PortAudio's thread: copy and return, nothing else."""
+        self.chunks += 1
         try:
-            self._queue.put_nowait(block)
+            self._raw.put_nowait(indata.copy())
         except queue.Full:
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                pass
-            self._queue.put_nowait(block)
+            self.dropped_chunks += 1
 
+    # ------------------------------------------------------------ worker side
     def _run(self) -> None:
-        failed = False
         while not self._stop.is_set():
             try:
-                block = self._queue.get(timeout=0.2)
+                chunk = self._raw.get(timeout=0.2)
             except queue.Empty:
                 continue
+            self.process(chunk)
+
+    def drain(self) -> None:
+        """Process every queued chunk now (tests, or a thread-less start)."""
+        while True:
             try:
-                self.feed(block)
-            except Exception as exc:              # one bad block must not stop listening
-                if not failed:
-                    self._status("error", f"Audio processing failed: {exc}")
-                failed = True
+                chunk = self._raw.get_nowait()
+            except queue.Empty:
+                return
+            self.process(chunk)
 
-    # -------------------------------------------------------------- processing
-    def feed(self, block) -> None:
-        """Process one block of source-rate audio. Tests call this directly."""
-        block = np.asarray(block, dtype=np.float32)
-        if block.ndim == 2:
-            block = block.mean(axis=1)
-        if self.mic_gain != 1.0:
-            block = np.clip(block * self.mic_gain, -1.0, 1.0)
-        self._buf.append(block)
-        self._n_in += len(block)
-        self._pending = np.concatenate([self._pending, to_16k(block, self.rate)])
-        while len(self._pending) >= FRAME:
-            frame, self._pending = self._pending[:FRAME], self._pending[FRAME:]
-            self._frame(np.ascontiguousarray(frame))
+    def process(self, chunk) -> None:
+        """Turn one native-rate mic chunk into blocks and run them through gain and VAD."""
+        import numpy as np
 
-    def flush(self) -> None:
-        """End of a file: finish an utterance that is still open."""
-        if self._speaking:
-            self._finish()
+        if self._resampler is None:
+            self._resampler = mic.Resampler16k(self.mic_settings.rate if self.mic_settings else RATE)
+        audio = self._resampler(chunk)
+        if len(audio):
+            self._pending = np.concatenate([self._pending, audio])
+        while len(self._pending) >= BLOCK:
+            block, self._pending = self._pending[:BLOCK], self._pending[BLOCK:]
+            self._block(block)
 
-    def _frame(self, frame: np.ndarray) -> None:
-        start, self._t = self._t, self._t + FRAME_S
-        prob = self.vad.prob(frame)
-        was_speaking = self._speaking
-        if not self._speaking:
-            if prob >= START_PROB:
-                self._speaking = True
-                self._start_s = max(0.0, start - PRE_ROLL_S)
-                self._last_speech_s, self._speech_s = self._t, FRAME_S
-            else:
-                self._trim(self._t - PRE_ROLL_S)
+    @property
+    def speech_prob(self) -> float:
+        """Silero's last speech probability (0-1), or -1 with a fake VAD."""
+        model = getattr(self._vad, "model", None)
+        return getattr(model, "last", -1.0)
+
+    def _block(self, block) -> None:
+        block = self._gain(block)
+        self.level = level_0_1(block)
+        start_sample = self._blocks * BLOCK
+        self._blocks += 1
+        event = self._vad(block)
+
+        if self.speaking:
+            self._speech.append(block)
         else:
-            if prob >= STOP_PROB:
-                self._last_speech_s = self._t
-                self._speech_s += FRAME_S
-            if (self._t - self._last_speech_s >= self.pause_seconds
-                    or self._t - self._start_s >= MAX_UTTERANCE_S):
-                self._finish()
-        if self._speaking != was_speaking or self._t >= self._next_level_s:
-            self._next_level_s = self._t + LEVEL_EVERY_S
+            self._pre.append((start_sample, block))
+
+        if event and "start" in event and not self.speaking:
+            self.speaking = True
+            self._voice_start = int(event["start"]) + self._vad_offset
+            first = self._pre[0][0] if self._pre else start_sample
+            self._speech_start = first
+            self._speech = [b for _, b in self._pre]
+            self._pre.clear()
+        elif event and "end" in event and self.speaking:
+            self._finish(end_sample=int(event["end"]) + self._vad_offset)
+        elif self.speaking and len(self._speech) * BLOCK >= MAX_UTTERANCE_S * RATE:
+            self._finish(end_sample=None)
+            if hasattr(self._vad, "reset_states"):
+                self._vad.reset_states()
+                self._vad_offset = self._blocks * BLOCK
+
+        if self._blocks % LEVEL_EVERY == 0:
             self.bus.publish(topics.TO_UI, messages.make(
-                messages.LISTENING, level=round(level_0_1(frame), 2), speaking=self._speaking))
+                messages.LISTENING, level=self.level, speaking=self.speaking))
 
-    def _finish(self) -> None:
-        self._speaking = False
-        self.vad.reset()
-        end_s = min(self._last_speech_s + TAIL_S, self._t)
-        if self._speech_s >= MIN_SPEECH_S:
-            audio = self._slice(self._start_s, end_s)
-            self.bus.publish(topics.UTTERANCE, auto_gain(to_16k(audio, self.rate)))
-        self._trim(self._t - PRE_ROLL_S)
+    def _finish(self, end_sample: int | None) -> None:
+        import numpy as np
 
-    def _slice(self, start_s: float, end_s: float) -> np.ndarray:
-        audio = np.concatenate(list(self._buf)) if self._buf else np.zeros(0, np.float32)
-        a = max(0, int(start_s * self.rate) - self._buf_start)
-        b = max(a, int(end_s * self.rate) - self._buf_start)
-        return audio[a:b]
-
-    def _trim(self, keep_from_s: float) -> None:
-        """Drop source audio older than keep_from_s (whole blocks only)."""
-        keep_from = int(max(0.0, keep_from_s) * self.rate)
-        while self._buf and self._buf_start + len(self._buf[0]) <= keep_from:
-            self._buf_start += len(self._buf.popleft())
-
-    def _status(self, level: str, text: str) -> None:
-        self.bus.publish(topics.TO_UI, messages.make(messages.STATUS, level=level, text=text))
-
-
-def _clamp_pause(value) -> float:
-    try:
-        return min(MAX_PAUSE_S, max(MIN_PAUSE_S, float(value)))
-    except (TypeError, ValueError):
-        return 1.5
-
-
-if __name__ == "__main__":
-    import sys
-
-    from engine.core.events import EventBus
-
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: python -m engine.voice.audio_in clip.wav")
-    bus = EventBus()
-    bus.subscribe(topics.UTTERANCE, lambda a: print(f"utterance: {len(a) / TARGET_RATE:.2f} s, "
-                                                   f"rms {rms(a):.3f}"))
-    bus.subscribe(topics.TO_UI, lambda m: m["type"] == messages.STATUS and print(m["text"]))
-    src = ArraySource.from_wav(sys.argv[1])
-    audio_in = AudioIn(bus, source=src, vad=load_vad())
-    for b in src.blocks():
-        audio_in.feed(b)
-    audio_in.flush()
+        audio = np.concatenate(self._speech) if self._speech else np.zeros(0, np.float32)
+        end = self._speech_start + len(audio)
+        if end_sample is not None and self._speech_start < end_sample < end:
+            audio = audio[:end_sample - self._speech_start]  # drop the silence VAD waited through
+            end = end_sample
+        voiced = end - max(self._voice_start, self._speech_start)
+        self._speech = []
+        self.speaking = False
+        self.bus.publish(topics.TO_UI, messages.make(messages.LISTENING, level=0.0, speaking=False))
+        if voiced >= MIN_SPEECH_S * RATE:
+            self.bus.publish(topics.UTTERANCE, audio.astype(np.float32))

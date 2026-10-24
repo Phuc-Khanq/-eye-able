@@ -22,7 +22,7 @@ from pathlib import Path
 
 from engine.core import topics
 
-ROOT = Path(__file__).resolve().parent.parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 BEAM_SIZE = 1             # greedy: fastest; short utterances barely gain from beam search
 NO_SPEECH_SKIP = 0.6      # drop a segment Whisper thinks is silence
@@ -31,20 +31,12 @@ MAX_QUEUED = 3            # if Whisper falls behind, drop the oldest utterance
 
 
 def resolve_model(name: str) -> str:
-    """'large-v3-turbo' stays a model name; 'models/whisper-turbo-torgo-ct2' becomes a folder
-    path from the repo root, so it works whatever folder the engine was started from."""
-    if "/" not in name and "\\" not in name:
-        return name
+    """A folder under the repo root (e.g. "models/whisper-elder-ct2") becomes its full path;
+    anything else ("large-v3-turbo", "small") is a model name faster-whisper downloads."""
     path = Path(name)
-    if not path.is_absolute():
-        path = ROOT / path
-    if path.is_dir():
-        return str(path)
-    if name.startswith(("models/", "models\\")):
-        raise FileNotFoundError(f"Whisper model folder not found: {path}. "
-                                "Train it (training/README.md) or remove whisper_model "
-                                "from config.local.json.")
-    return name  # a Hugging Face id such as "openai/whisper-large-v3-turbo"
+    if not path.is_absolute() and (REPO_ROOT / path).is_dir():
+        return str(REPO_ROOT / path)
+    return name
 
 
 class Dictation:
@@ -62,7 +54,7 @@ class Dictation:
         s = self.settings
         if s is None:
             from engine.config import settings as s
-        return s.stt_backend == "assemblyai"
+        return getattr(s, "stt_backend", "whisper") == "assemblyai"
 
     def load(self) -> None:
         if self._use_cloud():
@@ -73,8 +65,13 @@ class Dictation:
             s = self.settings
             if s is None:
                 from engine.config import settings as s
-            self._model = WhisperModel(resolve_model(s.whisper_model), device=s.whisper_device,
-                                       compute_type=s.whisper_compute_type)
+            name = resolve_model(s.whisper_model)
+            kwargs = dict(device=s.whisper_device, compute_type=s.whisper_compute_type)
+            try:
+                # already downloaded: load offline (skips a ~2 s online check, nothing leaves the laptop)
+                self._model = WhisperModel(name, local_files_only=True, **kwargs)
+            except Exception:
+                self._model = WhisperModel(name, **kwargs)   # first run: download it once
 
     def warm_up(self) -> None:
         """First CUDA call is slow; run one second of silence at startup."""

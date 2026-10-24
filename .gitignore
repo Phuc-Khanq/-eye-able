@@ -10,9 +10,12 @@ recordings/
 !tests/recordings/
 tests/recordings/*
 !tests/recordings/*.jsonl
-data/
-user_data/
 calibration/
+
+# Training data, checkpoints and downloaded Kaggle results (TORGO is never published)
+data/
+checkpoints/
+downloads/
 *.wav
 *.mp4
 

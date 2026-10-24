@@ -34,7 +34,6 @@ class Settings:
     # Voice
     sample_rate: int = 16000
     pause_seconds: float = 1.5  # user setting, 1 to 4
-    mic_gain: float = 1.0       # fixed boost before speech detection, for a quiet mic or voice
     whisper_model: str = "large-v3-turbo"
     whisper_device: str = "cuda"
     whisper_compute_type: str = "float16"  # use "int8" on CPU

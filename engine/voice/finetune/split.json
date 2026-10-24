@@ -1,0 +1,21 @@
+{
+  "_note": "Speaker IDs only. No speaker is in more than one split. Severity from Rudzicz et al. 2012 (TORGO).",
+  "torgo": {
+    "test": ["F04", "M01"],
+    "dev": ["M05"],
+    "train": ["F01", "F03", "M02", "M03", "M04"],
+    "_why": "test: F04 = female, very mild; M01 = male, severe. dev: M05 = male, moderate to severe. train: F01 severe, F03 moderate, M02 severe, M03 very mild, M04 severe."
+  },
+  "librispeech": {
+    "test": "test-clean (all of it)",
+    "dev_clean_halves": "dev-clean speakers sorted by ID, alternating within each gender: even positions = train (typical-speech mix), odd positions = dev",
+    "dev_max_clips": 300,
+    "train_max_clips_per_speaker": 80
+  },
+  "personal": {
+    "test_fraction": 0.2,
+    "_how": "split by sentence (the same sentence is never in both), fixed seed"
+  },
+  "sentence_min_words": 3,
+  "seed": 1234
+}

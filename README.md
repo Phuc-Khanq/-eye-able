@@ -72,7 +72,7 @@ npm --prefix ui run dev                          # front end
 - UI-Venus 1.5 (Ant Group): Hugging Face lists Apache 2.0; the GitHub page says research and educational use only.
 - MediaPipe Face Landmarker (Google): Apache 2.0.
 - Whisper weights (OpenAI) via faster-whisper: MIT.
-- TORGO dysarthric speech database (University of Toronto), used only in `training/` to adapt Whisper: free for academic, non-profit use; cite Rudzicz et al. (2012). The data and adapted model are never committed. See `training/README.md`.
+- TORGO dysarthric speech database (University of Toronto), used only in `engine/voice/finetune/` to adapt Whisper: free for academic, non-profit use; cite Rudzicz et al. (2012). The data and adapted model are never committed. See `engine/voice/finetune/DATA.md`.
 
 ## License
 

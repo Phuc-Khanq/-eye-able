@@ -2,63 +2,78 @@
 
 Route: Khoi and Khoa (Khoa leads)
 Publishes: status
-Subscribes: topics.DELETE_VOICE_DATA (the mode manager sends it only after the user confirms)
+Subscribes: a delete request from the settings panel (topics.DELETE_VOICE_DATA, sent by the
+            mode manager after the user confirms)
 APIs: pathlib
 
-Everything personal to one user's voice lives under VOICE_DIR (git-ignored):
-    user_data/voice/commands/     personal_commands.py: the user's 3 to 5 samples per command
-    user_data/voice/vocabulary.txt  names and words for Whisper's hotwords
-Anything that saves voice data must save it there, so this one delete covers it.
+What it deletes: data/voice/personal/ (the recordings made with
+`python -m engine.voice.finetune.record_pack`, plus their transcripts.csv).
+Live microphone audio is never saved, so there is nothing else to delete.
+
+    python -m engine.voice.voice_data      # delete from the command line (asks first)
 """
 
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 from engine.core import messages, topics
 
-ROOT = Path(__file__).resolve().parent.parent.parent
-VOICE_DIR = ROOT / "user_data" / "voice"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PERSONAL_DIR = REPO_ROOT / "data" / "voice" / "personal"
 
 
-def delete_all(voice_dir: Path = VOICE_DIR) -> int:
-    """Delete everything inside voice_dir (the folder itself stays). Returns files removed."""
-    voice_dir = Path(voice_dir).resolve()
-    if voice_dir == voice_dir.parent or voice_dir in (ROOT, *ROOT.parents):
-        raise ValueError(f"Refusing to delete {voice_dir}: not a voice-data folder")
-    if not voice_dir.is_dir():
-        return 0
-    removed = 0
-    for child in voice_dir.iterdir():
-        if child.is_dir() and not child.is_symlink():
-            removed += sum(1 for p in child.rglob("*") if p.is_file())
-            shutil.rmtree(child)
-        else:
-            child.unlink()
-            removed += 1
+def personal_dirs(data_dir: Path | None = None) -> list[Path]:
+    return [Path(data_dir) / "personal"] if data_dir else [PERSONAL_DIR]
+
+
+def delete_all(data_dir: Path | None = None) -> list[Path]:
+    """Delete every personal voice folder. Returns the folders that were removed."""
+    removed = []
+    for folder in personal_dirs(data_dir):
+        if folder.exists():
+            shutil.rmtree(folder)
+            removed.append(folder)
     return removed
 
 
 class VoiceData:
-    """Deletes the files and forgets the vocabulary already loaded into Whisper."""
+    """Deletes the personal voice data when the mode manager asks (after a confirm)."""
 
-    def __init__(self, bus, dictation=None, voice_dir: Path = VOICE_DIR) -> None:
+    def __init__(self, bus, data_dir: Path | None = None) -> None:
         self.bus = bus
-        self.dictation = dictation
-        self.voice_dir = voice_dir
+        self.data_dir = data_dir
         bus.subscribe(topics.DELETE_VOICE_DATA, self.on_delete)
 
-    def on_delete(self, _msg) -> None:
+    def on_delete(self, _payload) -> None:
         try:
-            removed = delete_all(self.voice_dir)
-        except Exception as exc:
-            self._status("error", f"Couldn't delete your voice data: {exc}")
+            removed = delete_all(self.data_dir)
+        except OSError as exc:
+            self._status("error", f"Could not delete your voice data: {exc}")
             return
-        if self.dictation is not None:
-            self.dictation.hotwords = None
-        self._status("info", "Your voice data is deleted." if removed
-                     else "There was no saved voice data to delete.")
+        self._status("info", "Deleted your voice recordings" if removed
+                     else "There were no voice recordings to delete")
 
     def _status(self, level: str, text: str) -> None:
         self.bus.publish(topics.TO_UI, messages.make(messages.STATUS, level=level, text=text))
+
+
+if __name__ == "__main__":
+    folders = [f for f in personal_dirs() if f.exists()]
+    if not folders:
+        print("No personal voice data found.")
+        sys.exit(0)
+    for f in folders:
+        n = sum(1 for p in f.rglob("*") if p.is_file())
+        print(f"{f}: {n} files")
+    try:
+        answer = input("Delete all of it? [y/N] ").strip().lower()
+    except EOFError:
+        answer = ""
+    if answer in ("y", "yes"):
+        delete_all()
+        print("Deleted.")
+    else:
+        print("Nothing deleted.")

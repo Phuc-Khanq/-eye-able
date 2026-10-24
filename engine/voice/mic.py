@@ -1,7 +1,7 @@
 """Find a mic format Windows accepts, and turn its audio into 16 kHz mono.
 
 Route: Khoi and Khoa
-Used by: whisper_bench.py now; audio_in.py should use open_settings() and to_16k() too.
+Used by: whisper_bench.py (record) and audio_in.py (open_settings, Resampler16k).
 
 Why: laptop mic arrays (Intel Smart Sound, Realtek) often refuse 44.1 kHz or 2 channels
 and fail with "format is not supported" (MME error 32) or DSERR_BADFORMAT. We try each
@@ -113,6 +113,48 @@ def to_16k(audio, rate: int):
         g = gcd(TARGET_RATE, rate)
         audio = resample_poly(audio, TARGET_RATE // g, rate // g)
     return audio.astype(np.float32)
+
+
+class Resampler16k:
+    """to_16k for a live stream: feed chunks of any size, get 16 kHz mono back.
+
+    Resampling each small chunk on its own clicks at the edges, so we keep a short
+    overlap from the previous chunk and only return output the filter fully covered.
+    The output runs about PAD_MS behind the input.
+    """
+
+    PAD_MS = 4
+
+    def __init__(self, rate: int) -> None:
+        import numpy as np
+        from math import ceil, gcd
+
+        g = gcd(TARGET_RATE, rate)
+        self.up, self.down = TARGET_RATE // g, rate // g
+        min_pad = max(64, rate * self.PAD_MS // 1000)
+        self.pad = self.down * ceil(min_pad / self.down)   # whole output samples
+        self._buf = np.zeros(self.pad, dtype=np.float32)  # silence as the first history
+
+    def __call__(self, chunk):
+        import numpy as np
+
+        chunk = np.asarray(chunk, dtype=np.float32)
+        if chunk.ndim == 2:
+            chunk = chunk.mean(axis=1)
+        if self.up == self.down:
+            return chunk
+        from scipy.signal import resample_poly
+
+        buf = np.concatenate([self._buf, chunk])
+        usable = (len(buf) // self.down) * self.down
+        if usable < 2 * self.pad + self.down:
+            self._buf = buf
+            return np.zeros(0, dtype=np.float32)
+        y = resample_poly(buf[:usable], self.up, self.down)
+        a = self.pad * self.up // self.down
+        b = (usable - self.pad) * self.up // self.down
+        self._buf = buf[usable - 2 * self.pad:]
+        return y[a:b].astype(np.float32)
 
 
 def record(seconds: float, preferred: int | None = None):

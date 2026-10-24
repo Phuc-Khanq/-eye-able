@@ -13,23 +13,27 @@ from engine.core import messages, topics
 from engine.core.events import EventBus
 from engine.core.mode_manager import Mode
 from engine.core.types import GazePoint, Gesture
-from engine.main import Engine
-from engine.voice.audio_in import ArraySource, EnergyVad
+from engine.main import Engine, play_wav
 from engine.voice.dictation import Dictation
+from engine.voice.mic import MicSettings
 from tests.helpers import FakeWhisperModel
+from tests.test_audio_in import FakeSD, FakeVad
 from tests.test_demo_flow import EXPECTED_OS, SCRIPT
 
-SETTINGS = SimpleNamespace(pause_seconds=1.5, mic_gain=1.0)
+SETTINGS = SimpleNamespace(pause_seconds=1.0)
+MIC = MicSettings(0, "fake mic", "MME", 16000, 1)
 
 
 class Recorder:
     def __init__(self, bus):
         self.log, self.lock = [], threading.Lock()
         self.transcripts = threading.Semaphore(0)
+        self.utterances = threading.Semaphore(0)
         for topic in (topics.OS_CLICK, topics.OS_TYPE, topics.OS_KEY, topics.OS_SCROLL, topics.TO_UI):
             bus.subscribe(topic, lambda p, t=topic: self._add(t, p))
         # Subscribed after the mode manager, so this runs once it has handled the transcript.
         bus.subscribe(topics.TRANSCRIPT, lambda p: self.transcripts.release())
+        bus.subscribe(topics.UTTERANCE, lambda p: self.utterances.release())
 
     def _add(self, topic, payload):
         with self.lock:
@@ -39,12 +43,19 @@ class Recorder:
         with self.lock:
             return [(t, p) for t, p in self.log if t.startswith("os.")]
 
+    def statuses(self):
+        with self.lock:
+            return [p for t, p in self.log if t == topics.TO_UI and p["type"] == messages.STATUS]
+
+
+def make_engine(bus, **kwargs):
+    return Engine(bus, SETTINGS, dictation=Dictation(model=FakeWhisperModel()),
+                  mic_settings=MIC, vad=FakeVad(min_silence_s=1.0), warm_up=False, **kwargs)
+
 
 def run_once():
     bus = EventBus()
-    silence = ArraySource(np.zeros(16000, np.float32))
-    engine = Engine(bus, SETTINGS, dictation=Dictation(model=FakeWhisperModel()),
-                    audio_source=silence, vad=EnergyVad(), warm_up=False)
+    engine = make_engine(bus, sd=FakeSD())
     rec = Recorder(bus)
     engine.start()
     try:
@@ -76,22 +87,31 @@ class TestEngine(unittest.TestCase):
 
     def test_a_missing_mic_does_not_stop_the_engine(self):
         class NoMic:
-            rate = 48000
-
-            def open(self, on_block):
+            def InputStream(self, **kwargs):
                 raise RuntimeError("No mic format worked")
 
         bus = EventBus()
-        engine = Engine(bus, SETTINGS, dictation=Dictation(model=FakeWhisperModel()),
-                        audio_source=NoMic(), vad=EnergyVad(), warm_up=False)
+        engine = make_engine(bus, sd=NoMic())
         rec = Recorder(bus)
         engine.start()
         try:
-            bus.publish(topics.UTTERANCE, "start dictation")   # voice still works from other sources
+            self.assertTrue(any("No microphone" in s["text"] for s in rec.statuses()))
+            bus.publish(topics.UTTERANCE, "start dictation")   # the rest still works
             self.assertTrue(rec.transcripts.acquire(timeout=5))
             self.assertEqual(engine.mode_manager.mode, Mode.DICTATION)
-            statuses = [p for t, p in rec.log if t == topics.TO_UI and p["type"] == messages.STATUS]
-            self.assertTrue(any("No microphone" in s["text"] for s in statuses))
+        finally:
+            engine.stop()
+
+    def test_wav_instead_of_the_mic(self):
+        bus = EventBus()
+        engine = make_engine(bus)
+        rec = Recorder(bus)
+        engine.start(listen=False)
+        t = np.arange(16000) / 16000
+        speech = np.concatenate([np.zeros(8000), 0.3 * np.sin(2 * np.pi * 220 * t)]).astype(np.float32)
+        try:
+            play_wav(engine.audio_in, speech, 16000, threading.Event(), realtime=False)
+            self.assertTrue(rec.utterances.acquire(timeout=5))
         finally:
             engine.stop()
 

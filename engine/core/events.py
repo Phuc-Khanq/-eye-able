@@ -23,7 +23,12 @@ from engine.core import topics
 
 
 class EventBus:
-    """Thread-safe publish/subscribe. Camera, audio and UI-Venus threads publish here."""
+    """Thread-safe publish/subscribe. Camera, audio and UI-Venus threads publish here.
+
+    publish() calls each handler right away on the publisher's thread, so handlers
+    must be quick (queue the work, like DictationWorker.on_utterance does).
+    A handler that raises is reported and skipped; it never breaks the publisher.
+    """
 
     def __init__(self) -> None:
         self._handlers: dict[str, list[Callable[[Any], None]]] = defaultdict(list)

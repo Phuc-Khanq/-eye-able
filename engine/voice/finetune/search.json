@@ -1,0 +1,8 @@
+{
+  "_note": "run_all trains these one by one, in order, and picks the best on DEV only. Any field left out uses the default in train.py.",
+  "configs": [
+    {"name": "r32-lr1e-4-mix25", "lora_r": 32, "lora_alpha": 64, "lr": 1e-4, "typical_mix": 0.25},
+    {"name": "r32-lr5e-5-mix25", "lora_r": 32, "lora_alpha": 64, "lr": 5e-5, "typical_mix": 0.25},
+    {"name": "r64-lr1e-4-mix35", "lora_r": 64, "lora_alpha": 128, "lr": 1e-4, "typical_mix": 0.35}
+  ]
+}

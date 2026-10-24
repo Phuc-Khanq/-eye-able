@@ -21,6 +21,8 @@ class EyeFeatures:
     v: float      # below the corner line, divided by eye width
     lid: float    # lid gap divided by eye width
     usable: bool  # False on blinks or bad frames
+    blend_h: float = 0.0  # MediaPipe's eye-direction score, + = toward the image's right (about -1 to 1)
+    blend_v: float = 0.0  # MediaPipe's eye-direction score, + = looking down (about -1 to 1)
 
 
 @dataclass
@@ -59,3 +61,9 @@ class TargetResult:
     x: int = -1     # screen pixels (physical); -1 when not found
     y: int = -1
     ms: float = 0.0  # time UI-Venus took
+
+
+@dataclass
+class MouthSample:
+    t_ms: int     # camera frame time: time.monotonic() in ms, the clock audio_in stamps utterances with
+    open: float   # MediaPipe jawOpen, 0 (closed) to about 1

@@ -13,10 +13,14 @@ from pathlib import Path
 @dataclass
 class Settings:
     # Camera
+    # Defaults are the demo PC's webcam; run `python -m tests.camera_probe` to check a camera.
     camera_index: int = 0
+    camera_backend: str = "dshow"  # "dshow", "msmf" or "any"
+    camera_fourcc: str = "MJPG"    # "" lets the driver choose
     frame_width: int = 1280
     frame_height: int = 720
     fps: int = 30
+    preview_mirror: bool = True    # mirror only what people see; MediaPipe gets the unmirrored frame
     face_model_path: str = "models/face_landmarker.task"
     blink_threshold: float = 0.5
 

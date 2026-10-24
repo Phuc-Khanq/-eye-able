@@ -68,6 +68,41 @@ class TestDictation(Base):
         self.assertEqual(self.bus.of(topics.TARGET_REQUEST), [])
         self.assertEqual(len(self.mm.preview), 7)
 
+    def test_click_still_clicks_while_dictating(self):
+        self.say("start dictation")
+        self.look(400, 200)
+        self.say("click search box")
+        req = self.bus.of(topics.TARGET_REQUEST)[-1]
+        self.assertEqual((req.label, req.gaze_x), ("Search Box", 400))
+        self.assertEqual(self.mm.preview, [])
+        self.assertEqual(self.mm.mode, Mode.DICTATION)
+
+    def test_type_words_in_pointer_mode(self):
+        self.say("type see you at noon")
+        self.assertEqual(self.mm.mode, Mode.POINTER)
+        self.assertEqual(self.mm._preview_text(), "see you at noon")
+        self.say("yes")
+        self.assertEqual(self.os(), [(topics.OS_TYPE, {"text": "see you at noon "})])
+
+    def test_yes_with_nothing_waiting_says_so(self):
+        self.say("yes")
+        self.assertEqual(self.os(), [])
+        self.assertIn("Nothing is waiting", self.bus.ui(messages.STATUS)[-1]["text"])
+
+    def test_trigger_word_makes_a_command_while_dictating(self):
+        self.say("start dictation")
+        self.say("hello team")
+        self.say("computer, stop dictation")
+        self.assertEqual(self.bus.ui(messages.CONFIRM)[-1]["state"], "open")   # asks to insert first
+        self.assertEqual(self.mm._preview_text(), "hello team")
+
+    def test_dictation_text_and_click_in_one_utterance(self):
+        self.say("start dictation")
+        self.look(300, 200)
+        self.say("see you at noon. click send")
+        self.assertEqual(self.mm._preview_text(), "see you at noon.")
+        self.assertEqual(self.bus.of(topics.TARGET_REQUEST)[-1].label, "Send")
+
     def test_ui_edit_word(self):
         self.say("start dictation")
         self.say("meet at nine? today")
@@ -238,3 +273,93 @@ class TestModes(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMixedSpeech(Base):
+    """Whisper hands over everything said before a pause as one utterance (from a live test)."""
+
+    def answer(self, found=True):
+        req = self.bus.of(topics.TARGET_REQUEST)[-1]
+        self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, found, 410, 220))
+
+    def clicks(self):
+        return [p for t, p in self.os() if t == topics.OS_CLICK]
+
+    def test_yes_in_the_same_breath_clicks_when_found(self):
+        self.look()
+        self.say("Click search box. Yeah.")
+        self.assertEqual(self.bus.of(topics.TARGET_REQUEST)[-1].label, "Search Box")
+        self.answer()
+        self.assertEqual(self.clicks(), [{"x": 410, "y": 220}])
+
+    def test_repeating_the_command_answers_yes(self):
+        self.look()
+        self.say("click window")
+        self.answer()
+        self.say("Click window. Click window.")
+        self.assertEqual(len(self.bus.of(topics.TARGET_REQUEST)), 1)
+        self.assertEqual(self.clicks(), [{"x": 410, "y": 220}])
+
+    def test_repeats_after_a_click_dont_click_again(self):
+        self.look()
+        self.say("click window")
+        self.answer()
+        self.say("Click it. Click window. Click window.")
+        self.assertEqual(len(self.clicks()), 1)
+        self.assertEqual(len(self.bus.of(topics.TARGET_REQUEST)), 1)
+
+    def test_repeated_yes_counts_once(self):
+        self.look()
+        self.say("click minus")
+        self.answer()
+        self.say("Yes. Yes.")
+        self.assertEqual(len(self.clicks()), 1)
+
+    def test_type_keeps_words_after_a_comma(self):
+        self.say("type hello, see you at noon")
+        self.assertEqual(self.mm._preview_text(), "hello, see you at noon")
+
+    def test_chatter_is_ignored_in_pointer_mode(self):
+        self.say("I'm going to take a look at the top of the top.")
+        self.assertEqual(self.os(), [])
+        self.assertEqual(self.bus.of(topics.TARGET_REQUEST), [])
+
+
+class TestEyebrowRaise(Base):
+    def test_answers_an_open_question(self):
+        self.look()
+        self.say("click send")
+        req = self.bus.of(topics.TARGET_REQUEST)[-1]
+        self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 410, 220))
+        self.gesture("brow_raise")
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 410, "y": 220})])
+
+    def test_inserts_the_preview_while_dictating(self):
+        self.say("start dictation")
+        self.say("on my way")
+        self.gesture("brow_raise")
+        self.assertEqual(self.os(), [(topics.OS_TYPE, {"text": "on my way "})])
+
+    def test_types_a_one_shot_preview_in_pointer_mode(self):
+        self.say("type see you soon")
+        self.gesture("brow_raise")
+        self.assertEqual(self.os(), [(topics.OS_TYPE, {"text": "see you soon "})])
+
+    def test_while_searching_clicks_when_found(self):
+        self.look()
+        self.say("click send")
+        self.gesture("brow_raise")
+        req = self.bus.of(topics.TARGET_REQUEST)[-1]
+        self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 410, 220))
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 410, "y": 220})])
+
+    def test_with_nothing_waiting_does_nothing_and_says_nothing(self):
+        self.gesture("brow_raise")
+        self.assertEqual(self.os(), [])
+        self.assertEqual(self.bus.ui(messages.STATUS), [])
+
+    def test_ignored_while_paused(self):
+        self.say("type hello")
+        self.say("pause")
+        self.gesture("brow_raise")
+        self.assertEqual(self.os(), [])

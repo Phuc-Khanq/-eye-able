@@ -57,6 +57,9 @@ MAX_FRAME_SCALE = 4.0
 # stopped halfway at 150 deg/s. Throws that end on the screen are cut as before, so the middle feels the same.
 # Turning back drops what's left. (No assist for slow moves: icons 20-60 px from an edge must stay reachable.)
 MAX_CARRY_PX = 1500.0
+# A comfortable turn (tests.pointer_feel edge test, Hung's laptop, 32 fps, 2026-10-24): the head moved over about
+# 38 degrees of yaw and 23 of pitch (5th..95th percentile), so about 19 degrees to a side and 11 up or down from
+# the middle. All four edges were reached in 0.3-2.8 s. Replaying that log through the old code missed the right edge.
 REVERSE_DEG = 0.3       # a head move against the throw bigger than this per frame (9 deg/s; not tracking noise)
 
 # Gaze (hybrid and gaze modes), One Euro in screen fractions. Tuned on 195 real calibration dots (9 sittings):

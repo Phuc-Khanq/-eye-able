@@ -268,3 +268,84 @@ class Rewriter:
         """(text to show, used, ms). Not used: the original text comes back."""
         r = self.rewrite_full(text)
         return r.clean, r.used, r.ms
+
+
+# ------------------------------------------------------------------ the worker
+class RewriteWorker:
+    """Runs the Rewriter on its own thread (CONTRIBUTING rule 9).
+
+    on_request only stores the request: it runs on the mode manager's thread, which may be the
+    camera thread. There is room for one waiting request; a newer one replaces it, so stale
+    text never runs. Every request that runs gets a REWRITE_RESULT. If the model can't load,
+    one status says so and every later request is answered at once with used=False, so the
+    mode manager never waits on a dead model.
+    """
+
+    def __init__(self, bus, rewriter, settings=None, log=print) -> None:
+        import threading
+
+        self.bus = bus
+        self.rewriter = rewriter
+        self._log = log
+        self._cv = threading.Condition()
+        self._next: dict | None = None
+        self._stopping = False
+        self._thread: threading.Thread | None = None
+        self.off_reason: str | None = None
+        from engine.core import topics
+
+        bus.subscribe(topics.REWRITE_REQUEST, self.on_request)
+
+    def on_request(self, request: dict) -> None:
+        with self._cv:
+            self._next = request                     # newest wins
+            self._cv.notify()
+
+    def start(self, warm_up: bool = True) -> None:
+        import threading
+
+        self._thread = threading.Thread(target=self._run, args=(warm_up,), name="rewrite", daemon=True)
+        self._thread.start()
+
+    def stop(self, timeout: float = 2.0) -> None:
+        with self._cv:
+            self._stopping = True
+            self._cv.notify()
+        if self._thread is not None:
+            self._thread.join(timeout)
+
+    def _run(self, warm_up: bool) -> None:
+        if warm_up:
+            try:
+                self.rewriter.warm_up()
+            except Exception as exc:
+                self.off_reason = str(exc) or type(exc).__name__
+                self._status("warn", f"Text clean-up is off: {self.off_reason}")
+        while True:
+            with self._cv:
+                while self._next is None and not self._stopping:
+                    self._cv.wait()
+                if self._stopping:
+                    return
+                request, self._next = self._next, None
+            self.process(request)
+
+    def process(self, request: dict) -> None:
+        """Rewrite one request and publish the result. Tests call this directly."""
+        from engine.core import topics
+
+        text = request.get("text", "")
+        clean, used, ms = text, False, 0.0
+        if self.off_reason is None:
+            try:
+                clean, used, ms = self.rewriter.rewrite(text)
+            except Exception as exc:                 # Rewriter.rewrite doesn't raise; a fake might
+                self._log(f"[rewrite] failed ({exc}); using the original text")
+                clean, used = text, False
+        self.bus.publish(topics.REWRITE_RESULT, {"id": request.get("id"), "clean": clean, "used": bool(used),
+                                                 "ms": ms})
+
+    def _status(self, level: str, text: str) -> None:
+        from engine.core import messages, topics
+
+        self.bus.publish(topics.TO_UI, messages.make(messages.STATUS, level=level, text=text))

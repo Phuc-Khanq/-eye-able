@@ -97,5 +97,46 @@ class TestDwellIsTheLeftClick(Base):
         self.assertEqual(self.clicks(), [{"x": 300, "y": 200}])          # no "button": left by default
 
 
+class TestDwellOnOff(Base):
+    """Task 6b: "stop clicking" / "start clicking" turn dwell (the left click) off / on."""
+
+    def dwell(self):
+        return self.bus.of(topics.DWELL)
+
+    def test_pointer_mode(self):
+        self.say("Stop clicking.")
+        self.say("start clicking")
+        self.assertEqual(self.dwell(), [{"on": False}, {"on": True}])
+        self.assertEqual(self.bus.ui(messages.STATUS), [])     # the eyes service shows "Dwell clicking on/off"
+
+    def test_while_dictating_it_is_a_command_not_text(self):
+        self.say("start dictation")
+        self.say("stop clicking")
+        self.assertEqual(self.dwell(), [{"on": False}])
+        self.assertEqual(self.mm.preview, [])
+
+    def test_after_a_trigger_word_inside_dictation(self):
+        self.say("start dictation")
+        self.say("hi mom")
+        self.say("Venus, stop clicking")
+        self.assertEqual(self.dwell(), [{"on": False}])
+        self.assertEqual(self.mm._preview_text(), "hi mom")
+
+    def test_near_misses_stay_speech(self):
+        for text in ["stop clicking on that", "I'll start clicking around", "stopped clicking", "clicking"]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.say(text)
+                self.say("start dictation")
+                self.say(text)
+                self.assertEqual(self.dwell(), [])
+                self.assertEqual(self.mm._preview_text(), text)
+
+    def test_ignored_while_paused(self):
+        self.say("pause")
+        self.say("stop clicking")
+        self.assertEqual(self.dwell(), [])
+
+
 if __name__ == "__main__":
     unittest.main()

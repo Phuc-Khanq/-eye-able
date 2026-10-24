@@ -75,6 +75,9 @@ FIXED_COMMANDS: dict[str, str] = {
     "nope": "no",
     "calibrate": "calibrate",
     "delete my voice data": "delete_voice_data",
+    # Dwell (resting the cursor) is the left click: these turn it off / on
+    "stop clicking": "dwell_off",
+    "start clicking": "dwell_on",
     # Dictation clean-up: switch the preview between the cleaned text and the user's own words
     "use original": "use_original",
     "use the original": "use_original",
@@ -94,7 +97,7 @@ FIXED_CUTOFF = 80
 VERB_CUTOFF = 75
 EXACT_ONLY_BELOW = 6       # phrases shorter than this (chars) must match exactly
 # ...and these always: fuzzy matching made "I used the original" and "cleaning up" commands
-EXACT_ONLY = {"use original", "use the original", "clean it up"}
+EXACT_ONLY = {"use original", "use the original", "clean it up", "stop clicking", "start clicking"}
 MAX_COMMAND_WORDS = 5      # longer utterances are never fixed commands
 MAX_LABEL_WORDS = 5        # "click <up to 5 words>"
 

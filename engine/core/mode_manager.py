@@ -429,6 +429,9 @@ class ModeManager:
                       on_yes=lambda: self.bus.publish(topics.DELETE_VOICE_DATA, {}))
         elif name == "target":
             self._look_and_say(cmd.label)
+        elif name in ("dwell_off", "dwell_on"):
+            # the eyes service switches dwell (the left click) and shows the status itself
+            self.bus.publish(topics.DWELL, {"on": name == "dwell_on"})
         elif name == "use_original":
             if self.preview and self._use_clean:
                 self._use_clean = False

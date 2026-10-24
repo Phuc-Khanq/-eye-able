@@ -208,9 +208,6 @@ class GestureDetector:
                 return None               # a slow sweep across the screen, not a shake
         if np.ptp(pitch[points[0][0]:]) > CROSS_AXIS_FRACTION * 2 * self.shake_deg:
             return None
-        _, _, _, roll = self._window(SHAKE_WINDOW_MS)
-        if np.ptp(roll) > CROSS_AXIS_FRACTION * 2 * self.shake_deg:
-            return None               # tilting while turning is not a shake
         return Gesture(t_ms=int(t[-1]), type="shake")
 
     def _tilt(self, pose: HeadPose) -> Gesture | None:

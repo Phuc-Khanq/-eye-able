@@ -110,6 +110,8 @@ SCENARIOS = [
         tilt_track(200, 20, 40, 18)), ["tilt_right"]),
     ("tilt right, then a nod after it", lambda: run(np.zeros(200), bump(200, 100, 14, 14),
         tilt_track(200, 20, 30, 20)), ["tilt_right", "nod"]),
+    ("shake with a little natural roll still counts", lambda: run(shake_track(200, 20), np.zeros(200),
+        shake_track(200, 20, amp=6, cycles=2, frames=24)), ["shake"]),
     ("tilt right starts while the head is still in a shake's cooldown", lambda: run(shake_track(200, 20), np.zeros(200),
         tilt_track(200, 60, 30, 20)), ["shake", "tilt_right"]),
 ]

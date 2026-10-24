@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>diseyeble</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Rubik:wght@700;800&family=JetBrains+Mono:wght@400;600&family=Roboto+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<template id="mascot-tpl">
+<svg class="mascot" viewBox="0 0 220 240" aria-hidden="true">
+  <ellipse cx="110" cy="230" rx="46" ry="7" fill="currentColor" opacity=".18"/>
+  <g class="bob">
+    <path d="M88 176 L80 214" stroke="var(--ink)" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <path d="M132 176 L140 214" stroke="var(--ink)" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <ellipse cx="72" cy="216" rx="16" ry="8" fill="var(--iris)"/>
+    <ellipse cx="148" cy="216" rx="16" ry="8" fill="var(--iris)"/>
+    <path d="M38 110 Q20 120 24 140" stroke="var(--ink)" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <g class="arm-r"><path d="M182 104 Q204 90 202 66" stroke="var(--ink)" stroke-width="6" stroke-linecap="round" fill="none"/><circle cx="202" cy="62" r="7" fill="var(--eyewhite)" stroke="var(--ink)" stroke-width="4"/></g>
+    <circle cx="110" cy="104" r="76" fill="var(--eyewhite)" stroke="var(--ink)" stroke-width="5"/>
+    <path d="M48 86 q10 4 14 14 M50 128 q12 -2 18 6 M172 82 q-10 6 -12 16 M168 132 q-10 -4 -18 4" stroke="var(--vein)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <g class="iris">
+      <circle cx="110" cy="104" r="34" fill="var(--iris)"/>
+      <circle cx="110" cy="104" r="34" fill="none" stroke="var(--ink)" stroke-opacity=".25" stroke-width="3" stroke-dasharray="2 5"/>
+      <circle cx="110" cy="104" r="15" fill="#0A0F1E"/>
+      <circle cx="101" cy="94" r="6" fill="#fff"/>
+      <circle cx="120" cy="112" r="2.5" fill="#fff" opacity=".8"/>
+    </g>
+    <circle cx="64" cy="150" r="9" fill="var(--vein)" opacity=".6"/>
+    <circle cx="156" cy="150" r="9" fill="var(--vein)" opacity=".6"/>
+    <clipPath id="CLIPID"><circle cx="110" cy="104" r="73.5"/></clipPath>
+    <g clip-path="url(#CLIPID)"><rect class="lid" x="30" y="26" width="160" height="160" fill="var(--lid)"/></g>
+    <path d="M68 30 q42 -26 84 0" stroke="var(--ink)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>
+</template>
+
+<canvas id="dotField" aria-hidden="true"></canvas>
+<div class="bgimg" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#intro" data-go="intro" aria-label="Diseyeble home"><span class="wordmark wm2" role="img" aria-label="diseyeble"><span class="wm2-a">dis</span><span class="wm2-eye"><i class="wc wc-tl"></i><i class="wc wc-tr"></i><i class="wc wc-bl"></i><i class="wc wc-br"></i><b>eye</b></span><span class="wm2-a">ble</span></span></a>
+    <nav class="pagelinks" aria-label="Pages">
+      <button data-page-go="0">Home</button><button data-page-go="1">How it works</button><button data-page-go="2">Controls</button><button data-page-go="3">Voice</button><button data-page-go="4">Gestures</button>
+      <button class="nav-demo" id="tab-demo" data-go="demo" aria-selected="false">Live demo</button>
+    </nav>
+    <button id="tab-intro" data-go="intro" hidden aria-selected="true">Introduction</button>
+  </div>
+</header>
+
+<!-- ======================= SCREEN 1: INTRODUCTION ======================= -->
+<main id="intro">
+  <section class="hero-band ipage" id="pg-home" data-page="0" aria-label="Home">
+  <canvas id="peepCanvas" aria-hidden="true"></canvas>
+  <div class="wrap hero">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">Hands-free computing for older adults and people with disabilities</div>
+        <h1>Your eyes, face and voice are the <em>mouse</em>.</h1>
+        <p class="lead lead-lines"><span class="lead-name">&ldquo;dis<b>EYE</b>ble&rdquo;</span> turns an ordinary webcam and microphone into a full computer controller.<br>
+          Look to move the pointer.<br>
+          Hold your gaze, nod or shake your head.<br>
+          Say what you want, even if your speech is slurred or quiet.</p>
+        <div class="modal-row" aria-label="Ways to control">
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/><circle cx="13.2" cy="10.8" r=".9" fill="currentColor" stroke="none"/></svg>Eyes</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" opacity=".35"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>Gaze hold</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10.5" r="4.5"/><path d="M12 2.5v1.5M10 3.8 12 2l2 1.8"/><path d="M12 18.5V22M10 20.2l2 1.8 2-1.8"/></svg>Nod</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="4.5"/><path d="M5 11H2.5M4.2 9 2.4 11l1.8 2"/><path d="M19 11h2.5M19.8 9l1.8 2-1.8 2"/><path d="M8.5 19.5c1-1 2.1-1.5 3.5-1.5s2.5.5 3.5 1.5"/></svg>Head shake</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(-20 12 11)"><circle cx="12" cy="10" r="4.5"/><path d="M12 14.5v3"/></g><path d="M18.5 5.5a8 8 0 0 1 1.8 6.5"/><path d="m21.6 10.6-1.3 1.6-1.6-1.4"/></svg>Head tilt</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/><path d="M3 9.5v3M21 9.5v3" opacity=".6"/></svg>Voice</span>
+        </div>
+        <div class="cta-row">
+          <button class="btn btn-primary" id="allowCam"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg><span id="allowCamTxt">Allow camera</span></button>
+          <button class="btn btn-ghost" data-page-go="1">How it works →</button>
+        </div>
+      </div>
+
+      <div class="hero-eye" id="heroEye" aria-label="Peep, the diseyeble mascot: an iris made of coloured dots that follows your pointer"></div>
+    </div>
+  </div>
+  </section>
+
+  <section class="ipage" id="pg-how" data-page="1" aria-label="How it works" hidden>
+    <canvas id="howDots" aria-hidden="true"></canvas>
+    <div class="wrap ipage-in">
+      <span class="ipage-num label">02 / 05 · How it works</span>
+
+    <div class="how-grid" id="howGrid">
+      <div class="how-left">
+        <div class="sec-head">
+          <h2>How eye tracking works with a normal webcam</h2>
+          <p>No special hardware. diseyeble finds your face, measures where each iris sits inside the eye, and maps that to a point on the screen.</p>
+        </div>
+        <div class="lab-viz" id="howLab">
+          <span class="label" style="color:inherit;opacity:.7">Try it · move your mouse over this panel</span>
+          <svg class="eye-svg" id="labEye" viewBox="0 0 440 220" aria-label="3D eye diagram that follows your pointer">
+            <defs>
+              <clipPath id="eyeClip"><path d="M44 112 Q220 -34 398 112 Q220 246 44 112Z"/></clipPath>
+              <radialGradient id="eyeBall" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#1b1d1c"/><stop offset=".6" stop-color="#0b0c0c"/><stop offset="1" stop-color="#030303"/></radialGradient>
+              <radialGradient id="irisFill" cx="50%" cy="50%" r="50%">
+                <stop offset="0" stop-color="#1a0f08"/><stop offset=".3" stop-color="#24150b"/><stop offset=".34" stop-color="#6e441a"/><stop offset=".41" stop-color="#9c6a27"/><stop offset=".48" stop-color="#c38f3e"/><stop offset=".55" stop-color="#8e8a5a"/><stop offset=".64" stop-color="#7f8a70"/><stop offset=".82" stop-color="#6a755f"/><stop offset=".93" stop-color="#4d5446"/><stop offset="1" stop-color="#22261f"/>
+              </radialGradient>
+              <radialGradient id="irisShade" cx="38%" cy="32%" r="72%"><stop offset="0" stop-color="#fff" stop-opacity=".12"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></radialGradient>
+              <filter id="glowW" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              <filter id="glowI" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feComponentTransfer in="b" result="b2"><feFuncA type="linear" slope=".7"/></feComponentTransfer><feMerge><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <path d="M44 112 Q220 -34 398 112 Q220 246 44 112Z" fill="url(#eyeBall)"/>
+            <g clip-path="url(#eyeClip)">
+              <g id="labMeridians" fill="none" stroke="rgba(205,228,220,.55)" stroke-width="1.2"></g>
+              <g id="labIrisWrap" filter="url(#glowI)">
+                <g id="labIris">
+                  <circle r="56" fill="url(#irisFill)"/>
+                  <g id="labFibers"></g>
+                  <path id="labCollar" fill="none" stroke="rgba(214,152,60,.9)" stroke-width="2.2" stroke-linejoin="round"/>
+                  <circle r="54" fill="none" stroke="#1c1e18" stroke-width="4"/>
+                  <circle r="56" fill="url(#irisShade)"/>
+                  <circle id="labPupil" r="19" fill="#060608"/>
+                </g>
+              </g>
+              <circle id="labGlint" r="11" fill="#fff" filter="url(#glowW)"/>
+              
+            </g>
+            <path d="M44 112 L26 103 L30 121 Z" fill="none" stroke="#F4F4F0" stroke-width="1.6" stroke-linejoin="round" filter="url(#glowW)"/>
+            <path d="M44 112 Q220 -34 398 112 Q220 246 44 112Z" fill="none" stroke="#F7F5EE" stroke-width="2.4" stroke-linejoin="round" filter="url(#glowW)"/>
+            <circle cx="44" cy="112" r="4.5" fill="#F0A94B"/><circle cx="398" cy="112" r="4.5" fill="#F0A94B"/>
+            <line x1="44" y1="112" x2="398" y2="112" stroke="#F0A94B" stroke-width="1" stroke-dasharray="3 6" opacity=".35"/>
+            <circle id="labCenter" cx="221" cy="112" r="3.5" fill="#F0A94B"/>
+            <text x="44" y="160" fill="#F0A94B" font-size="11" font-family="JetBrains Mono, monospace" text-anchor="middle" opacity=".85">corner 33</text>
+            <text x="398" y="160" fill="#F0A94B" font-size="11" font-family="JetBrains Mono, monospace" text-anchor="middle" opacity=".85">corner 133</text>
+          </svg>
+          <div class="readout">
+            <div>iris offset x<b id="roX">+0.00</b></div>
+            <div>iris offset y<b id="roY">+0.00</b></div>
+            <div>screen point<b id="roP">960, 540</b></div>
+          </div>
+                </div>
+        <div class="how-back"><button class="btn btn-ghost" data-page-go="0">← Back</button></div>
+      </div>
+      <svg class="how-wires" id="howWires" aria-hidden="true"></svg>
+      <div class="how-right">
+        <div class="steps" id="howSteps">
+          <div class="step"><span class="n">01</span><div><h3>Find the face</h3><p>Each webcam frame is scanned for a face and 478 landmark points, including both irises.</p></div></div>
+          <div class="step"><span class="n">02</span><div><h3>Measure the eyes</h3><p>The iris centre is compared with the eye corners. Head turn and tilt are measured from the nose and face outline.</p></div></div>
+          <div class="step"><span class="n">03</span><div><h3>Calibrate once</h3><p>You follow a short series of dots on the screen. diseyeble learns how your eye positions map to your screen.</p></div></div>
+          <div class="step"><span class="n">04</span><div><h3>Smooth and act</h3><p>A filter removes jitter and tremor. diseyeble moves the real mouse, and a gaze hold, nod or head shake becomes a click at the pointer.</p></div></div>
+        </div>
+        <div class="how-next"><button class="btn btn-ghost" data-page-go="2">Controls →</button></div>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <section class="ipage" id="pg-controls" data-page="2" aria-label="Controls" hidden>
+    <div class="wrap ipage-in">
+      <span class="ipage-num label">03 / 05 · Controls</span>
+
+    <div class="sec-head">
+      <h2>Six ways to control. Zero hands.</h2>
+      <p>Use whichever your body allows. Every input can be switched on or off, and each one has its own sensitivity so tremors and slow movements don't cause false clicks.</p>
+    </div>
+    <div class="inputs">
+      <article class="inp"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div><h3>Look</h3><span class="does">Moves the pointer</span><p>The pointer follows where you look. Hold your gaze on a button to click it, if you want.</p><span class="spec">iris + head pose · 30 fps</span></article>
+      <article class="inp"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" opacity=".35"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg></div><h3>Hold</h3><span class="does">Left click</span><p>Keep looking at a button. A ring fills around the pointer, and when it is full the button is clicked. Normal blinks never click.</p><span class="spec">gaze held ~0.9 s · adjustable</span></article>
+      <article class="inp"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M12 15v6M9 18l3 3 3-3"/></svg></div><h3>Nod</h3><span class="does">Left click · confirm</span><p>A small nod clicks, or says "yes" when diseyeble asks you to confirm a voice command.</p><span class="spec">pitch ≥ 12° down-up · 600 ms</span></article>
+      <article class="inp a"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="5"/><path d="M3 18h4M17 18h4M5 16l-2 2 2 2M19 16l2 2-2 2"/></svg></div><h3>Shake</h3><span class="does">Right click · cancel</span><p>Shake your head to open the right-click menu, or to say "no" and cancel an action.</p><span class="spec">yaw ≥ 15° left-right-left</span></article>
+      <article class="inp a"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><g transform="rotate(-18 12 10)"><circle cx="12" cy="9" r="5"/><path d="M12 14v3"/></g><path d="M4 20a9 9 0 0 1 3-4M20 20a9 9 0 0 0-3-4"/></svg></div><h3>Tilt</h3><span class="does">Left or right click</span><p>Tilt your head towards your left shoulder to left-click, towards your right shoulder to right-click.</p><span class="spec">roll ≥ 15° and back · 700 ms</span></article>
+      <article class="inp v"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><h3>Speak</h3><span class="does">Commands &amp; typing</span><p>"Open YouTube", "search for music", "write an email to Mai". Tuned for unclear speech. Always listening, no button to hold.</p><span class="spec">faster-whisper · dysarthric fine-tune</span></article>
+    </div>
+    </div>
+  </section>
+
+  <section class="ipage" id="pg-voice" data-page="3" aria-label="Voice" hidden>
+    <div class="wrap ipage-in">
+      <span class="ipage-num label">04 / 05 · Voice</span>
+
+    <div class="voice-sec">
+      <div class="copy">
+        <h2 style="font-size:clamp(28px,4vw,46px);font-weight:800;letter-spacing:0">Understands speech that others find hard to follow</h2>
+        <p>Standard voice assistants fail people with slurred speech, a weak voice, or an accent shaped by age or illness. diseyeble listens differently.</p>
+        <ul>
+          <li><span><b>Trained on unclear speech.</b> The speech model (faster-whisper large-v3-turbo) is fine-tuned on dysarthric speech, so slurred or quiet words are still understood.</span></li>
+          <li><span><b>Always listening.</b> Just speak. There is no button to hold down.</span></li>
+          <li><span><b>Matches meaning, not perfect words.</b> Unclear words are matched to the closest known command.</span></li>
+          <li><span><b>Confirms before acting.</b> When it isn't sure, it shows what it understood and asks you to confirm first.</span></li>
+          <li><span><b>Dictation preview.</b> When a text box is selected, what you say is shown as a preview, then typed in.</span></li>
+          <li><span><b>English today.</b> Vietnamese is planned next.</span></li>
+        </ul>
+      </div>
+      <div class="transcripts">
+        <div class="tr"><div class="heard"><small>Heard</small>"oh-peh yoo-choob"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Open YouTube</div><span class="conf">91%</span></div>
+        <div class="tr"><div class="heard"><small>Heard</small>"seh fo… pee-ah-no moo-sic"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Search for piano music</div><span class="conf">84%</span></div>
+        <div class="tr"><div class="heard"><small>Heard</small>"ri' ee-meh to my"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Write an email to Mai</div><span class="conf">78%</span></div>
+        <div class="tr"><div class="heard"><small>Heard</small>"sco… dow"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Scroll down</div><span class="conf">88%</span></div>
+        <div class="tr"><div class="heard"><small>Heard</small>"go bah"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Go back</div><span class="conf">93%</span></div>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <section class="ipage" id="pg-gestures" data-page="4" aria-label="Gestures" hidden>
+    <div class="wrap ipage-in">
+      <span class="ipage-num label">05 / 05 · Gestures</span>
+
+    <div class="sec-head">
+      <h2>Gesture map</h2>
+      <p>The default mapping. Every row can be turned off or changed in settings.</p>
+    </div>
+    <div class="gmap-wrap">
+      <table class="gmap">
+        <thead><tr><th>You do</th><th>Computer does</th><th>How it's detected</th></tr></thead>
+        <tbody>
+          <tr><td>Look somewhere</td><td><span class="tag">Move pointer</span></td><td>Iris offset + head pose, mapped by your calibration</td></tr>
+          <tr><td>Hold your gaze</td><td><span class="tag">Left click</span> · open</td><td>Pointer stays within 55 px for 0.9 s</td></tr>
+          <tr><td>Nod</td><td><span class="tag">Left click</span> · confirm</td><td>Head pitch down then up by 12° or more within 600 ms</td></tr>
+          <tr><td>Tilt head left</td><td><span class="tag">Left click</span></td><td>Head roll towards the left shoulder by 15° or more, then back, within 700 ms</td></tr>
+          <tr><td>Tilt head right</td><td><span class="tag r">Right click</span></td><td>Head roll towards the right shoulder by 15° or more, then back, within 700 ms</td></tr>
+          <tr><td>Shake head</td><td><span class="tag r">Right click</span> · cancel</td><td>Head yaw left-right-left by 15° or more within 800 ms</td></tr>
+          <tr><td>Speak a command</td><td><span class="tag v">Open, search, type</span></td><td>faster-whisper, fine-tuned for dysarthric speech. The engine runs the command itself</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cta-wrap"><div class="cta-band">
+      <div class="mascot-slot"></div>
+      <h2>Ready? See it open YouTube, search and send an email without a single touch.</h2>
+      <button class="btn btn-primary" data-go="demo">Open the live demo →</button>
+    </div></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ======================= SCREEN 2: LIVE DEMO ======================= -->
+<main id="demo" hidden>
+  <div class="wrap ws">
+    <div class="ws-grid">
+      <aside class="rail">
+        <section class="card">
+          <div class="card-h"><h3>Camera</h3><button class="mini-btn" id="demoCamBtn">Allow camera</button></div>
+          <div class="cam">
+            <canvas id="camCanvas" width="480" height="360"></canvas>
+            <video id="camVideo" playsinline muted></video>
+            <span class="rec">TRACKING · 640×480</span>
+            <span class="cam-src" id="camSrc">source: simulated face</span>
+          </div>
+          <div class="plot-wrap"><canvas id="plot" width="660" height="420" aria-label="Live signal chart for eyes, pitch, yaw and roll"></canvas></div>
+          <div class="sim-row">
+            <span class="label">Simulate</span>
+                        <button id="sNod" title="Head dips 18° → click">↧ Nod</button>
+            <button id="sShake" title="Head turns ±17° → right click">↔ Shake</button>
+            <button id="sTiltL" title="Head rolls left 20° → left click">↶ Tilt L</button>
+            <button id="sTiltR" title="Head rolls right 20° → right click">↷ Tilt R</button>
+            <button id="sNat" title="Normal blink → ignored, never clicks">Blink (ignored)</button>
+          </div>
+          <dl class="cam-legend">
+            <div><dt>yaw</dt><dd>head turn left / right. Large swings = head shake</dd></div>
+            <div><dt>pitch</dt><dd>head tilt up / down. A quick dip = nod</dd></div>
+            <div><dt>roll</dt><dd>head tilt to a shoulder. Left = click, right = right click</dd></div>
+            <div><dt>eyes</dt><dd>open or closed. Blinks are ignored, so you can blink freely</dd></div>
+          </dl>
+        </section>
+
+        <section class="card">
+          <div class="card-h"><h3>Detected signals</h3><span class="label" id="clock">00:00</span></div>
+          <div class="signals">
+            <div class="sig" id="sigGaze"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><b>Gaze</b><small id="gazeXY">0, 0</small></div>
+            <div class="sig" id="sigBlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" opacity=".35"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg><b>Hold</b><small>left click</small></div>
+            <div class="sig" id="sigNod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M12 15v6M9 18l3 3 3-3"/></svg><b>Nod</b><small>left click</small></div>
+            <div class="sig r" id="sigShake"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="5"/><path d="M3 18h4M17 18h4M5 16l-2 2 2 2M19 16l2 2-2 2"/></svg><b>Shake</b><small>right click</small></div>
+            <div class="sig" id="sigTilt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><g transform="rotate(-18 12 10)"><circle cx="12" cy="9" r="5"/><path d="M12 14v3"/></g><path d="M4 20a9 9 0 0 1 3-4M20 20a9 9 0 0 0-3-4"/></svg><b>Tilt</b><small>L / R click</small></div>
+            <div class="sig v" id="sigVoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><b>Voice</b><small>command</small></div>
+          </div>
+          <div class="gest-btns">
+                        <button id="bNod">Nod<span class="kbd">N</span></button>
+            <button id="bShake">Shake<span class="kbd">H</span></button>
+            <button id="bTiltL">Tilt left<span class="kbd">←</span></button>
+            <button id="bTiltR">Tilt right<span class="kbd">→</span></button>
+          </div>
+        </section>
+
+        <section class="card voice-card">
+          <div class="card-h"><h3>Voice commands</h3><span class="label">always listening</span></div>
+          <div class="mic-row">
+            <button class="mic" id="mic" aria-label="Try a voice command"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+            <canvas class="wave" id="wave" width="460" height="92"></canvas>
+          </div>
+          <div class="vt">
+            <div class="ln"><span class="label">Heard</span><span class="heardTxt" id="heardTxt">Listening… just speak (click the mic to try an example).</span></div>
+            <div class="ln"><span class="label">Understood</span><span class="meantTxt" id="meantTxt">–</span></div>
+          </div>
+          <form class="vin" id="vform"><input id="vinput" placeholder="Or type what you'd say, slurred is fine" autocomplete="off"><button type="submit">Say</button></form>
+          <div class="chips" id="chips"></div>
+        </section>
+
+        <section class="card set">
+          <div class="card-h" style="margin:0"><h3>Settings</h3><button class="mini-btn" id="calibBtn">Calibrate 9 points</button></div>
+          <div class="tg"><span id="l2">Nod to click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l2" id="swNod"></button></div>
+          <div class="tg"><span id="l3">Shake for right click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l3" id="swShake"></button></div>
+          <div class="tg"><span id="l5">Tilt head for left / right click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l5" id="swTilt"></button></div>
+          <div class="tg"><span id="l4">Click by holding gaze</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l4" id="swDwell"></button></div>
+          <div class="range"><label for="dwellMs">Gaze hold time <output id="dwellOut">900 ms</output></label><input type="range" id="dwellMs" min="400" max="2000" step="100" value="900"></div>
+          <div class="range"><label for="steady">Pointer steadiness <output id="steadyOut">70%</output></label><input type="range" id="steady" min="0" max="95" step="5" value="70"></div>
+        </section>
+      </aside>
+
+      <section class="main">
+        <div class="statusbar">
+          <span class="pill" id="trackPill"><span class="dot"></span><span id="trackTxt">Tracking</span></span>
+          <span class="pill">Accuracy <b id="accTxt" style="font-family:var(--f-mono)">±3.8°</b></span>
+          <span class="grow"></span>
+          <button class="mini-btn" id="pauseBtn">Pause <span class="kbd">P</span></button>
+        </div>
+        <div class="demos" id="demoBar">
+          <span class="label">Guided demos</span>
+          <button class="demo-btn" data-demo="youtube">▶ Open YouTube &amp; search <span class="dur">eyes + nod + voice</span></button>
+          <button class="demo-btn" data-demo="mail">✉ Write an email <span class="dur">voice + gaze hold</span></button>
+          <button class="demo-btn" data-demo="google">🔍 Google search <span class="dur">eye typing</span></button>
+        </div>
+        <div class="running" id="runBar" hidden><span class="label" style="color:inherit;opacity:.7">Demo</span><span class="stepTxt" id="stepTxt">Starting…</span><button id="stopDemo">Stop</button></div>
+
+        <div class="monitor-scroll">
+          <div class="monitor">
+            <div class="screen" id="screen">
+              <div class="wall-glow"></div>
+              <div class="dicons">
+                <button class="dicon" data-act="open:browser"><span class="ai br" id="icoBr"></span>Chrome</button>
+                <button class="dicon" data-act="open:youtube"><span class="ai vt"></span>YouTube</button>
+                <button class="dicon" data-act="open:mail"><span class="ai ml"></span>Mail</button>
+                <button class="dicon" data-act="toast:This PC"><span class="ai fx"></span>This PC</button>
+              </div>
+
+              <div class="win" id="winBrowser" hidden>
+                <div class="titlebar">
+                  <div class="tabs-row"><div class="wtab"><span class="fav" id="tabFav"></span><span id="tabTitle">New Tab</span></div></div>
+                  <div class="wbtns"><button class="wbtn" data-act="min:browser">—</button><button class="wbtn">▢</button><button class="wbtn x" data-act="close:browser">✕</button></div>
+                </div>
+                <div class="toolbar">
+                  <button class="nb" data-act="back" aria-label="Back">←</button>
+                  <button class="nb" data-act="fwd" aria-label="Forward">→</button>
+                  <button class="nb" data-act="reload" aria-label="Reload">↻</button>
+                  <div class="omni"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="omni">google.com</span></div>
+                </div>
+                <div class="wbody"><div class="page"><div class="page-inner" id="bPage"></div></div></div>
+              </div>
+
+              <div class="win mail" id="winMail" hidden>
+                <div class="titlebar"><div class="wtitle"><span class="ai ml" style="width:18px;height:18px;border-radius:5px"></span>Mail</div>
+                  <div class="wbtns"><button class="wbtn" data-act="min:mail">—</button><button class="wbtn">▢</button><button class="wbtn x" data-act="close:mail">✕</button></div></div>
+                <div class="wbody" id="mPage"></div>
+              </div>
+
+              <div class="startmenu" id="startMenu" hidden>
+                <h4>Pinned</h4>
+                <div class="sm-grid">
+                  <button class="sm-app" data-act="open:browser"><span class="ai br"></span>Chrome</button>
+                  <button class="sm-app" data-act="open:youtube"><span class="ai vt"></span>YouTube</button>
+                  <button class="sm-app" data-act="open:mail"><span class="ai ml"></span>Mail</button>
+                  <button class="sm-app" data-act="toast:Settings"><span class="ai fx"></span>Settings</button>
+                </div>
+              </div>
+
+              <div class="osk" id="osk" hidden></div>
+              <div class="ctx" id="ctx" hidden></div>
+              <div id="wtoastSlot"></div>
+
+              <div class="taskbar">
+                <button class="tb" data-act="start" id="tbStart" aria-label="Start"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="12.5" y="2" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="2" y="12.5" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="12.5" y="12.5" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/></svg></button>
+                <div class="tb-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>Search</div>
+                <button class="tb" data-act="open:browser" id="tbBrowser" aria-label="Chrome"><span class="ai br"></span></button>
+                <button class="tb" data-act="open:mail" id="tbMail" aria-label="Mail"><span class="ai ml"></span></button>
+                <button class="tb" data-act="toast:File Explorer" aria-label="File Explorer"><span class="ai fx"></span></button>
+                <div class="tray"><span>ENG</span><span>📶 🔊 🔋</span><span class="clock" id="trayClock">9:41 AM<br>24/10/2026</span></div>
+              </div>
+
+              <div class="gaze" id="gaze"><svg viewBox="0 0 58 58"><circle class="track" cx="29" cy="29" r="25" fill="none" stroke-width="4"/><circle class="prog" id="prog" cx="29" cy="29" r="25" fill="none" stroke-width="4" stroke-dasharray="157.1" stroke-dashoffset="157.1"/></svg><div class="core"></div><span class="glabel" id="glabel">BLINK · CLICK</span></div>
+              <div class="calib" id="calib" hidden><div class="msg" id="calibMsg"></div><div class="pt" id="calibPt" hidden></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="lower">
+          <section class="card">
+            <div class="card-h"><h3>Activity</h3><button class="mini-btn" id="clearLog">Clear</button></div>
+            <div class="log" id="log" aria-live="polite"></div>
+          </section>
+          <section class="card buddy">
+            <div class="mascot-slot"></div>
+            <p id="tip">Move your mouse over the screen. The black dot is where your eyes are looking. Hold it on something to open it.</p>
+          </section>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status"></div>
+<script src="js/app.js"></script>
+</body>
+</html>

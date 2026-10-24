@@ -42,13 +42,13 @@ CHIP_MAX_CHARS = 70
 WAVE_BARS = 14
 
 # look
-PANEL_W = 760
-PAD = 22
-R_PANEL = 18
-PILL_H = 44
-GAP = 10                  # between the pill and the panel
+PANEL_W = 560
+PAD = 18
+R_PANEL = 28              # big rounded corners: a soft floating card, not a box
+PILL_H = 38
+GAP = 8                   # between the pill and the panel
 BOTTOM_GAP = 80           # px above the bottom of the screen (clear of the taskbar)
-TOP_GAP = 60
+TOP_GAP = 10              # px below the top of the screen
 POLL_MS = 50
 KEY = "#ff00fe"           # made transparent: the rounded corners
 PANEL = "#1b1c21"
@@ -164,7 +164,7 @@ class CardModel:
 
 class DictationCard:
     def __init__(self, bus, clock=time.monotonic, hide_from_capture: bool = True, opacity: float = 0.82,
-                 position: str = "bottom") -> None:
+                 position: str = "top") -> None:
         self.bus = bus
         self.model = CardModel(clock)
         self.hide_from_capture = hide_from_capture
@@ -211,15 +211,15 @@ class DictationCard:
         canvas = tk.Canvas(win, width=PANEL_W + 4, height=PILL_H + 4, bg=KEY, highlightthickness=0, bd=0)
         canvas.pack()
         fonts = {
-            "pill": tkfont.Font(root=root, family=FONT, size=12, weight="bold"),
-            "pill_hint": tkfont.Font(root=root, family=FONT, size=11),
-            "label": tkfont.Font(root=root, family=FONT, size=11),
-            "chip": tkfont.Font(root=root, family=FONT, size=12, weight="bold"),
-            "body": tkfont.Font(root=root, family=FONT, size=20),
-            "shaky": tkfont.Font(root=root, family=FONT, size=20, underline=True),
-            "action": tkfont.Font(root=root, family=FONT, size=12),
-            "hint": tkfont.Font(root=root, family=FONT, size=12),
-            "key": tkfont.Font(root=root, family=FONT, size=11, weight="bold"),
+            "pill": tkfont.Font(root=root, family=FONT, size=11, weight="bold"),
+            "pill_hint": tkfont.Font(root=root, family=FONT, size=10),
+            "label": tkfont.Font(root=root, family=FONT, size=10),
+            "chip": tkfont.Font(root=root, family=FONT, size=11, weight="bold"),
+            "body": tkfont.Font(root=root, family=FONT, size=16),
+            "shaky": tkfont.Font(root=root, family=FONT, size=16, underline=True),
+            "action": tkfont.Font(root=root, family=FONT, size=11),
+            "hint": tkfont.Font(root=root, family=FONT, size=10),
+            "key": tkfont.Font(root=root, family=FONT, size=10, weight="bold"),
         }
         # Never withdrawn and shown again (that can take the focus): it stays mapped and moves off screen.
         win.geometry(OFF_SCREEN)
@@ -253,6 +253,7 @@ class DictationCard:
 
 # ----------------------------------------------------------------- drawing (Tk thread)
 def round_rect(c, x1, y1, x2, y2, r, **kw):
+    r = max(1, min(r, (x2 - x1) / 2, (y2 - y1) / 2))
     pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2,
            x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
     return c.create_polygon(pts, smooth=True, **kw)
@@ -316,16 +317,16 @@ def draw(c, v: View, levels, fonts) -> int:
     items_start = len(c.find_all())
     row_h = 0
     if v.label:
-        c.create_text(x0 + PAD, y + 15, text=v.label, fill=MUTED, font=fonts["label"], anchor="w")
-        row_h = 30
+        c.create_text(x0 + PAD, y + 14, text=v.label, fill=MUTED, font=fonts["label"], anchor="w")
+        row_h = 28
     if v.chip:
         cw = min(inner - 90, fonts["chip"].measure(v.chip) + 28)
         cx2 = x0 + w - PAD
-        round_rect(c, cx2 - cw, y, cx2, y + 32, 14, fill=CHIP, outline=CHIP)
-        c.create_text(cx2 - cw + 14, y + 16, text=v.chip, fill="#ffffff", font=fonts["chip"], anchor="w",
+        round_rect(c, cx2 - cw, y, cx2, y + 28, 14, fill=CHIP, outline=CHIP)
+        c.create_text(cx2 - cw + 14, y + 14, text=v.chip, fill="#ffffff", font=fonts["chip"], anchor="w",
                       width=cw - 20)
-        row_h = 32
-    y += row_h + (12 if row_h else 0)
+        row_h = 28
+    y += row_h + (10 if row_h else 0)
     if v.words:
         line_h = fonts["body"].metrics("linespace") + 4
         for line in layout_words(v.words, fonts["body"], fonts["shaky"], inner):
@@ -352,20 +353,20 @@ def draw(c, v: View, levels, fonts) -> int:
         y += 34
     if v.keys:
         fy = y + 8
-        fh = 46
+        fh = 40
         field_start = len(c.find_all())
         sx, sy = x0 + PAD + 16, fy + fh // 2
-        for text, is_key in (("Blink, raise your eyebrows or say", False), ("yes", True), ("to type", False),
+        for text, is_key in (("Blink or say", False), ("yes", True), ("to type", False),
                              ("·  say", False), ("no", True), ("to drop it", False)):
             if is_key:
                 kw = fonts["key"].measure(text) + 16
-                round_rect(c, sx, sy - 12, sx + kw, sy + 12, 6, fill=KEYCAP, outline=PANEL_EDGE)
+                round_rect(c, sx, sy - 11, sx + kw, sy + 11, 8, fill=KEYCAP, outline=PANEL_EDGE)
                 c.create_text(sx + kw // 2, sy, text=text, fill=TEXT, font=fonts["key"])
                 sx += kw + 8
             else:
                 c.create_text(sx, sy, text=text, fill=MUTED, font=fonts["hint"], anchor="w")
                 sx += fonts["hint"].measure(text) + 8
-        field = round_rect(c, x0 + PAD, fy, x0 + w - PAD, fy + fh, 12, fill=FIELD, outline=PANEL_EDGE)
+        field = round_rect(c, x0 + PAD, fy, x0 + w - PAD, fy + fh, fh // 2, fill=FIELD, outline=PANEL_EDGE)
         c.tag_lower(field, c.find_all()[field_start])   # behind its own text and key caps
         y = fy + fh
     bottom = y + PAD

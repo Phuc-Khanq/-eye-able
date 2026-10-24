@@ -35,7 +35,9 @@ def main() -> None:
     cam = Camera(index=args.camera)
     mode = cam.start()
     print(f"Camera {mode.width}x{mode.height}. Face the camera.")
-    mesh, det = FaceMesh(), BlinkDetector()
+    from engine.eyes.head_pose import HeadPoseEstimator
+
+    mesh, det, head = FaceMesh(), BlinkDetector(), HeadPoseEstimator()
     stop = threading.Event()
     fired = []
 
@@ -47,7 +49,8 @@ def main() -> None:
                 continue
             frame_id = new_id
             face = mesh.process(frame, t_ms)
-            if det.update(face.t_ms if face else t_ms, face.blendshapes if face else {}) is not None:
+            pitch = head.compute(face).pitch if face is not None else None
+            if det.update(face.t_ms if face else t_ms, face.blendshapes if face else {}, pitch) is not None:
                 fired.append(time.monotonic())
                 print("\n   <- CLICK (none made)", flush=True)
 
@@ -63,7 +66,8 @@ def main() -> None:
             t0, end = time.monotonic(), time.monotonic() + secs
             while time.monotonic() < end:
                 sc = det.score if det.score is not None else float("nan")
-                print(f"\r  eyes shut {sc:4.2f} {'#' * max(0, int(sc * 30)):<30} closed {det.closed_ms:5d} ms",
+                print(f"\r  eyes shut {sc:4.2f} {'#' * max(0, int(sc * 30)):<30} open level {det.open_level:4.2f}"
+                      f"  closed {det.closed_ms:5d} ms",
                       end="", flush=True)
                 time.sleep(0.1)
             counts[name] = sum(t0 <= t < end for t in fired)

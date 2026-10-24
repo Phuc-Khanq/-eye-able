@@ -80,7 +80,7 @@ class Engine:
                 from engine.eyes.dictation_card import DictationCard
                 self.card = DictationCard(bus, hide_from_capture=bool(getattr(settings, "card_hide_from_capture", True)),
                                           opacity=float(getattr(settings, "card_opacity", 0.82)),
-                                          position=str(getattr(settings, "card_position", "bottom")))
+                                          position=str(getattr(settings, "card_position", "top")))
                 self.meter.add_window(self.card.attach)   # what was heard and what will be typed, on screen
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
         #    (without eyes, mouth is None: no gate, every word counts)

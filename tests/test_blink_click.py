@@ -87,6 +87,66 @@ class TestBlinkDetector(unittest.TestCase):
         self.assertFalse(d.held)
 
 
+def feed_pitch(d, scores, pitches, t0=0):
+    """Blink score (both eyes) and head pitch per frame; returns the frame indexes where it fired."""
+    out = []
+    for i, (s, p) in enumerate(zip(scores, pitches)):
+        if d.update(t0 + i * FRAME_MS, {"eyeBlinkLeft": s, "eyeBlinkRight": s}, p) is not None:
+            out.append(i)
+    return out
+
+
+class TestBlinkLookingDown(unittest.TestCase):
+    """Looking at the lower half: the head tips down 15 degrees and the open score rises to about 0.45."""
+
+    DOWN_OPEN = 0.45
+
+    def test_a_long_blink_while_looking_down_fires(self):
+        scores = [0.08] * 30 + [self.DOWN_OPEN] * 60 + shut(600, 0.85) + [self.DOWN_OPEN] * 30
+        pitches = [0.0] * 30 + [15.0] * (len(scores) - 30)
+        self.assertEqual(len(feed_pitch(BlinkDetector(), scores, pitches)), 1)
+
+    def test_a_long_blink_right_after_looking_down_fires(self):
+        # the open level for "down" is learned on the way: about half a second of looking there
+        scores = [0.08] * 30 + [self.DOWN_OPEN] * 15 + shut(600, 0.85) + [self.DOWN_OPEN] * 30
+        pitches = [0.0] * 30 + [15.0] * (len(scores) - 30)
+        self.assertEqual(len(feed_pitch(BlinkDetector(), scores, pitches)), 1)
+
+    def test_looking_down_and_back_never_fires(self):
+        for hold_ms in (500, 900, 2000):
+            with self.subTest(hold_ms=hold_ms):
+                n = round(hold_ms / FRAME_MS)
+                scores = [0.08] * 30 + [self.DOWN_OPEN] * n + [0.08] * 30
+                pitches = [0.0] * 30 + [15.0] * n + [0.0] * 30
+                self.assertEqual(feed_pitch(BlinkDetector(), scores, pitches), [])
+
+    def test_a_glance_down_with_the_eyes_only_never_fires(self):
+        n = round(700 / FRAME_MS)
+        scores = [0.08] * 30 + [0.5] * n + [0.08] * 30
+        self.assertEqual(feed_pitch(BlinkDetector(), scores, [0.0] * len(scores)), [])
+
+    def test_normal_blinks_while_looking_down_never_fire(self):
+        scores = [0.08] * 30 + [self.DOWN_OPEN] * 30
+        for _ in range(5):
+            scores += shut(170, 0.85) + [self.DOWN_OPEN] * 20
+        pitches = [0.0] * 30 + [15.0] * (len(scores) - 30)
+        self.assertEqual(feed_pitch(BlinkDetector(), scores, pitches), [])
+
+    def test_shut_while_the_head_moves_down_a_lot_is_not_a_click(self):
+        n = round(700 / FRAME_MS)
+        scores = [0.08] * 30 + [0.85] * n + [0.08] * 30
+        pitches = [0.0] * 30 + [i * 1.0 for i in range(n)] + [float(n)] * 30   # 20 degrees during the close
+        self.assertEqual(feed_pitch(BlinkDetector(), scores, pitches), [])
+
+    def test_moving_the_cursor_down_never_freezes_it(self):
+        d = BlinkDetector()
+        scores = [0.08] * 30 + [self.DOWN_OPEN] * 20
+        pitches = [0.0] * 30 + [3.0 * i for i in range(1, 6)] + [15.0] * 15
+        for i, (s, p) in enumerate(zip(scores, pitches)):
+            d.update(i * FRAME_MS, {"eyeBlinkLeft": s, "eyeBlinkRight": s}, p)
+            self.assertFalse(d.held)
+
+
 class TestModeManagerBlink(Base):
     def requests(self):
         return self.bus.of(topics.TARGET_REQUEST)

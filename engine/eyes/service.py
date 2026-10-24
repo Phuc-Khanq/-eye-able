@@ -122,7 +122,9 @@ class EyesService:
         self.gestures = GestureDetector()
         self.yes_nod = ConfirmNod()
         self.brows = BrowRaiseDetector()
-        self.blink = BlinkDetector() if getattr(settings, "blink_click", False) else None   # long blink = click
+        self.blink = (BlinkDetector(rise=float(getattr(settings, "blink_rise", 0.20)),
+                                    closed_abs=float(getattr(settings, "blink_closed_abs", 0.55)))
+                      if getattr(settings, "blink_click", False) else None)   # a long blink = click
         self.jaw = MouthOpenDetector() if getattr(settings, "mouth_click", True) else None   # open + close = right click
         self.dwell = DwellClicker(dwell_ms=getattr(settings, "dwell_ms", 1000)) if dwell else None
         self._dwell_blocked = True       # comes back disarmed at the cursor, so the first stop must be a new one
@@ -331,14 +333,14 @@ class EyesService:
             if self.jaw is not None:
                 self.jaw.update(face.t_ms, face.blendshapes or {})   # keeps its resting level; no right click here
             self._gestures(face.t_ms, pose, now, self.brows.update(face.t_ms, face.blendshapes or {}),
-                           blink=self.blink.update(face.t_ms, face.blendshapes or {}) if self.blink else None)
+                           blink=self.blink.update(face.t_ms, face.blendshapes or {}, pose.pitch) if self.blink else None)
             return
         if self._scrolling:
             self._end_scroll()
         point = self.pointer.update(face.t_ms, feats, pose)
         brow = self.brows.update(face.t_ms, face.blendshapes or {})
         mouth = self.jaw.update(face.t_ms, face.blendshapes or {}) if self.jaw is not None else None
-        blink = self.blink.update(face.t_ms, face.blendshapes or {}) if self.blink is not None else None
+        blink = self.blink.update(face.t_ms, face.blendshapes or {}, pose.pitch) if self.blink is not None else None
         with self._lock:
             if self.hold is not None and now > self.hold[2]:
                 self.hold = None

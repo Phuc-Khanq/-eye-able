@@ -30,9 +30,12 @@ class Settings:
     brow_click: str = "left"       # "left": a raise with nothing waiting is the snap left click; "right": the old right click
     snap_trust_cursor: bool = True  # already on a link or button: click there without asking UI-Venus
     snap_max_px: int = 150         # UI-Venus may move a snap click at most this far
-    blink_click: bool = False      # a long, deliberate blink (0.4 to 1.2 s, both eyes) = the same click as an eyebrow
-                                   # raise; off until tests.blink_click_check passes on your face (or run with --blink)
-    mouth_click: bool = True       # open the mouth and close it again (0.3 to 1.5 s) = right click
+    blink_click: bool = True       # a long, deliberate blink (0.4 to 1.2 s, both eyes) = the same click as an eyebrow
+                                   # raise (on since Khang's live test, Oct 24; --no-blink turns it off)
+    blink_rise: float = 0.20       # the blink click: how far over your open level the eyes must close; and how
+    blink_closed_abs: float = 0.55  # shut they must get (tests.blink_record + tests.blink_replay suggest yours)
+    mouth_click: bool = False      # open the mouth and close it again (0.3 to 1.5 s) = right click; off: it fired
+                                   # while talking in the live test (Oct 24). Right click is "right click" by voice
     dwell_ms: int = 1000           # with --dwell: rest the cursor this long = left click (off by default)
     dwell_clickable_only: bool = True   # Windows: dwell only on links, buttons, tabs... (engine/eyes/clickable.py);
                                         # false for canvas apps and games, which show neither
@@ -40,7 +43,7 @@ class Settings:
     dictation_card: bool = True    # the box at the bottom of the screen: what was heard and what will be typed
                                    # (engine/eyes/dictation_card.py); false once Nhi's Electron bubble shows it
     card_opacity: float = 0.82     # 0.3 to 1: lower = more see-through
-    card_position: str = "bottom"  # "bottom" or "top" center of the screen
+    card_position: str = "top"     # "top" or "bottom" center of the screen
     card_hide_from_capture: bool = True   # keep the card out of screenshots so UI-Venus never reads it; this also
                                           # hides it from OBS, so set false while recording the demo video
     dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py): the snap click's

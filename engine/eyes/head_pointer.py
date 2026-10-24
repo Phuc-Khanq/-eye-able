@@ -6,8 +6,9 @@ Subscribes: HeadPose, GazePoint (smoothed gaze)
 APIs: NumPy
 
 Gaze is fast but jittery; the head is slow but steady. So:
-  - When the gaze point lands more than JUMP_PX from the cursor, the cursor jumps there and the
-    current head pose becomes the anchor.
+  - When the gaze point lands more than JUMP_PX from the cursor, the cursor jumps there. For the
+    next SETTLE_MS it keeps following gaze, so a smoothed gaze that is still sliding toward the
+    target doesn't leave the cursor short. Then the current head pose becomes the anchor.
   - Between jumps, small head turns move the cursor from that spot, FINE_PX_PER_DEG per degree.
   - With no gaze at all (not calibrated, or gaze switched off), the head alone drives the cursor:
     the neutral pose is the screen center, and FULL_YAW_DEG / FULL_PITCH_DEG reach the edges.
@@ -19,6 +20,7 @@ from engine.config import settings
 from engine.core.types import GazePoint, HeadPose
 
 JUMP_PX = 150            # gaze this far from the cursor moves it in one jump
+SETTLE_MS = 300          # after a jump, follow gaze this long before head fine-tuning takes over
 FINE_PX_PER_DEG = 20.0   # head fine-tune speed after a jump
 FULL_YAW_DEG = 15.0      # head-only mode: turn that reaches a side edge
 FULL_PITCH_DEG = 10.0    # head-only mode: tilt up or down that reaches the top or bottom edge
@@ -26,10 +28,12 @@ FULL_PITCH_DEG = 10.0    # head-only mode: tilt up or down that reaches the top 
 
 class HeadPointer:
     def __init__(self, screen_w: int, screen_h: int, jump_px: float = JUMP_PX,
-                 fine_px_per_deg: float = FINE_PX_PER_DEG) -> None:
+                 fine_px_per_deg: float = FINE_PX_PER_DEG, settle_ms: int = SETTLE_MS) -> None:
         self.screen_w = screen_w
         self.screen_h = screen_h
         self.jump_px = jump_px
+        self.settle_ms = settle_ms
+        self.jump_ms: int | None = None
         self.fine_px_per_deg = fine_px_per_deg
         self.anchor_xy: tuple[float, float] | None = None
         self.anchor_pose: HeadPose | None = None
@@ -48,6 +52,7 @@ class HeadPointer:
         """Back to head-only mode."""
         self.anchor_xy = None
         self.anchor_pose = None
+        self.jump_ms = None
 
     def to_cursor(self, pose: HeadPose) -> tuple[float, float]:
         sens = max(settings.sensitivity, 0.1)
@@ -66,7 +71,11 @@ class HeadPointer:
         """Feed every frame. Pass the smoothed gaze when there is one; returns the cursor point."""
         if gaze is not None and np.isfinite(gaze.x) and np.isfinite(gaze.y):
             cx, cy = self.cursor
+            settling = self.jump_ms is not None and pose.t_ms - self.jump_ms < self.settle_ms
             if self.anchor_xy is None or np.hypot(gaze.x - cx, gaze.y - cy) > self.jump_px:
+                self.jump_to(gaze.x, gaze.y, pose)
+                self.jump_ms = pose.t_ms
+            elif settling:
                 self.jump_to(gaze.x, gaze.y, pose)
         x, y = self.to_cursor(pose)
         return GazePoint(t_ms=pose.t_ms, x=x, y=y, confidence=gaze.confidence if gaze is not None else 1.0)

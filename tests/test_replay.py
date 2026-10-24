@@ -21,6 +21,22 @@ class TestRecordingFiles(unittest.TestCase):
         self.assertFalse(keep({"no": "type"}))
         self.assertTrue(keep(messages.make(messages.MODE, mode="pointer")))
 
+    def test_real_sessions_are_never_committed(self):
+        """Session recordings can hold dictated words: git ignores them; the demo is shared."""
+        import subprocess
+
+        repo = Path(__file__).resolve().parents[1]
+
+        def ignored(path: str) -> bool:
+            r = subprocess.run(["git", "check-ignore", "-q", path], cwd=repo)
+            if r.returncode == 128:
+                self.skipTest("not a git checkout")
+            return r.returncode == 0
+
+        self.assertTrue(ignored("tests/recordings/session_20261024_101500.jsonl"))
+        self.assertTrue(ignored("tests/recordings/my_session.jsonl"))
+        self.assertFalse(ignored("tests/recordings/demo_flow.jsonl"))
+
     def test_load_skips_bad_lines(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "r.jsonl"

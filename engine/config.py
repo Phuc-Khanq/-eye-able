@@ -46,6 +46,12 @@ class Settings:
     mouth_min_moving: float = 0.3      # share of face frames with a moving mouth; lower it for weak movement
     mouth_pad_ms: float = 150.0        # widen each word's time window by this much on both sides
     mouth_status_every_s: float = 10.0  # "Ignored speech while your mouth wasn't moving", at most this often
+    # Dictation clean-up: a small local model tidies the preview before it's typed (engine/voice/rewrite.py)
+    rewrite_dictation: bool = True
+    rewrite_model: str = "Qwen/Qwen2.5-1.5B-Instruct"   # Apache 2.0; about 3.1 GB, downloaded once
+    rewrite_device: str = "cuda"       # "cpu" works but is slow (seconds per sentence)
+    rewrite_wait_s: float = 1.5        # "yes" waits at most this long for the clean-up, then types what's showing
+    rewrite_max_s: float = 3.0         # a clean-up that takes longer is cut off and not used
 
     # Engine <-> UI
     ws_host: str = "127.0.0.1"

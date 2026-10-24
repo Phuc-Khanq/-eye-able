@@ -94,11 +94,19 @@ class _Search:
 
 class ModeManager:
     def __init__(self, bus, clock: Callable[[], float] = time.monotonic,
-                 rewrite_wait_s: float | None = None) -> None:
+                 rewrite_wait_s: float | None = None, mouth=None, settings=None, log=print) -> None:
         """rewrite_wait_s: the dictation clean-up is on (engine/voice/rewrite.py's RewriteWorker is
-        running) and "yes" waits at most this long for it. None (the default): off, exactly as before."""
+        running) and "yes" waits at most this long for it. None (the default): off, exactly as before.
+        mouth: engine.eyes.mouth.MouthTracker. With it, an eyebrow raise made while the user is talking
+        is ignored (see _raised_while_talking). None (the default): no guard, exactly as before."""
         self.bus = bus
         self.clock = clock
+        self.mouth = mouth
+        self._brow_guard = bool(getattr(settings, "brow_ignore_while_talking", True))
+        self._brow_window_ms = float(getattr(settings, "brow_talk_window_ms", 600))
+        self._brow_min_moving = float(getattr(settings, "brow_talk_min_moving", 0.3))
+        self._brow_warned = float("-inf")   # clock time of the last "tracker failed" warning
+        self._log = log                     # console lines for tuning
         self.mode = Mode.POINTER
         self._return_mode = Mode.POINTER   # where Menu and Paused go back to
         self.preview: list[dict] = []      # words waiting for nod / shake
@@ -154,6 +162,9 @@ class ModeManager:
     def on_gesture(self, gesture: Gesture) -> None:
         with self._lock:
             self.tick()
+            if gesture.type == "brow_raise" and (self.question or self.mode != Mode.PAUSED):
+                if self._raised_while_talking(gesture.t_ms):
+                    return
             if self.question:
                 if gesture.type in ("nod", "brow_raise"):
                     self._answer(True)
@@ -173,6 +184,25 @@ class ModeManager:
                     self._status("info", f"Will click {self.search.label} as soon as it's found")
             elif intent:
                 self._do(Command(name=intent))
+
+    def _raised_while_talking(self, t_ms: float) -> bool:
+        """An eyebrow raise made while the mouth was moving is talking, not a yes or a click: people
+        raise their brows when they talk (about 0.8 a minute in Hung's test). Fails open: no face
+        (None) or a broken tracker lets the raise through."""
+        if self.mouth is None or not self._brow_guard:
+            return False
+        try:
+            f = self.mouth.moving_fraction(t_ms - self._brow_window_ms, t_ms)
+        except Exception as exc:
+            now = self.clock()
+            if now - self._brow_warned >= 60:
+                self._brow_warned = now
+                self._log(f"[brow] the mouth tracker failed ({exc}); not ignoring raises")
+            return False
+        if f is not None and f >= self._brow_min_moving:
+            self._log(f"[brow] ignored: you were talking ({f:.2f})")
+            return True
+        return False
 
     def on_transcript(self, transcript: dict) -> None:
         """One utterance can hold several things ("Click search box. Yeah."), so it is cut into

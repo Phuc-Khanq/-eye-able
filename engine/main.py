@@ -15,6 +15,7 @@ from engine.core.events import EventBus, WebSocketRelay
 from engine.core.mode_manager import ModeManager
 from engine.voice.audio_in import ArraySource, AudioIn
 from engine.voice.dictation import Dictation, DictationWorker
+from engine.voice.voice_data import VoiceData
 
 
 class Engine:
@@ -33,6 +34,7 @@ class Engine:
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
         self.dictation = DictationWorker(bus, dictation or Dictation(settings))
         self.audio_in = AudioIn(bus, settings, source=audio_source, vad=vad)
+        self.voice_data = VoiceData(bus, self.dictation.dictation)   # "delete my voice data"
 
     def start(self) -> None:
         self.bus.publish(topics.TO_UI, messages.make(messages.MODE, mode=self.mode_manager.mode.value))

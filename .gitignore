@@ -7,6 +7,9 @@ __pycache__/
 models/*
 !models/README.md
 recordings/
+!tests/recordings/
+tests/recordings/*
+!tests/recordings/*.jsonl
 data/
 calibration/
 *.wav

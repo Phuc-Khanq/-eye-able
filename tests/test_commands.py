@@ -37,7 +37,9 @@ class TestCommands(unittest.TestCase):
     def test_answers_to_click_question(self):
         # After "click Send" the engine asks "Click Send?"; people answer like this.
         # "click it" used to start a new search for a button named "It".
-        for text in ["Yes.", "Okay.", "OK", "Sure.", "Click.", "Click it.", "Do it.", "Go ahead."]:
+        # "Okay." / "OK" / "Sure." are no longer yes (part D review): said in passing they confirmed
+        # "send" and "delete my voice data". See tests/test_command_fixes.py.
+        for text in ["Yes.", "Click.", "Click it.", "Do it.", "Go ahead."]:
             with self.subTest(text=text):
                 self.assertEqual(parse(text).name, "yes")
         self.assertEqual(parse("okay click send").label, "Send")   # a filler before a target still works

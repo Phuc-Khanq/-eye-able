@@ -65,7 +65,6 @@ FIXED_COMMANDS: dict[str, str] = {
     "yeah": "yes",
     "yep": "yes",
     "confirm": "yes",
-    "sure": "yes",
     "do it": "yes",
     "go ahead": "yes",
     # Answering "Click Send?": without these, "click it" started a new search for a button named "It"
@@ -215,9 +214,9 @@ def parse(text: str, allow_targets: bool = True, target_verbs=TARGET_VERBS) -> C
     """
     clean = _collapse(normalize(text))
     if not clean:
-        # "Okay." alone: the filler words are removed above, but on its own it answers a question
-        bare = re.sub(r"[^\w\s]", " ", text.lower()).split()
-        return Command(name="yes") if bare and set(bare) <= {"ok", "okay"} else None
+        # "Okay." / "sure" alone are not yes: said in passing, they confirmed "send" and
+        # "delete my voice data". "okay" stays a filler word, so "okay, click send" still works.
+        return None
     return _fixed(clean) or (_target(clean, target_verbs) if allow_targets else None) or _type(clean)
 
 

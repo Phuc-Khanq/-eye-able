@@ -1,21 +1,24 @@
-"""Calibrate, check on new dots, then watch a dot follow your gaze. Only calibration numbers are saved.
+"""Calibrate (or re-center a trained model), check on new dots, then watch a dot follow your gaze.
+Every run saves its numbers (no images) to calibration/sessions/<profile>/ and retrains the model on
+all of that profile's sessions, so it gets better the more you use it.
 
-Run:  .\\.venv\\Scripts\\python.exe -m tests.gaze_dot
-Options:  --points 16   --sweep   --y-inputs eye|eye+mediapipe|mediapipe   --fps 60   --iris ring   --no-head
-Keys:  SPACE = start / next   R = redo calibration   M = move the real cursor on/off
+Run:  .\\.venv\\Scripts\\python.exe -m tests.gaze_dot --profile khang            full: 25 dots (about 1 min)
+      .\\.venv\\Scripts\\python.exe -m tests.gaze_dot --profile khang --quick    quick: 5 dots (about 6 s)
+Other options:  --points 16   --sweep   --y-inputs eye|eye+mediapipe|mediapipe|full   --fps 60   --no-head
+Keys:  SPACE = start / next   R = redo   C = re-center (live)   M = move the real cursor on/off
        B = show the 1280x720 area UI-Venus would search   Q or Esc = quit
 
-Steps
+A profile is one person on one setup. Use your own name, and a new name for a different screen or
+camera position (data from another screen size is skipped automatically).
+
+Full run
   1. Sit as you normally would, about an arm's length away. SPACE starts.
   2. Look at each dot until it turns green and disappears. Keep your head fairly still.
-     With --sweep there's a last step (6 s): keep looking at the middle dot while turning and nodding
-     a little. (Off by default: it didn't help on the demo PC.)
-  3. Results show the leave-one-dot-out error and which up/down inputs won. SPACE checks on 5 new dots.
-     The check starts with a 1-second look at the middle dot that re-centers the gaze (cancels a
-     steady shift since calibration). It reports accuracy with and without that re-center.
-  4. The check shows accuracy (how far off, on average) and wobble (how much it shakes). SPACE goes live.
-  5. Live: the blue dot is your gaze. B shows the box UI-Venus would search around it.
-The numbers are also printed in the terminal, so you can paste them.
+  3. Results. One session: leave-one-dot-out error. More sessions: the new-session test (train on the
+     other sessions, re-center on one dot, measure the rest), next to "this session alone".
+  4. SPACE: look at the middle dot (re-center), then 5 new dots. Shows accuracy with and without re-center.
+  5. SPACE: live. The blue dot is your gaze. C re-centers on the middle dot if it has drifted.
+Quick run: 5 re-center dots, then the same check and live view, using the trained model.
 """
 import argparse
 import math
@@ -26,6 +29,7 @@ import numpy as np
 
 from engine.config import settings
 from engine.eyes.calibration import GazeModel, feature_row, grid_targets
+from engine.eyes.gaze_data import Session, load_sessions, save_session
 from engine.eyes.smoothing import PointSmoother
 
 SETTLE_S = 0.7      # look time before collecting, while the dot shrinks
@@ -33,9 +37,10 @@ COLLECT_S = 1.0     # collect this long once settled
 MAX_S = 3.5         # give up on a dot after this long (blinks, no face)
 MIN_SAMPLES = 12    # usable frames needed per dot
 VALIDATION_DOTS = 5
-SWEEP_S = 6.0       # head-sweep step: look at the middle dot, turn and nod a little
+QUICK_DOTS = [(0.5, 0.5), (0.25, 0.25), (0.75, 0.25), (0.75, 0.75), (0.25, 0.75)]  # quick re-center
+SWEEP_S = 6.0       # optional head-sweep step: look at the middle dot, turn and nod a little
 SWEEP_SETTLE_S = 1.0
-SWEEP_CHUNK_S = 0.5  # each half second of the sweep becomes one training sample
+SWEEP_CHUNK_S = 0.5
 
 BG = (24, 22, 20)
 TEXT = (235, 235, 235)
@@ -53,22 +58,22 @@ class GazeDotApp:
     """The whole flow as a state machine, so it can run with a real camera or with fake input."""
 
     def __init__(self, screen_w: int, screen_h: int, points: int = 25, seed: int | None = None,
-                 y_inputs: str = "auto", sweep: bool = False) -> None:
+                 y_inputs: str = "auto", sweep: bool = False, profile: str = "default",
+                 trained: GazeModel | None = None, camera: str = "", iris_mode: str = "center",
+                 save: bool = True) -> None:
         self.W, self.H = screen_w, screen_h
-        self.sweep = sweep
-        self.points = points
-        self.y_inputs = y_inputs
+        self.points, self.y_inputs, self.sweep = points, y_inputs, sweep
+        self.profile, self.camera, self.iris_mode, self.save = profile, camera, iris_mode, save
+        self.quick = trained is not None
         self.rng = np.random.default_rng(seed)
-        self.model = GazeModel(screen_w, screen_h)
+        self.model = trained or GazeModel(screen_w, screen_h)
         self.smoother = PointSmoother(min_cutoff=1.0, beta=0.5)  # in screen fractions
-        self.state = "ready"
         self.move_cursor = False
         self.show_box = False
-        self.messages: list[str] = []
-        self.reset_calibration()
+        self.reset()
 
     # -- flow -------------------------------------------------------------------------------
-    def reset_calibration(self) -> None:
+    def reset(self) -> None:
         self.state = "ready"
         self.targets = grid_targets(self.W, self.H, self.points)
         self.i = 0
@@ -77,26 +82,46 @@ class GazeDotApp:
         self.sweep_rows: list[tuple[float, np.ndarray]] = []
         self.need_neutral = True
         self.report = None
+        self.messages: list[str] = []
+        self.rc_targets: list[tuple[float, float]] = []
+        self.rc_rows: list[list[np.ndarray]] = []
+        self.after_rc = "validate"
+        self.bias_before = self.model.bias
+        self.drift = (0.0, 0.0)
         self.val_targets: list[tuple[float, float]] = []
-        self.val_preds: list[list[tuple[float, float]]] = []
+        self.val_rows: list[list[np.ndarray]] = []
         self.val_result = None
         self.gaze = None
-        self.offset = (0.0, 0.0)  # re-center correction in screen pixels, subtracted from predictions
-        self.recenter_preds: list[tuple[float, float]] = []
+        self.session = Session(profile=self.profile, screen=(self.W, self.H), camera=self.camera,
+                               iris_mode=self.iris_mode, kind="quick" if self.quick else "calibration")
+
+    def _begin_recenter(self, now: float, points, then: str) -> None:
+        self.rc_targets = [(fx * self.W, fy * self.H) for fx, fy in points]
+        self.rc_rows = [[] for _ in self.rc_targets]
+        self.after_rc, self.bias_before = then, self.model.bias
+        self.state, self.i, self.dot_start = "recenter", 0, now
 
     def start(self, now: float) -> None:
         if self.state == "ready":
-            self.state, self.i, self.dot_start = "calib", 0, now
+            if self.quick:
+                self._begin_recenter(now, QUICK_DOTS, "validate")
+            else:
+                self.state, self.i, self.dot_start = "calib", 0, now
         elif self.state == "results" and self.model.ready:
-            m = 0.15
-            self.val_targets = [(float(self.rng.uniform(m, 1 - m) * self.W), float(self.rng.uniform(m, 1 - m) * self.H))
-                                for _ in range(VALIDATION_DOTS)]
-            self.val_preds = [[] for _ in self.val_targets]
-            self.recenter_preds = []
-            self.state, self.dot_start = "recenter", now
+            self._begin_recenter(now, QUICK_DOTS[:1], "validate")
         elif self.state == "val_results":
             self.smoother.reset()
             self.state = "live"
+
+    def recenter_live(self, now: float) -> None:
+        if self.state == "live":
+            self._begin_recenter(now, QUICK_DOTS[:1], "live")
+
+    def _new_val_targets(self) -> None:
+        m = 0.15
+        self.val_targets = [(float(self.rng.uniform(m, 1 - m) * self.W), float(self.rng.uniform(m, 1 - m) * self.H))
+                            for _ in range(VALIDATION_DOTS)]
+        self.val_rows = [[] for _ in self.val_targets]
 
     def _dot_phase(self, now: float, count: int) -> str:
         """'settle', 'collect' or 'done' for the current dot."""
@@ -108,15 +133,16 @@ class GazeDotApp:
         return "collect"
 
     def step(self, now: float, row: np.ndarray | None, on_center_collect=None) -> None:
-        """Feed one camera frame. row is the feature row, or None for no face or a blink."""
+        """Feed one camera frame. row is the feature row, or None for no face or a blink.
+        on_center_collect: called once at the first middle dot to zero the head pose; returns a new row."""
+        if self.state in ("calib", "recenter") and self.need_neutral and on_center_collect is not None \
+                and row is not None and self.i == 0 and self._dot_phase(now, 0) == "collect":
+            row = on_center_collect()
+            self.need_neutral = False
         if self.state == "calib":
             phase = self._dot_phase(now, len(self.rows[self.i]))
             if phase == "collect" and row is not None:
-                if self.i == 0 and self.need_neutral and on_center_collect is not None:
-                    row = on_center_collect()  # zero the head pose while looking at the middle dot
-                    self.need_neutral = False
-                if row is not None:
-                    self.rows[self.i].append(row)
+                self.rows[self.i].append(row)
             elif phase == "done":
                 self.i += 1
                 self.dot_start = now
@@ -132,19 +158,18 @@ class GazeDotApp:
             elif t >= SWEEP_SETTLE_S + SWEEP_S:
                 self._fit()
         elif self.state == "recenter":
-            phase = self._dot_phase(now, len(self.recenter_preds))
+            phase = self._dot_phase(now, len(self.rc_rows[self.i]))
             if phase == "collect" and row is not None:
-                self.recenter_preds.append(self.model.predict_row(row))
+                self.rc_rows[self.i].append(row)
             elif phase == "done":
-                if len(self.recenter_preds) >= MIN_SAMPLES // 2:
-                    med = np.median(np.array(self.recenter_preds), axis=0)
-                    self.offset = (float(med[0] - self.W / 2), float(med[1] - self.H / 2))
-                print(f"Re-center: gaze had drifted ({self.offset[0]:+.0f}, {self.offset[1]:+.0f}) px since calibration")
-                self.state, self.i, self.dot_start = "validate", 0, now
+                self.i += 1
+                self.dot_start = now
+                if self.i == len(self.rc_targets):
+                    self._finish_recenter(now)
         elif self.state == "validate":
-            phase = self._dot_phase(now, len(self.val_preds[self.i]))
+            phase = self._dot_phase(now, len(self.val_rows[self.i]))
             if phase == "collect" and row is not None:
-                self.val_preds[self.i].append(self.model.predict_row(row))
+                self.val_rows[self.i].append(row)
             elif phase == "done":
                 self.i += 1
                 self.dot_start = now
@@ -152,21 +177,50 @@ class GazeDotApp:
                     self._score_validation()
         elif self.state == "live" and row is not None:
             x, y = self.model.predict_row(row)
-            x, y = x - self.offset[0], y - self.offset[1]
             sx, sy = self.smoother(now, x / self.W, y / self.H)
             self.gaze = (sx * self.W, sy * self.H)
 
+    def _finish_recenter(self, now: float) -> None:
+        dots = [(t, np.array(r)) for t, r in zip(self.rc_targets, self.rc_rows) if len(r) >= MIN_SAMPLES // 2]
+        self.drift = self.model.recenter(dots)
+        print(f"Re-center on {len(dots)} dot(s): gaze had drifted ({self.drift[0]:+.0f}, {self.drift[1]:+.0f}) px")
+        for t, r in dots:
+            self.session.add(t, r, "recenter")
+        if self.after_rc == "live":
+            self.smoother.reset()
+            self.state = "live"
+        else:
+            self._new_val_targets()
+            self.state, self.i, self.dot_start = "validate", 0, now
+
+    def _train(self) -> None:
+        """Saves this session and retrains on every session of the profile (same screen size)."""
+        if self.save:
+            save_session(self.session)
+            others, notes = load_sessions(self.profile, (self.W, self.H))
+            others = [s for s in others if s.path != self.session.path]
+            for n in notes:
+                print("  " + n)
+        else:
+            others = []
+        self.report = self.model.fit_sessions(others + [self.session], current=len(others), y_inputs=self.y_inputs)
+        if self.save:
+            self.messages.append(f"Model saved to {self.model.save()}")
+
     def _fit(self) -> None:
-        dots = [(t, np.array(r)) for t, r in zip(self.targets, self.rows) if len(r) >= MIN_SAMPLES // 2]
+        self.messages = []
+        for t, r in zip(self.targets, self.rows):
+            if len(r) >= MIN_SAMPLES // 2:
+                self.session.add(t, r, "calib")
+        chunks: dict[int, list[np.ndarray]] = {}
+        for t, r in self.sweep_rows:
+            chunks.setdefault(int((t - SWEEP_SETTLE_S) // SWEEP_CHUNK_S), []).append(r)
+        for c in chunks.values():
+            if len(c) >= 5:
+                self.session.add((self.W / 2, self.H / 2), c, "sweep")
         try:
-            chunks: dict[int, list[np.ndarray]] = {}
-            for t, r in self.sweep_rows:
-                chunks.setdefault(int((t - SWEEP_SETTLE_S) // SWEEP_CHUNK_S), []).append(r)
-            center = (self.W / 2, self.H / 2)
-            sweep = [(center, np.array(c)) for c in chunks.values() if len(c) >= 5]
-            self.report = self.model.fit(dots, y_inputs=self.y_inputs, sweep=sweep)
-            path = self.model.save()
-            self.messages = [f"Calibration: {self.report.summary()}", self.report.compare(), f"Saved to {path}"]
+            self._train()
+            self.messages[:0] = [f"Calibration: {self.report.summary()}", self.report.compare()]
         except ValueError as e:
             self.report = None
             self.messages = [f"Calibration failed: {e}. Press R to try again (more light, face the camera)."]
@@ -175,19 +229,30 @@ class GazeDotApp:
         self.state = "results"
 
     def _score_validation(self) -> None:
-        offsets, raw_offsets, wobbles = [], [], []
-        for t, preds in zip(self.val_targets, self.val_preds):
-            if len(preds) < MIN_SAMPLES // 2:
+        offsets, raw_offsets, wobbles, self.val_meds = [], [], [], []
+        for t, rows in zip(self.val_targets, self.val_rows):
+            if len(rows) < MIN_SAMPLES // 2:
+                self.val_meds.append(None)
                 continue
-            p = np.array(preds)
-            med = np.median(p, axis=0)
-            raw_offsets.append(math.hypot(med[0] - t[0], med[1] - t[1]))
-            offsets.append(math.hypot(med[0] - self.offset[0] - t[0], med[1] - self.offset[1] - t[1]))
-            wobbles.append(float(np.sqrt(np.mean(np.sum((p - med) ** 2, axis=1)))))
+            med_row = np.median(np.array(rows), axis=0)
+            p = np.array(self.model.predict_row(med_row))
+            q = np.array(self.model.predict_row(med_row, bias=self.bias_before))
+            frames = np.array([self.model.predict_row(r) for r in rows])
+            self.val_meds.append(p)
+            offsets.append(math.hypot(p[0] - t[0], p[1] - t[1]))
+            raw_offsets.append(math.hypot(q[0] - t[0], q[1] - t[1]))
+            wobbles.append(float(np.sqrt(np.mean(np.sum((frames - np.median(frames, axis=0)) ** 2, axis=1)))))
+            self.session.add(t, rows, "check")
         if offsets:
             self.val_result = (float(np.mean(offsets)), float(np.mean(wobbles)), len(offsets), float(np.mean(raw_offsets)))
+            what = "the trained model's average shift" if self.quick else "the calibration"
             print(f"Check on {len(offsets)} new dots: accuracy {self.val_result[0]:.0f} px after re-center "
-                  f"({self.val_result[3]:.0f} px without), wobble {self.val_result[1]:.0f} px (frame-to-frame, before smoothing)")
+                  f"({self.val_result[3]:.0f} px with {what}), wobble {self.val_result[1]:.0f} px (frame-to-frame)")
+            try:  # the check dots are new training data too
+                self._train()
+                print(f"Retrained on {self.report.sessions} session(s), {self.report.dots_total} dots: {self.report.summary()}")
+            except ValueError as e:
+                print(f"Not retrained: {e}")
         else:
             self.val_result = None
             print("Check failed: no usable frames on the new dots.")
@@ -212,44 +277,39 @@ class GazeDotApp:
             scale, thick = fs * (1.3 if big else 1.0), 2 if big else 1
             (tw, th), base = cv2.getTextSize(txt, FONT, scale, thick)
             pad = int(6 * cw / 1920)
-            cv2.rectangle(img, (x - pad, y - th - pad), (x + tw + pad, y + base + pad), BG, -1)  # keeps text readable over dots
+            cv2.rectangle(img, (x - pad, y - th - pad), (x + tw + pad, y + base + pad), BG, -1)  # readable over dots
             cv2.putText(img, txt, (x, y), FONT, scale, color, thick, cv2.LINE_AA)
 
+        def dot(x, y, t):
+            if t < SETTLE_S:
+                cv2.circle(img, P(x, y), int((34 - 22 * t / SETTLE_S) * cw / 1920), DOT, -1, cv2.LINE_AA)
+            else:
+                cv2.circle(img, P(x, y), int(12 * cw / 1920), GOOD, -1, cv2.LINE_AA)
+            cv2.circle(img, P(x, y), max(2, int(3 * cw / 1920)), BG, -1, cv2.LINE_AA)
+
+        bottom = ch - int(70 * cw / 1920)
         if self.state == "ready":
-            say("Gaze calibration", 0, TEXT, big=True)
-            say(f"{len(self.targets)} dots. Look at each one until it turns green and disappears.", 2)
+            if self.quick:
+                say("Quick start with the trained model", 0, TEXT, big=True)
+                say(f"Profile '{self.profile}', trained on {self.model.sessions} session(s). Look at 5 dots to re-center.", 2)
+            else:
+                say("Gaze calibration", 0, TEXT, big=True)
+                say(f"Profile '{self.profile}'. {len(self.targets)} dots: look at each until it turns green and disappears.", 2)
             say("Keep your head fairly still. Blinking is fine.", 3)
             say("SPACE to start   Q to quit", 5, QUIET)
-        elif self.state in ("calib", "validate"):
-            targets = self.targets if self.state == "calib" else self.val_targets
-            counts = self.rows if self.state == "calib" else self.val_preds
+        elif self.state in ("calib", "validate", "recenter"):
+            targets = {"calib": self.targets, "validate": self.val_targets, "recenter": self.rc_targets}[self.state]
+            counts = {"calib": self.rows, "validate": self.val_rows, "recenter": self.rc_rows}[self.state]
             if self.i < len(targets):
-                t = now - self.dot_start
-                x, y = targets[self.i]
-                if t < SETTLE_S:
-                    r = int((34 - 22 * t / SETTLE_S) * cw / 1920)
-                    cv2.circle(img, P(x, y), r, DOT, -1, cv2.LINE_AA)
-                else:
-                    cv2.circle(img, P(x, y), int(12 * cw / 1920), GOOD, -1, cv2.LINE_AA)
-                cv2.circle(img, P(x, y), max(2, int(3 * cw / 1920)), BG, -1, cv2.LINE_AA)
-                label = "Calibrating" if self.state == "calib" else "Checking on new dots"
-                say(f"{label}: dot {self.i + 1} of {len(targets)}   samples {len(counts[self.i])}", 0, QUIET,
-                    y0=ch - int(70 * cw / 1920))
-        elif self.state == "recenter":
-            t = now - self.dot_start
-            c = P(self.W / 2, self.H / 2)
-            r = int((34 - 22 * t / SETTLE_S) * cw / 1920) if t < SETTLE_S else int(12 * cw / 1920)
-            cv2.circle(img, c, r, DOT if t < SETTLE_S else GOOD, -1, cv2.LINE_AA)
-            cv2.circle(img, c, max(2, int(3 * cw / 1920)), BG, -1, cv2.LINE_AA)
-            say("Re-centering: look at the dot", 0, QUIET, y0=ch - int(70 * cw / 1920))
+                dot(*targets[self.i], now - self.dot_start)
+                label = {"calib": "Calibrating", "validate": "Checking on new dots", "recenter": "Re-centering"}[self.state]
+                say(f"{label}: dot {self.i + 1} of {len(targets)}   samples {len(counts[self.i])}", 0, QUIET, y0=bottom)
         elif self.state == "sweep":
             t = now - self.dot_start
-            cv2.circle(img, P(self.W / 2, self.H / 2), int(12 * cw / 1920), GOOD, -1, cv2.LINE_AA)
-            cv2.circle(img, P(self.W / 2, self.H / 2), max(2, int(3 * cw / 1920)), BG, -1, cv2.LINE_AA)
-            left = max(0.0, SWEEP_SETTLE_S + SWEEP_S - t)
+            dot(self.W / 2, self.H / 2, SETTLE_S)
             say("Last step: keep looking at the green dot", 0, GOOD, big=True)
             say("Slowly turn your head a little left and right, then nod a little. Eyes stay on the dot.", 1)
-            say(f"{left:.0f} s left   samples {len(self.sweep_rows)}", 2, QUIET)
+            say(f"{max(0.0, SWEEP_SETTLE_S + SWEEP_S - t):.0f} s left   samples {len(self.sweep_rows)}", 2, QUIET)
         elif self.state == "results":
             if self.report:
                 for d in self.report.dots:
@@ -259,27 +319,26 @@ class GazeDotApp:
                 say("Calibration done", 0, GOOD, big=True)
                 say(self.report.summary(), 1)
                 say(self.report.compare(), 2)
-                say("White ring = dot, orange = where the model would put it without having seen that dot.", 3, QUIET)
-                say("SPACE: check on 5 new dots   R: redo   Q: quit", 4, QUIET)
+                say("White ring = dot, orange = where the model put it without having seen that dot.", 3, QUIET)
+                say("SPACE: re-center + check on 5 new dots   R: redo   Q: quit", 4, QUIET)
             else:
-                for m in self.messages:
-                    say(m, 0, BAD)
+                for k, m in enumerate(self.messages):
+                    say(m, k, BAD)
                 say("R: redo   Q: quit", 2, QUIET)
         elif self.state == "val_results":
-            for t, preds in zip(self.val_targets, self.val_preds):
+            for t, med in zip(self.val_targets, getattr(self, "val_meds", [])):
                 cv2.circle(img, P(*t), int(14 * cw / 1920), DOT, 2, cv2.LINE_AA)
-                if preds:
-                    med = np.median(np.array(preds), axis=0) - np.array(self.offset)
+                if med is not None:
                     cv2.line(img, P(*t), P(*med), GAZE, 2, cv2.LINE_AA)
                     cv2.circle(img, P(*med), int(7 * cw / 1920), GAZE, -1, cv2.LINE_AA)
             if self.val_result:
                 acc, wob, n, raw = self.val_result
                 say("Check on new dots", 0, GOOD, big=True)
                 say(f"Accuracy {acc:.0f} px after re-center ({raw:.0f} px without)   wobble {wob:.0f} px   {n} dots", 1)
-                say("White ring = new dot, blue = where your gaze landed on average.", 2, QUIET)
+                say("White ring = new dot, blue = where your gaze landed on average. Saved as training data.", 2, QUIET)
             else:
-                say("Check failed: no usable frames. R to recalibrate.", 0, BAD, big=True)
-            say("SPACE: go live   R: recalibrate   Q: quit", 3, QUIET)
+                say("Check failed: no usable frames. R to start over.", 0, BAD, big=True)
+            say("SPACE: go live   R: start over   Q: quit", 3, QUIET)
         elif self.state == "live":
             if self.gaze is not None:
                 gx, gy = self.gaze
@@ -292,7 +351,7 @@ class GazeDotApp:
                     cv2.circle(img, P(gx, gy), max(4, int(self.val_result[0] * s)), (90, 80, 70), 2, cv2.LINE_AA)
                 cv2.circle(img, P(gx, gy), int(16 * cw / 1920), GAZE, -1, cv2.LINE_AA)
             say("Live gaze   M move real cursor: " + ("ON" if self.move_cursor else "off") +
-                "   B UI-Venus box   R recalibrate   Q quit", 0, QUIET)
+                "   C re-center   B UI-Venus box   R start over   Q quit", 0, QUIET)
             if self.val_result:
                 say(f"Ring = average offset from the check ({self.val_result[0]:.0f} px)", 1, QUIET)
 
@@ -303,12 +362,13 @@ class GazeDotApp:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Gaze calibration and live gaze dot")
+    parser = argparse.ArgumentParser(description="Gaze calibration, check and live gaze dot")
+    parser.add_argument("--profile", default="default", help="your name; one profile per person and setup")
+    parser.add_argument("--quick", action="store_true", help="use the trained model, re-center on 5 dots")
     parser.add_argument("--camera", type=int, default=None)
     parser.add_argument("--fps", type=int, default=None)
     parser.add_argument("--points", type=int, default=25, help="9 (3x3), 16 (4x4) or 25 (5x5)")
-    parser.add_argument("--y-inputs", default="auto", choices=["auto", "eye", "eye+mediapipe", "mediapipe"],
-                        help="up/down inputs; auto keeps the one with the lowest leave-one-dot-out error")
+    parser.add_argument("--y-inputs", default="auto", choices=["auto", "eye", "eye+mediapipe", "mediapipe", "full"])
     parser.add_argument("--iris", choices=["center", "ring"], default="center")
     parser.add_argument("--no-head", action="store_true", help="leave head pose out of the model")
     parser.add_argument("--sweep", action="store_true", help="add the 6 s head-sweep step to calibration")
@@ -323,16 +383,29 @@ def main() -> None:
     os_input.make_dpi_aware()               # physical pixels, same as the cursor
     W, H = os_input.screen_size()
     canvas_scale = min(1.0, 1920 / W)       # draw at most 1920 wide; the window stretches it
-    print(f"Screen {W}x{H}. {args.points} dots, head pose {'off' if args.no_head else 'on'}, iris {args.iris}, "
-          f"up/down inputs {args.y_inputs}.")
+
+    trained = None
+    if args.quick:
+        try:
+            trained = GazeModel.load()
+            if (trained.screen_w, trained.screen_h) != (W, H):
+                print(f"The trained model is for a {trained.screen_w}x{trained.screen_h} screen, this one is {W}x{H}. "
+                      "Running a full calibration instead.")
+                trained = None
+        except (FileNotFoundError, ValueError) as e:
+            print(f"No usable trained model ({e}). Running a full calibration instead.")
+    print(f"Screen {W}x{H}. Profile '{args.profile}'. {'Quick re-center' if trained else f'{args.points}-dot calibration'}, "
+          f"head pose {'off' if args.no_head else 'on'}, iris {args.iris}, up/down inputs {args.y_inputs}.")
 
     cam = Camera(index=args.camera, fps=args.fps)
     mode = cam.start()
-    print(f"Camera: {mode.width}x{mode.height} {mode.fourcc} via {mode.backend}, camera {mode.index}")
+    camera = f"{mode.width}x{mode.height} {mode.fourcc} {mode.backend} camera {mode.index}"
+    print(f"Camera: {camera}")
     mesh = FaceMesh()
     eyes = EyeFeatureExtractor(iris_mode=args.iris)
     head = HeadPoseEstimator()
-    app = GazeDotApp(W, H, points=args.points, y_inputs=args.y_inputs, sweep=args.sweep and not args.no_head)
+    app = GazeDotApp(W, H, points=args.points, y_inputs=args.y_inputs, sweep=args.sweep and not args.no_head,
+                     profile=args.profile, trained=trained, camera=camera, iris_mode=args.iris)
 
     window = "Diseyeble gaze"
     cv2.namedWindow(window, cv2.WINDOW_NORMAL)
@@ -372,7 +445,9 @@ def main() -> None:
                 app.start(now)
             elif key == ord("r"):
                 head.reset_neutral()
-                app.reset_calibration()
+                app.reset()
+            elif key == ord("c"):
+                app.recenter_live(now)
             elif key == ord("m"):
                 app.move_cursor = not app.move_cursor
             elif key == ord("b"):

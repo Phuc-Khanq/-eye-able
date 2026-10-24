@@ -106,6 +106,12 @@ SCENARIOS = [
     ("three quick nods in a row count once", lambda: run(np.zeros(200), bump(200, 20, 14, 14) + bump(200, 38, 14, 14)
                                                            + bump(200, 56, 14, 14)), ["nod"]),
     ("nod, pause, shake", lambda: run(shake_track(200, 90), bump(200, 20, 14, 14)), ["nod", "shake"]),
+    ("tilt right while nodding is not a nod", lambda: run(np.zeros(200), bump(200, 20, 14, 14),
+        tilt_track(200, 20, 40, 18)), ["tilt_right"]),
+    ("tilt right, then a nod after it", lambda: run(np.zeros(200), bump(200, 100, 14, 14),
+        tilt_track(200, 20, 30, 20)), ["tilt_right", "nod"]),
+    ("tilt right starts while the head is still in a shake's cooldown", lambda: run(shake_track(200, 20), np.zeros(200),
+        tilt_track(200, 60, 30, 20)), ["shake", "tilt_right"]),
 ]
 
 

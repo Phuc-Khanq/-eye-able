@@ -133,11 +133,10 @@ class GestureDetector:
         ))
         while self.history and pose.t_ms - self.history[0].t_ms > HISTORY_MS:
             self.history.popleft()
-        if pose.t_ms < self.quiet_until_ms:
-            return None
-
+        # Tilts are never held back by the cooldown: a nod or shake fired by a head that is tilting
+        # must not swallow the tilt that caused it. Nods and shakes wait for cooldown and calm.
         gesture = self._tilt(self.history[-1])
-        if gesture is None and self._calm():
+        if gesture is None and pose.t_ms >= self.quiet_until_ms and self._calm():
             gesture = self._nod() or self._shake()
         if gesture is not None:
             self.quiet_until_ms = pose.t_ms + self.cooldown_ms
@@ -169,7 +168,7 @@ class GestureDetector:
         return t, yaw, pitch, roll
 
     def _nod(self) -> Gesture | None:
-        t, yaw, pitch, _ = self._window(NOD_WINDOW_MS)
+        t, yaw, pitch, roll = self._window(NOD_WINDOW_MS)
         if len(t) < 5:
             return None
         for sign in (1.0, -1.0):          # chin down first, then chin up
@@ -192,6 +191,8 @@ class GestureDetector:
                 continue                  # too slow: looking down at something, not a nod
             if np.ptp(yaw[s:]) > CROSS_AXIS_FRACTION * max(self.nod_deg, rise):
                 continue                  # that was a look around, not a nod
+            if np.ptp(roll) > CROSS_AXIS_FRACTION * max(self.nod_deg, rise):
+                continue                  # the head was tilting sideways, so the pitch change is a side effect
             return Gesture(t_ms=int(t[-1]), type="nod")
         return None
 
@@ -207,6 +208,9 @@ class GestureDetector:
                 return None               # a slow sweep across the screen, not a shake
         if np.ptp(pitch[points[0][0]:]) > CROSS_AXIS_FRACTION * 2 * self.shake_deg:
             return None
+        _, _, _, roll = self._window(SHAKE_WINDOW_MS)
+        if np.ptp(roll) > CROSS_AXIS_FRACTION * 2 * self.shake_deg:
+            return None               # tilting while turning is not a shake
         return Gesture(t_ms=int(t[-1]), type="shake")
 
     def _tilt(self, pose: HeadPose) -> Gesture | None:

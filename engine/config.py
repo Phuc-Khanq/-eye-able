@@ -37,6 +37,7 @@ class Settings:
     whisper_model: str = "large-v3-turbo"
     whisper_device: str = "cuda"
     whisper_compute_type: str = "float16"  # use "int8" on CPU
+    stt_backend: str = "whisper"  # "whisper" (local) or "assemblyai" (cloud, sends audio out)
 
     # Engine <-> UI
     ws_host: str = "127.0.0.1"

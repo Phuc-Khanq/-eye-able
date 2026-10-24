@@ -18,13 +18,33 @@ from __future__ import annotations
 import queue
 import threading
 import time
+from pathlib import Path
 
 from engine.core import topics
+
+ROOT = Path(__file__).resolve().parent.parent.parent
 
 BEAM_SIZE = 1             # greedy: fastest; short utterances barely gain from beam search
 NO_SPEECH_SKIP = 0.6      # drop a segment Whisper thinks is silence
 HALLUCINATION_CONF = 0.35  # a 1-3 word result this unsure is usually noise ("Thank you.")
 MAX_QUEUED = 3            # if Whisper falls behind, drop the oldest utterance
+
+
+def resolve_model(name: str) -> str:
+    """'large-v3-turbo' stays a model name; 'models/whisper-turbo-torgo-ct2' becomes a folder
+    path from the repo root, so it works whatever folder the engine was started from."""
+    if "/" not in name and "\\" not in name:
+        return name
+    path = Path(name)
+    if not path.is_absolute():
+        path = ROOT / path
+    if path.is_dir():
+        return str(path)
+    if name.startswith(("models/", "models\\")):
+        raise FileNotFoundError(f"Whisper model folder not found: {path}. "
+                                "Train it (training/README.md) or remove whisper_model "
+                                "from config.local.json.")
+    return name  # a Hugging Face id such as "openai/whisper-large-v3-turbo"
 
 
 class Dictation:
@@ -34,26 +54,55 @@ class Dictation:
         self.settings = settings
         self.hotwords = hotwords  # e.g. names the user says often: "Khoa Nhi Gmail"
         self._model = model
+        self._cloud = None
+
+    def _use_cloud(self) -> bool:
+        if self._model is not None:       # tests inject a fake Whisper
+            return False
+        s = self.settings
+        if s is None:
+            from engine.config import settings as s
+        return s.stt_backend == "assemblyai"
 
     def load(self) -> None:
+        if self._use_cloud():
+            return
         if self._model is None:
             from faster_whisper import WhisperModel  # heavy: import only when used (rule 6)
 
             s = self.settings
             if s is None:
                 from engine.config import settings as s
-            self._model = WhisperModel(s.whisper_model, device=s.whisper_device,
+            self._model = WhisperModel(resolve_model(s.whisper_model), device=s.whisper_device,
                                        compute_type=s.whisper_compute_type)
 
     def warm_up(self) -> None:
         """First CUDA call is slow; run one second of silence at startup."""
         import numpy as np
 
+        if self._use_cloud():
+            from engine.voice.assemblyai_stt import load_api_key
+
+            load_api_key()                # fail at startup, not on the first sentence
+            return
         self.load()
         self.transcribe(np.zeros(16000, dtype=np.float32))
 
+    def _transcribe_cloud(self, audio) -> list[dict]:
+        if self._cloud is None:
+            from engine.voice.assemblyai_stt import AssemblyAI
+
+            self._cloud = AssemblyAI()
+        keyterms = self.hotwords.split() if self.hotwords else None
+        return self._cloud.transcribe(audio, keyterms)
+
     def transcribe(self, audio) -> list[dict]:
         """Return [{"text": str, "conf": float}, ...] for the preview bubble."""
+        if self._use_cloud():
+            words = self._transcribe_cloud(audio)
+            if words and len(words) <= 3 and max(w["conf"] for w in words) < HALLUCINATION_CONF:
+                return []
+            return words
         self.load()
         segments, _info = self._model.transcribe(
             audio,

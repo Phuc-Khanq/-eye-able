@@ -2,7 +2,8 @@
 
 Each laptop can override any setting in config.local.json at the repo root
 (git ignores it). Example for a laptop without an NVIDIA GPU:
-    {"whisper_device": "cpu", "whisper_model": "small", "use_ui_venus": false}
+    {"whisper_device": "cpu", "whisper_model": "small",
+     "whisper_compute_type": "int8", "use_ui_venus": false}
 """
 import json
 from dataclasses import dataclass, fields
@@ -35,6 +36,7 @@ class Settings:
     pause_seconds: float = 1.5  # user setting, 1 to 4
     whisper_model: str = "large-v3-turbo"
     whisper_device: str = "cuda"
+    whisper_compute_type: str = "float16"  # use "int8" on CPU
 
     # Engine <-> UI
     ws_host: str = "127.0.0.1"

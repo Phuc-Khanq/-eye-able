@@ -328,5 +328,158 @@ class TestEventBus(unittest.TestCase):
         self.assertEqual(len(got), 2000)
 
 
+class Clock:
+    """A fake time.monotonic(): seconds, moved only by the test."""
+
+    def __init__(self, t=1000.0):
+        self.t = t
+
+    def __call__(self):
+        return self.t
+
+
+def make_timed(rate=RATE, channels=1, pause=1.0):
+    bus, sd, clock = FakeBus(), FakeSD(), Clock()
+    a = AudioIn(bus, Settings(), sd=sd, mic_settings=MicSettings(0, "fake", "MME", rate, channels),
+                vad=FakeVad(min_silence_s=pause), clock=clock)
+    a.start(run_thread=False)
+    return a, bus, sd, clock
+
+
+def feed(a, sd, clock, audio, rate=RATE, channels=1, chunk=1536, drop=(), backlog_s=None):
+    """Play audio as a real mic would: the clock moves by each chunk's length as it "arrives".
+    drop: chunk numbers lost before the callback. backlog_s: queue everything and process it
+    only this long after the last chunk arrived (the audio thread was behind)."""
+    for k, i in enumerate(range(0, len(audio), chunk)):
+        part = audio[i:i + chunk]
+        clock.t += len(part) / rate
+        if k in drop:
+            continue
+        part = np.repeat(part[:, None], channels, axis=1) if channels > 1 else part[:, None]
+        sd.stream.callback(part, len(part), None, None)
+        if backlog_s is None:
+            a.drain()
+    if backlog_s is not None:
+        clock.t += backlog_s
+        a.drain()
+
+
+def spans_and_utterances(bus):
+    spans = bus.of(topics.SPEECH_SPAN)
+    utts = bus.of(topics.UTTERANCE)
+    return list(zip(spans, utts)), spans, utts
+
+
+def onset_s(utt):
+    """Where the tone starts inside an utterance clip (s): the first loud sample."""
+    loud = np.flatnonzero(np.abs(utt) > 0.3 * np.abs(utt).max())
+    return loud[0] / RATE
+
+
+class TestSpeechSpan(unittest.TestCase):
+    """voice.speech_span says when an utterance's audio was spoken, on the time.monotonic() clock."""
+
+    def check_onsets(self, bus, t0_s, true_onsets_s, tol_ms=32):
+        pairs, spans, utts = spans_and_utterances(bus)
+        self.assertEqual(len(spans), len(utts))
+        self.assertEqual(len(utts), len(true_onsets_s))
+        for (span, utt), true in zip(pairs, true_onsets_s):
+            # a word Whisper places at offset x in the clip happened at start_ms + x
+            said_ms = span["start_ms"] + onset_s(utt) * 1000
+            self.assertLessEqual(abs(said_ms - (t0_s + true) * 1000), tol_ms, (span, true))
+        return pairs
+
+    def test_matches_the_real_speech_time_16k_and_48k_stereo(self):
+        for rate, channels in ((16000, 1), (48000, 2)):
+            with self.subTest(rate=rate, channels=channels):
+                a, bus, sd, clock = make_timed(rate, channels)
+                t0 = clock.t
+                audio = np.concatenate([silence(2.0, rate), tone(1.0, rate=rate), silence(1.5, rate),
+                                        tone(0.8, rate=rate), silence(1.5, rate)])
+                feed(a, sd, clock, audio, rate, channels, chunk=1536 if rate == 16000 else 1536 * 3)
+                pairs = self.check_onsets(bus, t0, [2.0, 4.5])
+                for span, utt in pairs:
+                    # the span covers exactly the clip it goes with
+                    self.assertAlmostEqual(span["end_ms"] - span["start_ms"], len(utt) / RATE * 1000, delta=1)
+
+    def test_start_includes_the_pre_roll(self):
+        a, bus, sd, clock = make_timed()
+        t0 = clock.t
+        feed(a, sd, clock, np.concatenate([silence(2.0), tone(1.0), silence(1.5)]))
+        (span, utt), = self.check_onsets(bus, t0, [2.0])
+        self.assertGreaterEqual(onset_s(utt), audio_in.PRE_ROLL_S - 0.04)    # the clip starts before the voice
+        self.assertAlmostEqual(span["start_ms"], (t0 + 2.0 - onset_s(utt)) * 1000, delta=32)
+
+    def test_speech_at_the_very_start_has_a_short_pre_roll(self):
+        a, bus, sd, clock = make_timed()
+        t0 = clock.t
+        feed(a, sd, clock, np.concatenate([silence(0.1), tone(1.0), silence(1.5)]))
+        (span, utt), = self.check_onsets(bus, t0, [0.1])
+        self.assertAlmostEqual(span["start_ms"], t0 * 1000, delta=32)          # the stream's first sample
+
+    def test_a_backlog_does_not_shift_the_span(self):
+        audio = np.concatenate([silence(1.0), tone(1.0), silence(1.5), tone(0.6), silence(1.5)])
+        a, bus, sd, clock = make_timed()
+        feed(a, sd, clock, audio)
+        on_time = bus.of(topics.SPEECH_SPAN)
+        b, bus2, sd2, clock2 = make_timed()
+        feed(b, sd2, clock2, audio, backlog_s=2.0)          # the thread got to it 2 s late
+        late = bus2.of(topics.SPEECH_SPAN)
+        self.assertEqual(len(late), 2)
+        for x, y in zip(on_time, late):
+            self.assertAlmostEqual(x["start_ms"], y["start_ms"], delta=0.5)
+            self.assertAlmostEqual(x["end_ms"], y["end_ms"], delta=0.5)
+
+    def test_dropped_chunks_do_not_shift_later_spans(self):
+        a, bus, sd, clock = make_timed()
+        t0 = clock.t
+        audio = np.concatenate([silence(1.0), tone(1.0), silence(3.0), tone(1.0), silence(1.5)])
+        # chunks 30-39 (2.88-3.84 s, in the silence between) never reach the callback
+        feed(a, sd, clock, audio, drop=range(30, 40))
+        self.check_onsets(bus, t0, [1.0, 5.0])               # 960 ms lost, the times still match
+
+    def test_span_comes_right_before_its_utterance_and_none_for_blips(self):
+        a, bus, sd, clock = make_timed()
+        feed(a, sd, clock, np.concatenate([silence(0.5), tone(1.0), silence(1.5), tone(0.1),
+                                           silence(1.5), tone(0.7), silence(1.5)]))
+        log = [(t, p) for t, p in bus.log if t in (topics.SPEECH_SPAN, topics.UTTERANCE)]
+        self.assertEqual([t for t, _ in log], [topics.SPEECH_SPAN, topics.UTTERANCE] * 2)  # the blip: neither
+        for i, (topic, _) in enumerate(bus.log):
+            if topic == topics.UTTERANCE:
+                self.assertEqual(bus.log[i - 1][0], topics.SPEECH_SPAN)
+
+    def test_the_28_s_cap_gives_the_first_part_a_correct_span(self):
+        a, bus, sd, clock = make_timed()
+        t0 = clock.t
+        feed(a, sd, clock, np.concatenate([silence(0.5), tone(30.0), silence(1.5)]))
+        pairs, spans, utts = spans_and_utterances(bus)
+        self.assertGreaterEqual(len(utts), 2)
+        first_span, first = pairs[0]
+        self.assertLessEqual(len(first) / RATE, audio_in.MAX_UTTERANCE_S + 0.1)
+        self.assertAlmostEqual(first_span["start_ms"] + onset_s(first) * 1000, (t0 + 0.5) * 1000, delta=32)
+        self.assertAlmostEqual(first_span["end_ms"] - first_span["start_ms"], len(first) / RATE * 1000, delta=1)
+        # the next part starts where the first ended
+        self.assertAlmostEqual(pairs[1][0]["start_ms"], first_span["end_ms"], delta=1)
+
+    def test_process_without_a_time_uses_the_clock(self):
+        a, bus, sd, clock = make_timed()
+        clock.t = 50.0
+        audio = np.concatenate([silence(1.0), tone(1.0), silence(2.0)])
+        for i in range(0, len(audio), 1536):               # a WAV fed straight to process(), no callback
+            clock.t += len(audio[i:i + 1536]) / RATE
+            a.process(audio[i:i + 1536])
+        (span, utt), = spans_and_utterances(bus)[0]
+        self.assertAlmostEqual(span["start_ms"] + onset_s(utt) * 1000, 51.0 * 1000, delta=32)
+
+
+class TestResamplerDelay(unittest.TestCase):
+    def test_delay_is_the_overlap_kept_back(self):
+        r = Resampler16k(48000)
+        r(np.zeros(4800, np.float32))
+        self.assertGreater(r.delay_ms, 0.0)
+        self.assertLess(r.delay_ms, 10.0)                  # about PAD_MS
+        self.assertEqual(Resampler16k(16000).delay_ms, 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

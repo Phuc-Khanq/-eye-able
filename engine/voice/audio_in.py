@@ -1,14 +1,20 @@
 """16 kHz mono mic stream, automatic gain for quiet voices, speech start and end.
 
 Route: Khoi and Khoa (Khoa leads)
-Publishes: listening, finished utterances (float32 audio) to dictation
+Publishes: listening, finished utterances (float32 audio) to dictation, and right before
+           each one topics.SPEECH_SPAN: when that audio was spoken
 Subscribes: settings (pause_seconds)
 APIs: sounddevice InputStream (512-sample blocks), silero-vad VADIterator
 
 How audio flows:
-  sounddevice callback   copies each chunk onto a queue and returns (never blocks)
+  sounddevice callback   stamps each chunk with its arrival time, queues it, returns (never blocks)
   "audio-in" thread      mic.Resampler16k -> 512-sample blocks -> gain -> Silero VAD
-                         -> on speech end: topics.UTTERANCE (16 kHz mono float32)
+                         -> on speech end: topics.SPEECH_SPAN, then topics.UTTERANCE (16 kHz mono float32)
+
+When was it said? Each 16 kHz sample's time comes from the arrival stamp of its own mic chunk
+(time.monotonic() ms, the camera's clock too), not from "now" when the thread gets to it, so a
+backlog in the queue or a dropped chunk doesn't shift the times. The voice route's mouth gate
+lines Whisper's word times up with the camera with it.
 
 An utterance ends after settings.pause_seconds of silence (the user picks 1 to 4 s),
 or at MAX_UTTERANCE_S, because Whisper only hears 30 s at a time.
@@ -17,8 +23,10 @@ Audio stays in memory; nothing is written to disk (CONTRIBUTING rule 10).
 
 from __future__ import annotations
 
+import bisect
 import queue
 import threading
+import time
 from collections import deque
 
 from engine.core import messages, topics
@@ -33,6 +41,7 @@ MIN_SPEECH_S = 0.25         # shorter blips (a cough, a click) are dropped
 MAX_UTTERANCE_S = 28.0
 LEVEL_EVERY = 3             # send a listening level every 3 blocks (about 10 per second)
 RAW_QUEUE_MAX = 200         # about 6 s of mic chunks; if we fall that far behind, drop audio
+TIME_HISTORY_S = 35.0       # sample times kept for SPEECH_SPAN (longer than any utterance plus pre-roll)
 
 # Gentle automatic gain: lift quiet voices toward TARGET_RMS, never turn anyone down.
 TARGET_RMS = 0.05           # about -26 dBFS, a normal speaking level
@@ -184,7 +193,8 @@ class AudioIn:
     and model, then call the stream's callback and drain() themselves.
     """
 
-    def __init__(self, bus, settings=None, sd=None, mic_settings=None, vad=None) -> None:
+    def __init__(self, bus, settings=None, sd=None, mic_settings=None, vad=None,
+                 clock=time.monotonic) -> None:
         if settings is None:
             from engine.config import settings
         self.bus = bus
@@ -193,6 +203,7 @@ class AudioIn:
         self._sd = sd
         self.mic_settings = mic_settings
         self._vad = vad
+        self._clock = clock             # seconds; tests pass a fake one
         self._raw: queue.Queue = queue.Queue(maxsize=RAW_QUEUE_MAX)
         self._stream = None
         self._thread: threading.Thread | None = None
@@ -215,6 +226,7 @@ class AudioIn:
         self._speech_start = 0                         # sample index of _speech[0]
         self._voice_start = 0                          # sample index where VAD heard speech
         self._vad_offset = 0                           # our sample index when the VAD clock was 0
+        self._times: deque = deque()                   # (16 kHz samples produced after a chunk, its time ms)
         self.speaking = False
 
     # ------------------------------------------------------------------ control
@@ -264,10 +276,10 @@ class AudioIn:
 
     # --------------------------------------------------------- sounddevice side
     def _callback(self, indata, frames, time_info, status) -> None:
-        """Runs on PortAudio's thread: copy and return, nothing else."""
+        """Runs on PortAudio's thread: stamp, copy and return, nothing else."""
         self.chunks += 1
         try:
-            self._raw.put_nowait(indata.copy())
+            self._raw.put_nowait((self._clock() * 1000.0, indata.copy()))
         except queue.Full:
             self.dropped_chunks += 1
 
@@ -275,32 +287,57 @@ class AudioIn:
     def _run(self) -> None:
         while not self._stop.is_set():
             try:
-                chunk = self._raw.get(timeout=0.2)
+                t_ms, chunk = self._raw.get(timeout=0.2)
             except queue.Empty:
                 continue
-            self.process(chunk)
+            self.process(chunk, t_ms)
 
     def drain(self) -> None:
         """Process every queued chunk now (tests, or a thread-less start)."""
         while True:
             try:
-                chunk = self._raw.get_nowait()
+                t_ms, chunk = self._raw.get_nowait()
             except queue.Empty:
                 return
-            self.process(chunk)
+            self.process(chunk, t_ms)
 
-    def process(self, chunk) -> None:
-        """Turn one native-rate mic chunk into blocks and run them through gain and VAD."""
+    def process(self, chunk, t_ms: float | None = None) -> None:
+        """Turn one native-rate mic chunk into blocks and run them through gain and VAD.
+
+        t_ms: when the chunk arrived (time.monotonic() ms, the moment its last sample was
+        captured). None (tests, a WAV file) means now.
+        """
         import numpy as np
 
+        if t_ms is None:
+            t_ms = self._clock() * 1000.0
         if self._resampler is None:
             self._resampler = mic.Resampler16k(self.mic_settings.rate if self.mic_settings else RATE)
         audio = self._resampler(chunk)
         if len(audio):
             self._pending = np.concatenate([self._pending, audio])
+            produced = self._blocks * BLOCK + len(self._pending)   # 16 kHz samples so far
+            # the resampler's newest output is a few ms older than the chunk's last sample
+            self._times.append((produced, t_ms - self._resampler.delay_ms))
+            while self._times and self._times[0][0] < produced - TIME_HISTORY_S * RATE:
+                self._times.popleft()
         while len(self._pending) >= BLOCK:
             block, self._pending = self._pending[:BLOCK], self._pending[BLOCK:]
             self._block(block)
+
+    def _sample_time_ms(self, sample: int, edge: str) -> float:
+        """time.monotonic() ms at 16 kHz sample index `sample`.
+
+        edge "start": the moment that sample began, timed from its own chunk.
+        edge "end": the end of sample - 1, timed from the chunk that sample - 1 is in.
+        The two only differ across a dropped chunk, where the real clock jumps.
+        """
+        if not self._times:
+            return self._clock() * 1000.0
+        ends = [n for n, _ in self._times]
+        i = bisect.bisect_right(ends, sample) if edge == "start" else bisect.bisect_left(ends, sample)
+        produced, t_ms = self._times[min(i, len(self._times) - 1)]
+        return t_ms - (produced - sample) * 1000.0 / RATE
 
     @property
     def speech_prob(self) -> float:
@@ -352,4 +389,8 @@ class AudioIn:
         self.speaking = False
         self.bus.publish(topics.TO_UI, messages.make(messages.LISTENING, level=0.0, speaking=False))
         if voiced >= MIN_SPEECH_S * RATE:
+            # same thread, right before the audio: dictation pairs the two in order
+            self.bus.publish(topics.SPEECH_SPAN, {
+                "start_ms": round(self._sample_time_ms(self._speech_start, "start"), 1),
+                "end_ms": round(self._sample_time_ms(end, "end"), 1)})
             self.bus.publish(topics.UTTERANCE, audio.astype(np.float32))

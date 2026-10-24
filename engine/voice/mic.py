@@ -130,6 +130,7 @@ class Resampler16k:
         from math import ceil, gcd
 
         g = gcd(TARGET_RATE, rate)
+        self.rate = rate
         self.up, self.down = TARGET_RATE // g, rate // g
         min_pad = max(64, rate * self.PAD_MS // 1000)
         self.pad = self.down * ceil(min_pad / self.down)   # whole output samples
@@ -155,6 +156,14 @@ class Resampler16k:
         b = (usable - self.pad) * self.up // self.down
         self._buf = buf[usable - 2 * self.pad:]
         return y[a:b].astype(np.float32)
+
+    @property
+    def delay_ms(self) -> float:
+        """How far the newest output sample lags the newest input sample, in ms (the overlap
+        kept for the next chunk). audio_in uses it to time utterances exactly."""
+        if self.up == self.down:
+            return 0.0
+        return max(0, len(self._buf) - self.pad) * 1000.0 / self.rate
 
 
 def record(seconds: float, preferred: int | None = None):

@@ -12,6 +12,8 @@ tests/recordings/*
 # Only the made-up demo is shared. Real sessions (record_events saves them here) can
 # contain the words someone dictated, so they stay on the laptop.
 !tests/recordings/demo_flow.jsonl
+# all_messages.jsonl is made from the real pieces with fake input (no one's speech), for Nhi
+!tests/recordings/all_messages.jsonl
 calibration/
 
 # Training data, checkpoints and downloaded Kaggle results (TORGO is never published)

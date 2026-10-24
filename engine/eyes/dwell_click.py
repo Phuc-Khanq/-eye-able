@@ -16,7 +16,7 @@ least ARRIVE_PX away for at least half the time. Reading moves the head, so a pa
 10 to 50 px at a time and settles again; on Hung's laptop that clicked 10 times in a minute of reading.
 Real dwell clicks came after a move of 100 px or more. Replaying that recording with this rule and the
 40 px radius: 0 reading clicks (was 10), and 9 dwell clicks in the dwell test (was 7). Check a new log
-with: python -m tests.brow_click --replay calibration\brow_logs\<file>.csv
+with: python -m tests.brow_click --replay calibration/brow_logs/<file>.csv
 
 Midas touch (a desktop is full of things that click): every click, of any kind, disarms the dwell
 until the cursor has moved REARM_PX away from that spot. So a parked cursor clicks once, not every

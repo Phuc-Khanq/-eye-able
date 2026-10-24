@@ -6,7 +6,7 @@ Each laptop can override any setting in config.local.json at the repo root
      "whisper_compute_type": "int8", "use_ui_venus": false}
 """
 import json
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 
@@ -76,6 +76,27 @@ class Settings:
     rewrite_device: str = "cuda"       # "cpu" works but is slow (seconds per sentence)
     rewrite_wait_s: float = 1.5        # "yes" waits at most this long for the clean-up, then types what's showing
     rewrite_max_s: float = 3.0         # a clean-up that takes longer is cut off and not used
+
+    # Opening apps and sites by voice (engine/voice/launch.py; engine/eyes/os_output.py starts them)
+    # "open Chrome" starts an app only if its name is here; any other name stays look-and-say.
+    launch_apps: dict = field(default_factory=lambda: {
+        "chrome": "chrome.exe",            # os.startfile finds these through Windows App Paths
+        "edge": "msedge.exe",
+        "notepad": "notepad.exe",
+        "file explorer": "explorer.exe",
+        "settings": "ms-settings:",        # Windows Settings
+        "mail": "mailto:",                 # the default mail app
+    })
+    launch_aliases: dict = field(default_factory=lambda: {   # other ways to say a launch_apps name
+        "google chrome": "chrome",
+        "microsoft edge": "edge",
+        "explorer": "file explorer",
+        "files": "file explorer",
+        "my files": "file explorer",
+        "email": "mail",
+        "outlook": "mail",
+    })
+    launch_search_url: str = "https://www.google.com/search?q={q}"   # "search for <words>"; {q} = the words
 
     # Engine <-> UI
     ws_host: str = "127.0.0.1"

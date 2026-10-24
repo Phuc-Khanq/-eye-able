@@ -1,10 +1,13 @@
-"""Carries out the mode manager's actions on Windows: click, type, keys, scroll, undo.
+"""Carries out the mode manager's actions on Windows: click, type, keys, scroll, undo, open an app or site.
 
 Route: Khang and Hung (Hung leads os_input; this is the bus side of it)
-Publishes: nothing
+Publishes: status (to the UI) when opening something, or when an action fails
 Subscribes: topics.OS_CLICK {"x", "y", "button": "left" | "right" (optional, left)}, OS_TYPE {"text"}, OS_KEY {"key": "enter" | "shift+enter" | ...},
-            OS_SCROLL {"direction": "up" | "down"}, OS_UNDO {}
-APIs: os_input (pynput). Only the mode manager publishes these topics, so nothing else can click or type.
+            OS_SCROLL {"direction": "up" | "down"}, OS_UNDO {},
+            OS_LAUNCH {"app": a key of settings.launch_apps} or {"url": "https://..."}
+APIs: os_input (pynput); os.startfile and webbrowser for OS_LAUNCH. Only the mode manager publishes these
+topics, so nothing else can click or type. OS_LAUNCH only starts what settings.launch_apps lists (never a
+name from the message itself, never a shell) and only opens https:// URLs.
 
 Clicks go through the eyes service's CursorDriver when there is one: it snaps the cursor to the spot and
 clicks there, so the 120 Hz glide can't pull the cursor away mid-click. Every action runs in order on one
@@ -22,17 +25,34 @@ from engine.core import messages, topics
 SCROLL_NOTCHES = 5   # one "scroll down" or tilt moves about a third of a page in a browser
 
 
+def start(kind: str, target: str) -> None:
+    """kind "app": os.startfile(target), which finds chrome.exe / msedge.exe through Windows App Paths and
+    opens ms-settings: and mailto:. kind "url": the default browser. Windows only; no shell."""
+    if kind == "url":
+        import webbrowser
+
+        webbrowser.open(target)
+    else:
+        import os
+
+        os.startfile(target)
+
+
 class OsOutput:
-    def __init__(self, bus, driver=None, os_api=None, scroller=None) -> None:
+    def __init__(self, bus, driver=None, os_api=None, scroller=None, settings=None, launcher=None) -> None:
         if os_api is None:
             from engine.eyes import os_input as os_api
+        if settings is None:
+            from engine.config import settings
         self.bus, self.driver, self.os, self.scroller = bus, driver, os_api, scroller
+        self.settings, self.launcher = settings, launcher or start
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="os-output")
         bus.subscribe(topics.OS_CLICK, self.on_click)
         bus.subscribe(topics.OS_TYPE, self.on_type)
         bus.subscribe(topics.OS_KEY, self.on_key)
         bus.subscribe(topics.OS_SCROLL, self.on_scroll)
         bus.subscribe(topics.OS_UNDO, self.on_undo)
+        bus.subscribe(topics.OS_LAUNCH, self.on_launch)
 
     def on_click(self, p: dict) -> None:
         x, y = int(p["x"]), int(p["y"])
@@ -54,6 +74,30 @@ class OsOutput:
 
     def on_undo(self, p: dict) -> None:
         self._safely("undo", lambda: self.os.combo("ctrl+z"))
+
+    def on_launch(self, p: dict) -> None:
+        """Start an app from settings.launch_apps, or open an https:// URL. Anything else: a warning only."""
+        app, url = p.get("app"), p.get("url")
+        if app is not None:
+            apps = getattr(self.settings, "launch_apps", {}) or {}
+            target = apps.get(app) if isinstance(app, str) else None
+            if not target:
+                self._status("warn", f"Not opening {app!r}: it isn't on the list of apps")
+                return
+            name = app.title()
+            self._safely(f"open {name}", lambda: (self.launcher("app", target),
+                                                  self._status("info", f"Opening {name}")))
+        elif isinstance(url, str) and url.startswith("https://") and not any(c.isspace() for c in url):
+            from urllib.parse import urlparse
+
+            site = urlparse(url).netloc
+            self._safely(f"open {site}", lambda: (self.launcher("url", url),
+                                                  self._status("info", f"Opening {site}")))
+        else:
+            self._status("warn", f"Not opening {url!r}: only https:// sites")
+
+    def _status(self, level: str, text: str) -> None:
+        self.bus.publish(topics.TO_UI, messages.make(messages.STATUS, level=level, text=text))
 
     def _safely(self, what: str, action) -> None:
         def run() -> None:

@@ -198,8 +198,9 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Diseyeble engine")
     p.add_argument("--wav", help="use this recording instead of the mic")
     p.add_argument("--no-eyes", action="store_true", help="no camera, cursor, clicks or typing (voice only)")
-    p.add_argument("--pointer", choices=["head", "hybrid", "gaze"], default="head",
-                   help="what moves the cursor; hybrid and gaze need a gaze calibration (tests.gaze_dot)")
+    p.add_argument("--pointer", choices=["head", "head-abs", "hybrid", "gaze"], default="head",
+                   help="head = head as a mouse with acceleration (default); head-abs = fixed head angle per "
+                        "screen spot; hybrid and gaze need a gaze calibration (tests.gaze_dot)")
     p.add_argument("--dwell", action="store_true", help="resting the cursor clicks (dwell_ms in settings)")
     p.add_argument("--stdin", action="store_true", help="typed lines count as heard speech (testing)")
     p.add_argument("--confirm", choices=["brow", "nod", "both"], default="brow",

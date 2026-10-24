@@ -98,12 +98,12 @@ def face(t_ms, yaw=0.0, pitch=0.0, roll=0.0, brow=0.05):
 
 
 class Rig:
-    def __init__(self, sit=(3.0, 2.0), confirm="brow"):
+    def __init__(self, sit=(3.0, 2.0), confirm="brow", pointer="head"):
         self.bus, self.clock, self.os = FakeBus(), Clock(), FakeOs()
         self.mm = ModeManager(self.bus, clock=self.clock)
         self.eyes = EyesService(self.bus, SETTINGS, os_api=self.os, features=FakeFeatures(),
                                 head_pose=HeadPoseEstimator(), clock=self.clock, model_path="no-such-file.json",
-                                confirm=confirm)
+                                confirm=confirm, pointer=pointer)
         self.finder = FakeFinder()
         self.targets = TargetService(self.bus, SETTINGS, finder=self.finder)
         self.targets.start()
@@ -164,7 +164,10 @@ class TestEyesService(unittest.TestCase):
         self.r.frames(10)
         self.assertEqual(len(self.r.bus.of(topics.MOUTH)), n + 10)
 
-    def test_head_points(self):
+    def test_head_abs_points(self):
+        self.r.out.stop()
+        self.r = Rig(pointer="head-abs")
+        self.r.frames(60)
         self.r.frames(60, yaw=5.0, pitch=-3.0)   # right and up
         g = self.r.bus.of(topics.GAZE)[-1]
         self.assertAlmostEqual(g.x, (W - 1) / 2 * (1 + 5 / 15), delta=12)
@@ -202,7 +205,7 @@ class TestEyesService(unittest.TestCase):
 
     def test_click_by_name_then_nod_with_confirm_nod(self):
         self.r.out.stop()
-        self.r = r = Rig(confirm="nod")
+        self.r = r = Rig(confirm="nod", pointer="head-abs")
         r.frames(60)
         r.frames(60, yaw=5.0)
         r.say("click subscribe")
@@ -216,6 +219,16 @@ class TestEyesService(unittest.TestCase):
         self.assertEqual(r.os.clicks, [(found["x"], found["y"])])
         self.assertIsNone(r.eyes.hold)
         self.assertIsNone(r.mm.question)
+
+    def test_head_mode_continues_from_the_clicked_button(self):
+        r = self.r
+        r.say("click subscribe")
+        found = r.ui(messages.TARGET_FOUND)[-1]
+        r.raise_brows()
+        r.frames(5)
+        g = r.bus.of(topics.GAZE)[-1]
+        self.assertAlmostEqual(g.x, found["x"], delta=3)   # the cursor stays on the button, no jump back
+        self.assertAlmostEqual(g.y, found["y"], delta=3)
 
     def test_shake_cancels_the_click(self):
         r = self.r

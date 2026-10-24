@@ -82,13 +82,13 @@ class EyesService:
                 self.model = None
         except Exception as exc:   # no calibration yet, or an old file: head pointing still works
             model_note = f"no gaze model ({type(exc).__name__})"
-        if pointer != "head" and self.model is None:
+        if pointer in ("hybrid", "gaze") and self.model is None:
             self._notes = [f"Pointer '{pointer}' needs a gaze model ({model_note}); using the head pointer."]
             pointer = "head"
         else:
             self._notes = []
         self.pointer = Pointer(self.W, self.H, pointer, self.model)
-        self.driver = CursorDriver(self.os.move)
+        self.driver = CursorDriver(self.os.move, still_px=self.pointer.still_px)
         self.gestures = GestureDetector()
         self.yes_nod = ConfirmNod()
         self.brows = BrowRaiseDetector()
@@ -216,7 +216,9 @@ class EyesService:
 
     def _release(self) -> None:
         with self._lock:
-            self.hold = None
+            held, self.hold = self.hold, None
+        if held is not None:
+            self.pointer.place(held[0], held[1])   # head mode: carry on from the button just found
 
     # ------------------------------------------------------ per camera frame
     def process(self, face, now: float) -> None:

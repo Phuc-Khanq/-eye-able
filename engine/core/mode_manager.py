@@ -225,7 +225,10 @@ class ModeManager:
 
     def _clause_command(self, c) -> Command | None:
         if c.triggered or self.mode == Mode.POINTER:
-            return commands.parse(c.text, allow_targets=self.mode in (Mode.POINTER, Mode.DICTATION))
+            cmd = commands.parse(c.text, allow_targets=self.mode in (Mode.POINTER, Mode.DICTATION))
+            if cmd and not c.triggered and not c.starts_sentence:
+                return None   # cut from mid-sentence: "I said click it" is talk, not a yes
+            return cmd
         if self.mode == Mode.DICTATION:   # untriggered: only "click <name>", as its own short sentence
             cmd = commands.parse(c.text, allow_targets=True, target_verbs=commands.DICTATION_TARGET_VERBS)
             if (cmd and cmd.name == "target" and c.starts_sentence

@@ -155,5 +155,32 @@ class TestTriggerWordsOnlyBeforeACommand(Base):
                          [("see you at noon", False), ("stop dictation", True)])
 
 
+class TestPointerChatter(Base):
+    """Fix 4: in Pointer mode "I said click it" was cut before "click" and answered yes."""
+
+    def test_a_command_cut_from_mid_sentence_does_not_count(self):
+        self.say("click send")
+        self.found()                                         # "Click Send?" is open
+        self.say("I said click it")
+        self.assertEqual(self.os(), [])
+        self.assertEqual(self.questions()[-1], ("Click Send?", "open"))
+        self.say("you should click compose")
+        self.assertEqual(self.searches(), ["Send"])          # no new search
+
+    def test_commands_as_their_own_sentences_still_count(self):
+        self.say("Click search box. Yeah.")                 # Khang's live test
+        self.found()
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 410, "y": 220})])
+
+    def test_a_trigger_word_still_makes_it_count(self):
+        self.say("I said Venus, scroll down")
+        self.assertEqual(self.os(), [(topics.OS_SCROLL, {"direction": "down"})])
+
+    def test_fillers_before_a_command_are_fine(self):
+        self.say("um, click send")
+        self.say("please click compose")
+        self.assertEqual(self.searches(), ["Send", "Compose"])
+
+
 if __name__ == "__main__":
     unittest.main()

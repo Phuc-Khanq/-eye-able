@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Models and user data: never commit
+models/*
+!models/README.md
+recordings/
+calibration/
+*.wav
+*.mp4
+
+# Secrets
+.env
+
+# Front end
+ui/node_modules/
+ui/out/
+ui/dist/
+
+# Private team notes (roles, judge prep). Keep out of the public repo.
+Diseyeble_Project_Description.md

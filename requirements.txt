@@ -1,0 +1,24 @@
+# Install PyTorch first with scripts/install.ps1 (CUDA 12.8 build for the RTX 5080).
+# Once the demo laptop works, pin everything with: pip freeze > requirements.lock.txt
+
+# Eyes, cursor and UI-Venus
+numpy
+opencv-python
+mediapipe==1.1.1
+scipy
+scikit-learn
+pynput
+mss
+pillow
+transformers>=4.57
+accelerate
+
+# Voice
+faster-whisper==1.2.1
+sounddevice
+silero-vad
+rapidfuzz
+librosa
+
+# Engine <-> UI
+websockets

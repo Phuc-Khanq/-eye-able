@@ -6,6 +6,10 @@ Run:  .\\.venv\\Scripts\\python.exe -m tests.target_bench
 Options:  --no-zoom   skip the small zoom box, ask about the full 1280x720 box only (to compare)
           --move      also move the real cursor onto the answer
           --wait 3    seconds to switch windows before each capture
+          --app NAME  tag the results (e.g. youtube, gmail, explorer); every answer is added to
+                      calibration/ui_venus_results.csv (numbers and labels only, never screenshots)
+          --offset 150  ask from a point 150 px away from the mouse in a random direction, to measure how
+                        well UI-Venus copes with an imprecise pointer (the head or gaze cursor)
 
 How it works
   1. Type a target (or pass a list). You get a few seconds: switch to the window you want and rest
@@ -70,7 +74,21 @@ def main() -> None:
     parser.add_argument("--no-zoom", action="store_true", help="ask about the full 1280x720 box only")
     parser.add_argument("--move", action="store_true", help="move the real cursor onto each answer")
     parser.add_argument("--wait", type=float, default=3.0, help="seconds to switch windows before each capture")
+    parser.add_argument("--app", default="", help="tag for the results file, e.g. youtube")
+    parser.add_argument("--offset", type=float, default=0.0, help="ask this many px away from the mouse (random direction)")
+    parser.add_argument("--csv", default=None, help="results file (default calibration/ui_venus_results.csv)")
     args = parser.parse_args()
+    import csv
+    import math
+    import random
+    from pathlib import Path
+    csv_path = Path(args.csv) if args.csv else Path(__file__).resolve().parents[1] / "calibration" / "ui_venus_results.csv"
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    new_file = not csv_path.exists()
+    out = open(csv_path, "a", newline="", encoding="utf-8")
+    writer = csv.writer(out)
+    if new_file:
+        writer.writerow(["time", "app", "target", "zoom", "offset_px", "found", "verdict", "ms", "answered_by", "px_from_mouse"])
 
     os_input.make_dpi_aware()
     finder = ScreenTarget(zoom=None if args.no_zoom else (640, 360))
@@ -108,7 +126,13 @@ def main() -> None:
         mouse = os_input.position()
         sl, st, sw, sh = screen_bounds()
         screen = grab(sl, st, sw, sh)  # one grab; both steps crop from it
-        result = finder.find(TargetRequest(gaze_x=mouse[0], gaze_y=mouse[1], label=label), screen=screen, origin=(sl, st))
+        ask_at = mouse
+        if args.offset > 0:
+            a = random.uniform(0, 2 * math.pi)
+            ask_at = (int(min(max(mouse[0] + args.offset * math.cos(a), sl), sl + sw - 1)),
+                      int(min(max(mouse[1] + args.offset * math.sin(a), st), st + sh - 1)))
+            print(f"  asking from {ask_at}, {args.offset:.0f} px from the mouse")
+        result = finder.find(TargetRequest(gaze_x=ask_at[0], gaze_y=ask_at[1], label=label), screen=screen, origin=(sl, st))
         times.append(result.ms)
         print(f"  {label}: " + (f"({result.x}, {result.y})" if result.found else "NOT FOUND")
               + f" in {result.ms:.0f} ms, mouse at {mouse}")
@@ -126,6 +150,11 @@ def main() -> None:
         misses += verdict == "n"
         skipped += verdict == ""
         print(f"  marked: {'right' if verdict == 'y' else 'wrong' if verdict == 'n' else 'skipped'}\n")
+        answered = next((st_.name for st_ in finder.trace if st_.answer.point is not None and st_.answer.point[0] >= 0), "")
+        writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), args.app, label, bool(finder.zoom), int(args.offset),
+                         result.found, verdict or "skip", round(result.ms), answered,
+                         round(float(np.hypot(result.x - mouse[0], result.y - mouse[1]))) if result.found else ""])
+        out.flush()
 
     if times:
         judged = hits + misses
@@ -134,6 +163,8 @@ def main() -> None:
               + f", {not_found} answered 'not found', {skipped} skipped")
         print(f"time per target: median {statistics.median(times):.0f} ms, slowest {max(times):.0f} ms"
               + ("  (zoom, then wide if needed)" if finder.zoom else "  (wide box only)"))
+    out.close()
+    print(f"Results added to {csv_path}")
     finder.close()
 
 

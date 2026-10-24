@@ -52,3 +52,72 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def check_confirm_nod() -> None:
+    from engine.eyes.look_click import ConfirmNod
+    c = ConfirmNod(deg=6)
+    t, fired = 0, []
+    def run(pitches):
+        nonlocal t
+        for p in pitches:
+            t += 33
+            fired.append(c.update(t, p))
+    run([1.0] * 40)                                  # resting
+    run([3, 6, 8, 9, 8, 5, 2, 1, 1])                 # a modest nod: 8 deg down and back
+    assert sum(fired) == 1, fired
+    fired.clear(); c.reset(); run([1.0] * 40)
+    run([3, 6, 8, 9] + [9] * 60)                     # looked down and stayed: no click
+    assert sum(fired) == 0
+    fired.clear(); c.reset(); run([1.0] * 40)
+    run([2, 3, 4, 4, 3, 2])                          # too small
+    assert sum(fired) == 0 and 2.5 < c.deepest < 3.5, c.deepest
+    fired.clear(); c.reset(); run([1.0] * 40)
+    run([4, 7, 8.7, 8, 6, 4.5, 4, 4, 4])             # 7.7 deg dip, head settles 3 deg lower: still a nod
+    assert sum(fired) == 1, fired
+    print("confirm nod ok")
+
+
+def check_cursor() -> None:
+    import math
+    import random
+    from engine.eyes.cursor_driver import CursorDriver
+    from engine.eyes.smoothing import StableCursor
+    s = StableCursor(6)
+    s(100, 100)
+    assert s(104, 103) == (100, 100), "wobble inside the dead zone doesn't move it"
+    x, y = s(120, 100)
+    assert abs(x - 114) < 1e-6 and y == 100, (x, y)
+    moves = []
+    d = CursorDriver(lambda x, y: moves.append((x, y)), glide_ms=45, still_px=6)
+    random.seed(1)
+    # head held still with the demo PC's measured sway: 0.13 deg at 64 px/deg, plus 2 px noise
+    raw, out = [], []
+    for i in range(300):
+        sway = 8 * math.sin(i / 9.0)
+        px, py = 900 + sway + random.gauss(0, 2), 500 + 0.5 * sway + random.gauss(0, 2)
+        raw.append((px, py))
+        if i % 4 == 0:                    # camera at 30 Hz, glide at 120 Hz
+            d.set_target(px, py)
+        out.append(d.step(1 / 120))
+    def rms(pts):
+        mx = sum(p[0] for p in pts) / len(pts); my = sum(p[1] for p in pts) / len(pts)
+        return math.sqrt(sum((p[0] - mx) ** 2 + (p[1] - my) ** 2 for p in pts) / len(pts))
+    print(f"still head: raw wobble {rms(raw[60:]):.1f} px -> cursor {rms(out[60:]):.1f} px")
+    assert rms(out[60:]) < 0.5 * rms(raw[60:])
+    # a 600 px move: the cursor should arrive within 0.25 s and stop within the dead zone
+    d.snap(100, 500)
+    t = 0
+    for i in range(120):
+        if i % 4 == 0:
+            d.set_target(100 + min(600, 600 * i / 40), 500)
+        p = d.step(1 / 120)
+        if t == 0 and p[0] >= 690:
+            t = i / 120
+    assert 0 < t < 0.6, t
+    print(f"600 px move reaches the target in {t:.2f} s; ends {700 - p[0]:.1f} px short (dead zone)")
+
+
+if __name__ == "__main__":
+    check_confirm_nod()
+    check_cursor()

@@ -136,3 +136,67 @@ class LookClick:
         self.state, self.target = "idle", None
         self.stats["clicked"] += 1
         return ("click", x, y)
+
+
+class ConfirmNod:
+    """A forgiving nod for the moment a found element waits for a yes.
+
+    The general nod detector (head_gestures) is strict on purpose, because a stray nod anywhere would
+    click. Here a click only happens on the element UI-Venus just found, so a simpler rule is safe:
+    chin goes down at least `deg` below where the head was resting, then comes back up at least
+    `back` of the way (half) within `max_ms`. No speed or still-start rules, and the head doesn't have to
+    return all the way (on the demo PC, dips of 7.7 degrees were missed because the head settled a bit
+    lower). Feed it every frame; call arm() when a new element starts waiting.
+    """
+
+    def __init__(self, deg: float = 5.0, max_ms: int = 2000, back: float = 0.5,
+                 rest_ms: tuple[int, int] = (1200, 300)) -> None:
+        self.back = back
+        self.deg = deg
+        self.max_ms = max_ms
+        self.rest_ms = rest_ms                 # resting pitch = median of pitch from 1.2 s to 0.3 s ago
+        self.samples: deque[tuple[int, float]] = deque()
+        self.down: tuple[int, float, float] | None = None  # (time it went down, resting pitch, deepest pitch)
+        self.deepest = 0.0                     # largest dip seen since reset, for feedback
+
+    def reset(self) -> None:
+        self.samples.clear()
+        self.arm()
+
+    def arm(self) -> None:
+        """A new element starts waiting: forget a half-done nod, keep the resting-pitch history."""
+        self.down = None
+        self.deepest = 0.0
+
+    def _rest(self, t: int) -> float | None:
+        old = [p for ts, p in self.samples if self.rest_ms[1] <= t - ts <= self.rest_ms[0]]
+        if not old and self.samples:
+            old = [self.samples[0][1]]
+        return statistics.median(old) if old else None
+
+    def update(self, t_ms: int, pitch: float) -> bool:
+        """Feed every frame (pitch > 0 = chin down). True on the frame the nod completes."""
+        self.samples.append((t_ms, pitch))
+        while self.samples and t_ms - self.samples[0][0] > 3000:
+            self.samples.popleft()
+        recent = sorted(p for _, p in list(self.samples)[-3:])
+        p = recent[len(recent) // 2]           # 3-frame median against one-frame glitches
+        if self.down is None:
+            rest = self._rest(t_ms)
+            if rest is None:
+                return False
+            self.deepest = max(self.deepest, p - rest)
+            if p - rest >= self.deg:
+                self.down = (t_ms, rest, p)
+            return False
+        t0, rest, low = self.down
+        low = max(low, p)
+        self.down = (t0, rest, low)
+        self.deepest = max(self.deepest, p - rest)
+        if p <= low - self.back * (low - rest):  # came back up most of the way
+            self.down = None
+            self.samples.clear()               # don't let this nod count as the next resting level
+            return True
+        if t_ms - t0 > self.max_ms:            # went down and stayed: looking down, not a nod
+            self.down = None
+        return False

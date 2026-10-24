@@ -80,3 +80,31 @@ class DwellDetector:
 
     def reset(self) -> None:
         self._anchor = None
+
+
+class StableCursor:
+    """A dead zone for the cursor: wobble smaller than still_px leaves it exactly where it is.
+
+    The point drags the cursor like a rope of length still_px: inside the rope nothing moves, beyond it
+    the cursor follows, staying still_px behind. On the demo PC a still head sways about 0.13 degrees
+    within a second (about 8 px at the head pointer's 64 px per degree), so 6-8 px removes the shimmer
+    while costing only that many pixels of lag on real moves.
+    """
+
+    def __init__(self, still_px: float = 8.0) -> None:
+        self.still_px = still_px
+        self.pos: tuple[float, float] | None = None
+
+    def __call__(self, x: float, y: float) -> tuple[float, float]:
+        if self.pos is None or self.still_px <= 0:
+            self.pos = (x, y)
+            return self.pos
+        px, py = self.pos
+        d = math.hypot(x - px, y - py)
+        if d > self.still_px:
+            k = (d - self.still_px) / d
+            self.pos = (px + (x - px) * k, py + (y - py) * k)
+        return self.pos
+
+    def reset(self, x: float | None = None, y: float | None = None) -> None:
+        self.pos = None if x is None else (x, y)

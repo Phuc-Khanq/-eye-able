@@ -1,0 +1,6 @@
+# Same line endings on every laptop, so diffs show real changes only
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.task binary

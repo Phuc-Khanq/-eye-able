@@ -61,6 +61,8 @@ npm --prefix ui run dev                          # front end
 
 ## Working together
 
+**Read `CONTRIBUTING.md` before your first commit.** The demo runs on Khang's laptop, and those rules keep your code working there.
+
 - One branch per route: `eyes`, `voice`, `ui`. Merge into `main` often through pull requests.
 - Never commit model files, recordings, calibration data or keys. `.gitignore` covers these.
 - Keep modules talking through the event bus only, so any one can be swapped for a stub.

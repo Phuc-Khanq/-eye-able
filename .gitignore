@@ -11,8 +11,9 @@ calibration/
 *.wav
 *.mp4
 
-# Secrets
+# Secrets and per-laptop settings
 .env
+config.local.json
 
 # Front end
 ui/node_modules/

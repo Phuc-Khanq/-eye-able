@@ -8,6 +8,7 @@ plus the asyncio loop for the WebSocket server. Run with: python -m engine.main
     python -m engine.main --stdin          # also take typed lines as if heard (testing without the mic;
                                            # they go straight to voice.transcript, so the mouth gate never sees them)
     python -m engine.main --confirm nod    # say yes with a nod instead of an eyebrow raise (or "both")
+    python -m engine.main --no-dwell       # resting the cursor doesn't click (dwell = left click is on by default)
 """
 from __future__ import annotations
 
@@ -29,7 +30,7 @@ class Engine:
 
     def __init__(self, bus, settings=settings, dictation=None, sd=None, mic_settings=None,
                  vad=None, warm_up: bool = True, eyes: bool = False, pointer: str = "head",
-                 dwell: bool = False, confirm: str = "brow") -> None:
+                 dwell: bool = True, confirm: str = "brow") -> None:
         self.bus = bus
         self.warm_up = warm_up
         # Start order matters only for subscriptions; nothing is published until start().
@@ -159,7 +160,7 @@ def read_stdin(bus, stop: threading.Event, delay_s: float = 3.0) -> None:
                                             "ms": 0.0})
 
 
-async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head", dwell: bool = False,
+async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head", dwell: bool = True,
               stdin: bool = False, confirm: str = "brow") -> None:
     bus = EventBus()
     relay = WebSocketRelay(bus)
@@ -201,7 +202,8 @@ def main() -> None:
     p.add_argument("--pointer", choices=["head", "head-abs", "hybrid", "gaze"], default="head",
                    help="head = head as a mouse with acceleration (default); head-abs = fixed head angle per "
                         "screen spot; hybrid and gaze need a gaze calibration (tests.gaze_dot)")
-    p.add_argument("--dwell", action="store_true", help="resting the cursor clicks (dwell_ms in settings)")
+    p.add_argument("--dwell", action=argparse.BooleanOptionalAction, default=True,
+                   help="resting the cursor dwell_ms (settings, 1 s) left-clicks; on by default, --no-dwell turns it off")
     p.add_argument("--stdin", action="store_true", help="typed lines count as heard speech (testing)")
     p.add_argument("--confirm", choices=["brow", "nod", "both"], default="brow",
                    help="what says yes besides your voice: eyebrow raise (default), nod, or either")

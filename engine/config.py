@@ -25,7 +25,7 @@ class Settings:
     blink_threshold: float = 0.5
 
     # Pointing
-    dwell_ms: int = 800
+    dwell_ms: int = 1000           # rest the cursor this long = left click
     sensitivity: float = 1.0
 
     # UI-Venus

@@ -60,7 +60,7 @@ class Engine:
         #    the cursor, plus head_gestures; UI-Venus answers target requests; os_output carries out
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
         #    the cursor or the keyboard; run() turns it on.
-        self.eyes = self.targets = self.os_output = self.mouth = self.meter = None
+        self.eyes = self.targets = self.os_output = self.mouth = self.meter = self.card = None
         if eyes:
             from engine.eyes.mouth import MouthTracker
             from engine.eyes.os_output import OsOutput
@@ -72,9 +72,16 @@ class Engine:
             # Was the user's mouth moving? For the voice route's "only the user's voice" gate.
             self.mouth = MouthTracker(bus)
             self.mode_manager.mouth = self.mouth     # an eyebrow raise while talking is ignored
-            if getattr(settings, "dwell_meter", True):
+            card = bool(getattr(settings, "dictation_card", True))
+            if getattr(settings, "dwell_meter", True) or card:
                 from engine.eyes.dwell_meter import DwellMeter
                 self.meter = DwellMeter(bus)         # the dwell ring at the cursor, without the Electron UI
+            if card:
+                from engine.eyes.dictation_card import DictationCard
+                self.card = DictationCard(bus, hide_from_capture=bool(getattr(settings, "card_hide_from_capture", True)),
+                                          opacity=float(getattr(settings, "card_opacity", 0.82)),
+                                          position=str(getattr(settings, "card_position", "bottom")))
+                self.meter.add_window(self.card.attach)   # what was heard and what will be typed, on screen
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
         #    (without eyes, mouth is None: no gate, every word counts)
         self.dictation = DictationWorker(bus, dictation or Dictation(settings), mouth=self.mouth,

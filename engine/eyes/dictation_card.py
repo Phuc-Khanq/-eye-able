@@ -1,0 +1,411 @@
+"""The dictation card: a see-through floating panel that shows what was heard and what will be typed, so the
+user never has to read the terminal. Drawn by the engine itself, so it works without the Electron UI.
+Styled after a meeting-assistant overlay: a small pill on top (state, and a live waveform while you speak),
+and under it a dark glass panel with your own words in a blue chip on the right, the text that will be typed,
+an action row, and a hint field with key caps.
+
+Route: Khang (Nhi's Electron bubble can replace it later: dictation_card false in settings)
+Publishes: nothing
+Subscribes: topics.TO_UI, read only: listening, mode, dictation_preview; topics.TRANSCRIPT (what was heard);
+            topics.OS_TYPE (so it can say "Typed" rather than "Dropped")
+APIs: tkinter Canvas, as a Toplevel on the click ring's Tk thread (engine/eyes/dwell_meter.py), so the engine
+      has one Tk thread; Windows ctypes for click-through, never focused, out of the taskbar, and out of
+      screenshots (SetWindowDisplayAffinity), so UI-Venus never reads the card as part of the page
+
+States, first match wins:
+  preview    "Will type": the words waiting to be typed (unsure words in amber, underlined), your own words in
+             the chip, "Type it / Drop it / Use original", and "blink or say yes" in the hint field. Stays until
+             it is typed or dropped.
+  done       "Typed" or "Dropped" for a moment after a preview closes
+  heard      for HEARD_S after anything is heard: your words in the chip, so every command gets feedback
+  listening  the pill only, with a moving waveform, as soon as the mic hears speech (before Whisper finishes)
+  mode       the pill only, in Dictation, Scroll or Paused mode
+  hidden     otherwise (moved off screen; never withdrawn, so showing it can't take the keyboard focus)
+The pill also shows the waveform whenever the mic hears speech, over any state.
+Out of screenshots also means out of OBS: set card_hide_from_capture false while recording the demo video.
+"""
+from __future__ import annotations
+
+import sys
+import threading
+import time
+from collections import deque
+from dataclasses import dataclass, field
+
+from engine.core import messages, topics
+
+HEARD_S = 2.5             # your words stay in the chip this long after a command
+DONE_S = 1.2              # "Typed" / "Dropped" stays this long
+LISTEN_HOLD_S = 0.4       # the waveform stays a moment after the mic goes quiet, so it doesn't flicker
+SHAKY_CONF = 0.6          # a word under this confidence is drawn in amber, underlined
+CHIP_MAX_CHARS = 70
+WAVE_BARS = 14
+
+# look
+PANEL_W = 760
+PAD = 22
+R_PANEL = 18
+PILL_H = 44
+GAP = 10                  # between the pill and the panel
+BOTTOM_GAP = 80           # px above the bottom of the screen (clear of the taskbar)
+TOP_GAP = 60
+POLL_MS = 50
+KEY = "#ff00fe"           # made transparent: the rounded corners
+PANEL = "#1b1c21"
+PANEL_EDGE = "#3c3d45"
+PILL = "#26272d"
+TEXT = "#f4f4f5"
+MUTED = "#a1a1aa"
+CHIP = "#2563eb"
+SHAKY = "#fbbf24"
+FIELD = "#24252b"
+KEYCAP = "#3a3b42"
+FONT = "Segoe UI"
+WDA_EXCLUDEFROMCAPTURE = 0x11
+OFF_SCREEN = "+-5000+-5000"
+MODE_NAMES = {"pointer": "Diseyeble", "dictation": "Dictation", "scroll": "Scroll", "paused": "Paused",
+              "menu": "Menu"}
+MODE_HINTS = {"dictation": "say “stop dictation” to stop", "scroll": "tilt your head · say “stop”",
+              "paused": "say “resume”"}
+
+
+@dataclass
+class View:
+    kind: str                                  # "preview" | "done" | "heard" | "listening" | "mode" | "hidden"
+    pill: str = ""                             # the pill's text (the mode)
+    pill_hint: str = ""
+    listening: bool = False                    # the pill shows the waveform
+    label: str = ""                            # small gray line at the top of the panel
+    chip: str = ""                             # your own words, in the blue chip
+    words: list = field(default_factory=list)  # [(text, shaky)]: the text that will be typed
+    body: str = ""                             # plain large text (done)
+    actions: list = field(default_factory=list)  # ["type", "drop", "original"]
+    keys: bool = False                         # the hint field with "yes" / "no" key caps
+
+    @property
+    def panel(self) -> bool:
+        return self.kind in ("preview", "done", "heard")
+
+
+def shorten(text: str, n: int = CHIP_MAX_CHARS) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+class CardModel:
+    """What the card shows; no Tk, so the tests can drive it."""
+
+    def __init__(self, clock=time.monotonic) -> None:
+        self.clock = clock
+        self.preview: list[dict] = []
+        self.original = ""
+        self.mode = "pointer"
+        self.heard, self._heard_at = "", float("-inf")
+        self._listening_until = float("-inf")
+        self.level = 0.0
+        self.levels: deque[float] = deque([0.0] * WAVE_BARS, maxlen=WAVE_BARS)
+        self._done, self._done_at = "", float("-inf")
+        self._last_typed = False
+
+    def on_ui(self, msg: dict) -> None:
+        kind = msg.get("type")
+        now = self.clock()
+        if kind == messages.LISTENING:
+            self.level = float(msg.get("level", 0.0) or 0.0)
+            if msg.get("speaking"):
+                self._listening_until = now + LISTEN_HOLD_S
+        elif kind == messages.MODE:
+            self.mode = str(msg.get("mode", "pointer"))
+        elif kind == messages.DICTATION_PREVIEW:
+            words = list(msg.get("words") or [])
+            if not words and self.preview:
+                self._done, self._done_at = ("Typed" if self._last_typed else "Dropped"), now
+            self.preview = words
+            self.original = str(msg.get("original", "")) if msg.get("cleaned") else ""
+            self._last_typed = False
+
+    def on_typed(self) -> None:
+        """os.type went out: the preview that closes next was typed, not dropped."""
+        self._last_typed = True
+        if not self.preview:
+            self._done, self._done_at = "Typed", self.clock()
+
+    def on_heard(self, text: str) -> None:
+        self.heard, self._heard_at = text.strip(), self.clock()
+
+    def tick_wave(self) -> None:
+        """Called about 20 times a second by the Tk thread: one new bar for the scrolling waveform."""
+        self.levels.append(self.level if self.listening() else 0.0)
+
+    def listening(self) -> bool:
+        return self.clock() <= self._listening_until
+
+    def view(self) -> View:
+        now = self.clock()
+        pill, hint, listening = MODE_NAMES.get(self.mode, "Diseyeble"), MODE_HINTS.get(self.mode, ""), self.listening()
+        if listening:
+            pill, hint = "Listening", ""
+        base = dict(pill=pill, pill_hint=hint, listening=listening)
+        if self.preview:
+            chip = self.original or (self.heard if now - self._heard_at <= 30 else "")
+            return View("preview", label="Will type", chip=shorten(chip),
+                        words=[(w["text"], float(w.get("conf", 1.0)) < SHAKY_CONF) for w in self.preview],
+                        actions=["type", "drop"] + (["original"] if self.original else []), keys=True, **base)
+        if now - self._done_at <= DONE_S:
+            return View("done", body=self._done, **base)
+        if now - self._heard_at <= HEARD_S and self.heard:
+            return View("heard", label="Heard", chip=shorten(self.heard), **base)
+        if listening:
+            return View("listening", **base)
+        if self.mode in ("dictation", "scroll", "paused"):
+            return View("mode", **base)
+        return View("hidden")
+
+
+class DictationCard:
+    def __init__(self, bus, clock=time.monotonic, hide_from_capture: bool = True, opacity: float = 0.82,
+                 position: str = "bottom") -> None:
+        self.bus = bus
+        self.model = CardModel(clock)
+        self.hide_from_capture = hide_from_capture
+        self.opacity = min(1.0, max(0.3, float(opacity)))
+        self.position = position
+        self._lock = threading.Lock()
+        bus.subscribe(topics.TO_UI, self._on_ui)
+        bus.subscribe(topics.TRANSCRIPT, self._on_transcript)
+        bus.subscribe(topics.OS_TYPE, self._on_type)
+
+    def _on_ui(self, msg: dict) -> None:
+        with self._lock:
+            self.model.on_ui(msg)
+
+    def _on_transcript(self, t: dict) -> None:
+        with self._lock:
+            self.model.on_heard(str(t.get("text", "")))
+
+    def _on_type(self, _payload: dict) -> None:
+        with self._lock:
+            self.model.on_typed()
+
+    def view(self) -> tuple[View, tuple]:
+        with self._lock:
+            self.model.tick_wave()
+            return self.model.view(), tuple(round(v, 2) for v in self.model.levels)
+
+    # ------------------------------------------------------------- Tk thread (the click ring's)
+    def attach(self, root) -> None:
+        """Build the card as a Toplevel of the ring's Tk root; call on that thread."""
+        import tkinter as tk
+        import tkinter.font as tkfont
+
+        win = tk.Toplevel(root)
+        win.overrideredirect(True)
+        win.attributes("-topmost", True)
+        win.configure(bg=KEY)
+        if sys.platform == "win32":
+            win.attributes("-transparentcolor", KEY)
+        try:
+            win.attributes("-alpha", self.opacity)
+        except tk.TclError:
+            pass
+        canvas = tk.Canvas(win, width=PANEL_W + 4, height=PILL_H + 4, bg=KEY, highlightthickness=0, bd=0)
+        canvas.pack()
+        fonts = {
+            "pill": tkfont.Font(root=root, family=FONT, size=12, weight="bold"),
+            "pill_hint": tkfont.Font(root=root, family=FONT, size=11),
+            "label": tkfont.Font(root=root, family=FONT, size=11),
+            "chip": tkfont.Font(root=root, family=FONT, size=12, weight="bold"),
+            "body": tkfont.Font(root=root, family=FONT, size=20),
+            "shaky": tkfont.Font(root=root, family=FONT, size=20, underline=True),
+            "action": tkfont.Font(root=root, family=FONT, size=12),
+            "hint": tkfont.Font(root=root, family=FONT, size=12),
+            "key": tkfont.Font(root=root, family=FONT, size=11, weight="bold"),
+        }
+        # Never withdrawn and shown again (that can take the focus): it stays mapped and moves off screen.
+        win.geometry(OFF_SCREEN)
+        win.update_idletasks()
+        hwnd = _setup_window(win, self.hide_from_capture)
+        shown = [None]
+
+        def tick():
+            try:
+                v, levels = self.view()
+                key = (v, levels if v.listening else None)
+                if key != shown[0]:
+                    shown[0] = key
+                    if v.kind == "hidden":
+                        win.geometry(OFF_SCREEN)
+                    else:
+                        h = draw(canvas, v, levels, fonts)
+                        canvas.config(width=PANEL_W + 4, height=h)
+                        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+                        x = (sw - PANEL_W) // 2
+                        y = TOP_GAP if self.position == "top" else sh - h - BOTTOM_GAP
+                        win.geometry(f"{PANEL_W + 4}x{h}+{x}+{y}")
+                        if hwnd:
+                            _keep_on_top(hwnd)   # above a full-screen video too
+            except Exception:
+                pass
+            win.after(POLL_MS, tick)
+
+        win.after(POLL_MS, tick)
+
+
+# ----------------------------------------------------------------- drawing (Tk thread)
+def round_rect(c, x1, y1, x2, y2, r, **kw):
+    pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2,
+           x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
+    return c.create_polygon(pts, smooth=True, **kw)
+
+
+def layout_words(words, font, shaky_font, max_w):
+    """[(text, shaky)] -> [[(text, shaky, x)]] lines that fit max_w."""
+    lines, line, x = [], [], 0
+    space = font.measure(" ")
+    for text, shaky in words:
+        w = (shaky_font if shaky else font).measure(text)
+        if line and x + w > max_w:
+            lines.append(line)
+            line, x = [], 0
+        line.append((text, shaky, x))
+        x += w + space
+    if line:
+        lines.append(line)
+    return lines
+
+
+def draw(c, v: View, levels, fonts) -> int:
+    """Draw the whole card; returns its height."""
+    c.delete("all")
+    x0, w = 2, PANEL_W
+    # --- pill
+    pill_w = 52 + fonts["pill"].measure(v.pill)
+    if v.listening:
+        pill_w += WAVE_BARS * 6 + 12
+    elif v.pill_hint:
+        pill_w += 14 + fonts["pill_hint"].measure(v.pill_hint)
+    px = x0 + (w - pill_w) // 2
+    round_rect(c, px, 2, px + pill_w, 2 + PILL_H, PILL_H // 2, fill=PILL, outline=PANEL_EDGE)
+    cx, cy = px + 24, 2 + PILL_H // 2
+    c.create_oval(cx - 10, cy - 7, cx + 10, cy + 7, outline=TEXT, width=2)       # an eye
+    c.create_oval(cx - 3, cy - 3, cx + 3, cy + 3, fill=TEXT, outline=TEXT)
+    tx = px + 44
+    if v.listening:
+        for i, lv in enumerate(levels):
+            bh = 4 + min(1.0, lv * 2.5) * 22
+            bx = tx + i * 6
+            c.create_rectangle(bx, cy - bh / 2, bx + 3, cy + bh / 2, fill=TEXT, outline="")
+        tx += WAVE_BARS * 6 + 10
+    c.create_text(tx, cy, text=v.pill, fill=TEXT, font=fonts["pill"], anchor="w")
+    if v.pill_hint and not v.listening:
+        c.create_text(tx + fonts["pill"].measure(v.pill) + 14, cy, text=v.pill_hint, fill=MUTED,
+                      font=fonts["pill_hint"], anchor="w")
+    if not v.panel:
+        return PILL_H + 6
+    # --- panel contents first (to know its height), then the panel behind them
+    if v.kind == "heard":       # a short line: a panel just wide enough, centered under the pill
+        cw = min(PANEL_W - 2 * PAD - 90, fonts["chip"].measure(v.chip) + 28)
+        w = min(PANEL_W, 2 * PAD + fonts["label"].measure(v.label) + 40 + cw)
+        x0 = 2 + (PANEL_W - w) // 2
+    elif v.kind == "done":
+        w = max(240, 2 * PAD + fonts["body"].measure(v.body))
+        x0 = 2 + (PANEL_W - w) // 2
+    top = 2 + PILL_H + GAP
+    y = top + PAD
+    inner = w - 2 * PAD
+    items_start = len(c.find_all())
+    row_h = 0
+    if v.label:
+        c.create_text(x0 + PAD, y + 15, text=v.label, fill=MUTED, font=fonts["label"], anchor="w")
+        row_h = 30
+    if v.chip:
+        cw = min(inner - 90, fonts["chip"].measure(v.chip) + 28)
+        cx2 = x0 + w - PAD
+        round_rect(c, cx2 - cw, y, cx2, y + 32, 14, fill=CHIP, outline=CHIP)
+        c.create_text(cx2 - cw + 14, y + 16, text=v.chip, fill="#ffffff", font=fonts["chip"], anchor="w",
+                      width=cw - 20)
+        row_h = 32
+    y += row_h + (12 if row_h else 0)
+    if v.words:
+        line_h = fonts["body"].metrics("linespace") + 4
+        for line in layout_words(v.words, fonts["body"], fonts["shaky"], inner):
+            for text, shaky, wx in line:
+                c.create_text(x0 + PAD + wx, y, text=text, fill=SHAKY if shaky else TEXT,
+                              font=fonts["shaky" if shaky else "body"], anchor="nw")
+            y += line_h
+        y += 10
+    if v.body:
+        c.create_text(x0 + PAD, y, text=v.body, fill=TEXT, font=fonts["body"], anchor="nw", width=inner)
+        y += fonts["body"].metrics("linespace") + 8
+    if v.actions:
+        ax = x0 + PAD
+        ay = y + 14
+        names = {"type": "Type it", "drop": "Drop it", "original": "Use original"}
+        for i, a in enumerate(v.actions):
+            if i:
+                c.create_text(ax, ay, text="·", fill=MUTED, font=fonts["action"], anchor="w")
+                ax += 18
+            _icon(c, a, ax, ay)
+            ax += 20
+            c.create_text(ax, ay, text=names[a], fill=TEXT, font=fonts["action"], anchor="w")
+            ax += fonts["action"].measure(names[a]) + 14
+        y += 34
+    if v.keys:
+        fy = y + 8
+        fh = 46
+        field_start = len(c.find_all())
+        sx, sy = x0 + PAD + 16, fy + fh // 2
+        for text, is_key in (("Blink, raise your eyebrows or say", False), ("yes", True), ("to type", False),
+                             ("·  say", False), ("no", True), ("to drop it", False)):
+            if is_key:
+                kw = fonts["key"].measure(text) + 16
+                round_rect(c, sx, sy - 12, sx + kw, sy + 12, 6, fill=KEYCAP, outline=PANEL_EDGE)
+                c.create_text(sx + kw // 2, sy, text=text, fill=TEXT, font=fonts["key"])
+                sx += kw + 8
+            else:
+                c.create_text(sx, sy, text=text, fill=MUTED, font=fonts["hint"], anchor="w")
+                sx += fonts["hint"].measure(text) + 8
+        field = round_rect(c, x0 + PAD, fy, x0 + w - PAD, fy + fh, 12, fill=FIELD, outline=PANEL_EDGE)
+        c.tag_lower(field, c.find_all()[field_start])   # behind its own text and key caps
+        y = fy + fh
+    bottom = y + PAD
+    panel = round_rect(c, x0, top, x0 + w, bottom, R_PANEL, fill=PANEL, outline=PANEL_EDGE)
+    first = c.find_all()[items_start] if len(c.find_all()) > items_start else None
+    if first is not None:
+        c.tag_lower(panel, first)
+    return bottom + 2
+
+
+def _icon(c, kind: str, x: float, y: float) -> None:
+    if kind == "type":
+        c.create_line(x, y, x + 4, y + 5, x + 12, y - 5, fill=TEXT, width=2)
+    elif kind == "drop":
+        c.create_line(x + 1, y - 5, x + 11, y + 5, fill=TEXT, width=2)
+        c.create_line(x + 1, y + 5, x + 11, y - 5, fill=TEXT, width=2)
+    else:
+        c.create_arc(x, y - 6, x + 12, y + 6, start=30, extent=270, style="arc", outline=TEXT, width=2)
+        c.create_line(x + 9, y - 8, x + 11, y - 4, x + 7, y - 3, fill=TEXT, width=2)
+
+
+# ----------------------------------------------------------------- Windows window styles
+def _keep_on_top(hwnd: int) -> None:
+    from engine.eyes.dwell_meter import _keep_on_top as on_top
+
+    on_top(hwnd)
+
+
+def _setup_window(win, hide_from_capture: bool) -> int:
+    """Windows: click-through, never focused, out of the taskbar, and (optionally) out of screenshots."""
+    if sys.platform != "win32":
+        return 0
+    import ctypes
+
+    from engine.eyes.dwell_meter import _click_through
+
+    hwnd = _click_through(win)
+    if hide_from_capture:
+        try:
+            ctypes.windll.user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
+        except Exception:
+            pass
+    return hwnd

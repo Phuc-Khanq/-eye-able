@@ -37,6 +37,12 @@ class Settings:
     dwell_clickable_only: bool = True   # Windows: dwell only on links, buttons, tabs... (engine/eyes/clickable.py);
                                         # false for canvas apps and games, which show neither
     dwell_uia: bool = True         # also ask Windows UI Automation (native buttons, text boxes; pip install uiautomation)
+    dictation_card: bool = True    # the box at the bottom of the screen: what was heard and what will be typed
+                                   # (engine/eyes/dictation_card.py); false once Nhi's Electron bubble shows it
+    card_opacity: float = 0.82     # 0.3 to 1: lower = more see-through
+    card_position: str = "bottom"  # "bottom" or "top" center of the screen
+    card_hide_from_capture: bool = True   # keep the card out of screenshots so UI-Venus never reads it; this also
+                                          # hides it from OBS, so set false while recording the demo video
     dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py): the snap click's
                                    # spinner and flash, and the dwell fill; no Electron UI needed
     sensitivity: float = 1.0

@@ -36,6 +36,7 @@ from rapidfuzz import fuzz, process
 FIXED_COMMANDS: dict[str, str] = {
     "start dictation": "start_dictation",
     "dictation": "start_dictation",
+    "dictate": "start_dictation",        # "dictate" alone; "dictate <words>" stays the one-shot
     "start typing": "start_dictation",
     "stop dictation": "stop_dictation",
     "stop typing": "stop_dictation",

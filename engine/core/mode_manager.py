@@ -296,8 +296,16 @@ class ModeManager:
                     continue
                 done = True
                 if cmd.name == "type_text":
-                    rest = [w for later in clauses[i + 1:] for w in later.words]
+                    later = clauses[i + 1:]
+                    answer = None    # "Dictate how are you. Yes." -> type "how are you", then the yes answers it
+                    if later and later[-1].starts_sentence:
+                        tail = commands.parse(later[-1].text, allow_targets=False)
+                        if tail and tail.name in ("yes", "no"):
+                            answer, later = tail, later[:-1]
+                    rest = [w for c2 in later for w in c2.words]
                     self._type_text({"words": c.words + rest})
+                    if answer is not None:
+                        self._do(answer)
                     return
                 if (cmd.name, cmd.label) != last:
                     self._do(cmd)

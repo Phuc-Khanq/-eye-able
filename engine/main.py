@@ -47,7 +47,7 @@ class Engine:
             from engine.eyes.target_service import TargetService
             self.eyes = EyesService(bus, settings, pointer=pointer, dwell=dwell, confirm=confirm)
             self.targets = TargetService(bus, settings)
-            self.os_output = OsOutput(bus, driver=self.eyes.driver)
+            self.os_output = OsOutput(bus, driver=self.eyes.driver, scroller=self.eyes.scroller)
             # Was the user's mouth moving? For the voice route's "only the user's voice" gate.
             self.mouth = MouthTracker(bus)
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager

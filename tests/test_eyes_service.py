@@ -29,6 +29,7 @@ class FakeOs:
 
     def __init__(self):
         self.moves, self.clicks, self.typed, self.keys, self.scrolls = [], [], [], [], []
+        self.wheel = []     # smooth scrolling: steps in 1/120 notch, positive = up
 
     def make_dpi_aware(self):
         pass
@@ -50,6 +51,9 @@ class FakeOs:
 
     def scroll(self, notches):
         self.scrolls.append(notches)
+
+    def scroll_units(self, units):
+        self.wheel.append(units)
 
 
 class FakeFinder:
@@ -98,7 +102,7 @@ def face(t_ms, yaw=0.0, pitch=0.0, roll=0.0, brow=0.05):
 
 
 class Rig:
-    def __init__(self, sit=(3.0, 2.0), confirm="brow", pointer="head"):
+    def __init__(self, sit=(3.0, 2.0), confirm="brow", pointer="head", smooth=False):
         self.bus, self.clock, self.os = FakeBus(), Clock(), FakeOs()
         self.mm = ModeManager(self.bus, clock=self.clock)
         self.eyes = EyesService(self.bus, SETTINGS, os_api=self.os, features=FakeFeatures(),
@@ -107,7 +111,8 @@ class Rig:
         self.finder = FakeFinder()
         self.targets = TargetService(self.bus, SETTINGS, finder=self.finder)
         self.targets.start()
-        self.out = OsOutput(self.bus, driver=self.eyes.driver, os_api=self.os)
+        self.out = OsOutput(self.bus, driver=self.eyes.driver, os_api=self.os,
+                            scroller=self.eyes.scroller if smooth else None)
         self.sit = sit          # raw yaw, pitch of the user's resting head (camera not straight ahead)
         self.t_ms = 0
 
@@ -141,6 +146,14 @@ class Rig:
 
     def ui(self, kind):
         return self.bus.ui(kind)
+
+    def set_mode(self, mode):
+        self.bus.publish(topics.TO_UI, messages.make(messages.MODE, mode=mode))
+
+    def scroll_for(self, seconds):
+        """Run the 60 Hz scroller by hand (its thread isn't started in tests)."""
+        for _ in range(int(seconds * 60)):
+            self.eyes.scroller.step(1 / 60)
 
 
 class TestEyesService(unittest.TestCase):
@@ -285,6 +298,94 @@ class TestEyesService(unittest.TestCase):
         r.frames(30)
         g = r.bus.of(topics.GAZE)[-1]
         self.assertAlmostEqual(g.x, (W - 1) / 2, delta=3)
+
+    def test_scroll_mode_head_down_scrolls_down_and_the_cursor_stays(self):
+        r = self.r
+        r.frames(20)
+        n_gaze, cursor = len(r.bus.of(topics.GAZE)), r.eyes.cursor
+        r.set_mode("scroll")
+        r.frames(20)                                  # learns "straight ahead" (0.4 s), no scrolling yet
+        r.scroll_for(0.5)
+        self.assertEqual(r.os.wheel, [])
+        r.frames(40, pitch=7.0)                       # chin down 7 degrees
+        r.scroll_for(1.0)
+        self.assertLess(sum(r.os.wheel), -600)        # scrolled down, more than 5 notches
+        self.assertGreater(len(r.os.wheel), 30)       # in many small steps
+        self.assertTrue(all(abs(u) < 120 for u in r.os.wheel[5:]))
+        self.assertEqual(len(r.bus.of(topics.GAZE)), n_gaze)   # the pointer didn't move
+        self.assertEqual(r.eyes.cursor, cursor)
+
+    def test_scroll_mode_chin_up_scrolls_up(self):
+        r = self.r
+        r.set_mode("scroll")
+        r.frames(20)
+        r.frames(40, pitch=-7.0)
+        r.scroll_for(1.0)
+        self.assertGreater(sum(r.os.wheel), 600)
+
+    def test_scroll_mode_straight_ahead_is_where_you_started(self):
+        r = self.r
+        r.frames(20, pitch=8.0)                       # head already tilted 8 degrees when "scroll" is said
+        r.set_mode("scroll")
+        r.frames(60, pitch=8.0)
+        r.scroll_for(1.0)
+        self.assertEqual(r.os.wheel, [])
+
+    def test_leaving_scroll_mode_coasts_and_the_cursor_carries_on_from_where_it_stayed(self):
+        r = self.r
+        r.frames(30)
+        before = r.eyes.cursor
+        r.set_mode("scroll")
+        r.frames(20)
+        r.frames(40, pitch=8.0)
+        r.scroll_for(0.5)
+        r.set_mode("pointer")
+        r.frames(2, pitch=8.0)                        # the head is still tilted 8 degrees
+        n = len(r.os.wheel)
+        r.scroll_for(0.3)
+        self.assertGreater(len(r.os.wheel), n)        # it coasts for a moment instead of stopping dead
+        r.scroll_for(3.0)
+        end = sum(r.os.wheel)
+        r.scroll_for(1.0)
+        self.assertEqual(sum(r.os.wheel), end)        # and stops
+        r.frames(10, pitch=8.0)
+        g = r.bus.of(topics.GAZE)[-1]
+        self.assertAlmostEqual(g.x, before[0], delta=2)    # no jump from the 8 degrees of head tilt
+        self.assertAlmostEqual(g.y, before[1], delta=2)
+
+    def test_losing_the_face_stops_scrolling(self):
+        r = self.r
+        r.set_mode("scroll")
+        r.frames(20)
+        r.frames(40, pitch=8.0)
+        r.scroll_for(1.0)
+        self.assertLess(r.eyes.scroller.rate, -3)
+        r.eyes.process(None, r.clock.t + 0.1)
+        r.scroll_for(3.0)
+        self.assertEqual(r.eyes.scroller.rate, 0.0)
+
+    def test_scroll_mode_tells_the_ui_the_speed(self):
+        r = self.r
+        r.set_mode("scroll")
+        r.frames(20)
+        r.frames(40, pitch=7.0)
+        msgs = r.ui(messages.SCROLL)
+        self.assertTrue(msgs)
+        self.assertGreater(msgs[-1]["offset"], 5)
+        self.assertTrue(msgs[-1]["ready"])
+        r.set_mode("pointer")
+        r.frames(2)
+        self.assertEqual(r.ui(messages.SCROLL)[-1]["rate"], 0.0)
+
+    def test_scroll_by_voice_glides_with_the_scroller(self):
+        self.r.out.stop()
+        self.r = r = Rig(smooth=True)
+        r.frames(60)
+        r.bus.publish(topics.OS_SCROLL, {"direction": "down"})
+        r.scroll_for(1.2)
+        self.assertEqual(r.os.scrolls, [])            # not one 5-notch jump...
+        self.assertAlmostEqual(sum(r.os.wheel), -600, delta=12)   # ...but 5 notches in many small steps
+        self.assertGreater(len(r.os.wheel), 20)
 
     def test_ui_venus_off_answers_not_found(self):
         bus = FakeBus()

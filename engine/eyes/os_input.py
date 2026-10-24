@@ -111,6 +111,25 @@ def scroll(dy: int, dx: int = 0) -> None:
     _get_mouse().scroll(dx, dy)
 
 
+_wheel_leftover = 0.0
+
+
+def scroll_units(units: int) -> None:
+    """Scroll by 1/120 of a notch per unit (positive = up): the smooth, trackpad-like scrolling.
+    Windows takes these small wheel steps directly. Elsewhere only whole notches work, so the rest is carried."""
+    global _wheel_leftover
+    if sys.platform == "win32":
+        import ctypes
+
+        ctypes.windll.user32.mouse_event(0x0800, 0, 0, int(units), 0)   # MOUSEEVENTF_WHEEL
+        return
+    _wheel_leftover += units / 120.0
+    whole = int(_wheel_leftover)
+    if whole:
+        _wheel_leftover -= whole
+        scroll(whole)
+
+
 def type_text(text: str) -> None:
     _get_keyboard().type(text)
 

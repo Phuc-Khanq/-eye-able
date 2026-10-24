@@ -15,6 +15,8 @@ What the cursor does:
   pointer, dictation   follows the head (or gaze); wobble under 8 px is ignored, moves glide at 120 Hz
   target found         jumps onto the element and holds still until the question closes
   menu                 holds still: head moves drive the radial menu instead
+  scroll               holds still; the head's up-down tilt sets the scroll speed (engine/eyes/scroll.py);
+                       the mode manager says "scroll" and ends it ("stop", a raise, any other command)
   paused               the engine leaves the cursor alone
   calibrating          holds on the screen center while you look at the dot (about 1.5 s)
 The first face the camera sees starts a calibration, so the head's neutral pose is wherever you face
@@ -40,6 +42,7 @@ from engine.eyes.head_gestures import GestureDetector
 from engine.eyes.brow_gesture import BrowRaiseDetector
 from engine.eyes.look_click import ConfirmNod
 from engine.eyes.pointer import Pointer
+from engine.eyes.scroll import HeadScroll, SmoothScroller
 from engine.eyes.smoothing import DwellDetector
 
 CALIB_SETTLE_S = 0.6      # look at the dot: the eyes and head settle first...
@@ -47,6 +50,7 @@ CALIB_COLLECT_S = 0.9     # ...then this long is measured
 HOLD_TIMEOUT_S = 10.0     # a found target holds the cursor at most this long (the question expires at 8 s)
 NOD_DEDUPE_S = 1.0        # a second nod this soon after one is the same nod
 NO_FACE_S = 2.0
+SCROLL_UI_S = 0.1         # how often the scroll speed goes to the UI
 CONFIRMS = ("brow", "nod", "both")   # what says yes: eyebrow raise (default), nod, or either           # say so when no face was seen for this long
 DWELL_RADIUS_PX = 60.0
 
@@ -95,6 +99,12 @@ class EyesService:
         self.dwell = DwellDetector(DWELL_RADIUS_PX, getattr(settings, "dwell_ms", 800)) if dwell else None
         self._dwell_armed = True
         self._dwell_at: tuple[float, float] | None = None
+        self.head_scroll = HeadScroll()
+        self.scroller = SmoothScroller(self._wheel, on_error=lambda exc: self._status(
+            "error", f"Couldn't scroll: {type(exc).__name__}: {exc}"))
+        self._scrolling = False          # camera thread only: head scrolling has started in scroll mode
+        self._scroll_ui_at = 0.0
+        self._wheel_left = 0.0
 
         self._lock = threading.Lock()
         self.mode = "pointer"
@@ -132,6 +142,7 @@ class EyesService:
         for note in self._notes:
             self._status("warn", note)
         self.driver.start()
+        self.scroller.start()
         self._thread = threading.Thread(target=self._run, name="eyes", daemon=True)
         self._thread.start()
 
@@ -139,7 +150,20 @@ class EyesService:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=3)
+        self.scroller.stop()
         self.driver.stop()
+
+    def _wheel(self, units: int) -> None:
+        """One smooth wheel step: 1/120 notch units where the OS takes them, else whole notches."""
+        fn = getattr(self.os, "scroll_units", None)
+        if fn is not None:
+            fn(units)
+            return
+        self._wheel_left += units / 120.0
+        whole = int(self._wheel_left)
+        if whole:
+            self._wheel_left -= whole
+            self.os.scroll(whole)
 
     def _run(self) -> None:
         try:
@@ -224,6 +248,8 @@ class EyesService:
     def process(self, face, now: float) -> None:
         """One camera frame (face is None when no face was found). The camera thread calls this."""
         if face is None:
+            if self._scrolling:
+                self.scroller.set_rate(0.0)      # no face: coast to a stop, don't run away
             if self._last_face is not None and now - self._last_face > NO_FACE_S and not self._no_face_said:
                 self._status("warn", "Can't see your face: face the camera, add light")
                 self._no_face_said = True
@@ -243,6 +269,12 @@ class EyesService:
             self._calibration_step(feats, pose, now)
             return
 
+        if self.mode == "scroll":
+            self._scroll_frame(face.t_ms, pose, now)
+            self._gestures(face.t_ms, pose, now, face.blendshapes)
+            return
+        if self._scrolling:
+            self._end_scroll()
         point = self.pointer.update(face.t_ms, feats, pose)
         self.cursor = (point.x, point.y)
         self.bus.publish(topics.GAZE, GazePoint(t_ms=face.t_ms, x=point.x, y=point.y, confidence=point.confidence))
@@ -276,6 +308,26 @@ class EyesService:
         if brow is not None and self.confirm != "nod":
             self.bus.publish(topics.GESTURE, brow)
 
+    def _scroll_frame(self, t_ms: int, pose, now: float) -> None:
+        """Scroll mode, one frame: the cursor stays; the head's tilt sets the speed."""
+        if not self._scrolling:
+            self._scrolling = True
+            self.head_scroll.start()
+            self.hold = None
+        self.scroller.set_rate(self.head_scroll.update(t_ms, pose.pitch))
+        if now - self._scroll_ui_at >= SCROLL_UI_S:
+            self._scroll_ui_at = now
+            self._ui(messages.SCROLL, rate=round(self.scroller.rate, 1), offset=round(self.head_scroll.offset, 1),
+                     ready=self.head_scroll.settled)
+
+    def _end_scroll(self) -> None:
+        """Back to pointing: the speed coasts to zero and the cursor carries on from where it stayed."""
+        self._scrolling = False
+        self.scroller.set_rate(0.0)
+        if self.cursor is not None:
+            self.pointer.place(*self.cursor)
+        self._ui(messages.SCROLL, rate=0.0, offset=0.0, ready=False)
+
     def _dwell(self, t_ms: int, point: GazePoint, holding: bool) -> None:
         if self.mode != "pointer" or holding or self.question_open:
             self.dwell.reset()
@@ -295,6 +347,7 @@ class EyesService:
 
     # ------------------------------------------------------------ calibration
     def _start_calibration(self, now: float) -> None:
+        self.scroller.set_rate(0.0)
         with self._lock:
             self.calib = {"t0": now, "gaze": []}
         cx, cy = self.W // 2, self.H // 2

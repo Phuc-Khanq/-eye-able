@@ -9,6 +9,8 @@ APIs: os_input (pynput). Only the mode manager publishes these topics, so nothin
 Clicks go through the eyes service's CursorDriver when there is one: it snaps the cursor to the spot and
 clicks there, so the 120 Hz glide can't pull the cursor away mid-click. Every action runs in order on one
 worker thread, so typing a long sentence never stalls the camera or the bus (CONTRIBUTING rule 9).
+With a scroller (the eyes service's SmoothScroller), OS_SCROLL is a smooth glide of 5 notches in 0.7 s
+instead of one 5-notch jump.
 """
 from __future__ import annotations
 
@@ -20,10 +22,10 @@ SCROLL_NOTCHES = 5   # one "scroll down" or tilt moves about a third of a page i
 
 
 class OsOutput:
-    def __init__(self, bus, driver=None, os_api=None) -> None:
+    def __init__(self, bus, driver=None, os_api=None, scroller=None) -> None:
         if os_api is None:
             from engine.eyes import os_input as os_api
-        self.bus, self.driver, self.os = bus, driver, os_api
+        self.bus, self.driver, self.os, self.scroller = bus, driver, os_api, scroller
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="os-output")
         bus.subscribe(topics.OS_CLICK, self.on_click)
         bus.subscribe(topics.OS_TYPE, self.on_type)
@@ -42,6 +44,9 @@ class OsOutput:
         self._safely("key", lambda: self.os.combo(p.get("key", "")))
 
     def on_scroll(self, p: dict) -> None:
+        if self.scroller is not None:
+            self.scroller.glide("up" if p.get("direction") == "up" else "down", notches=SCROLL_NOTCHES)
+            return
         notches = SCROLL_NOTCHES if p.get("direction") == "up" else -SCROLL_NOTCHES
         self._safely("scroll", lambda: self.os.scroll(notches))
 

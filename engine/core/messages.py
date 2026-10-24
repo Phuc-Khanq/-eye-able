@@ -4,10 +4,11 @@ Every message is a JSON object: {"type": <name>, ...fields}.
 """
 
 # Engine -> UI
-MODE = "mode"                            # mode: "pointer" | "dictation" | "menu" | "paused"
+MODE = "mode"                            # mode: "pointer" | "dictation" | "menu" | "paused" | "scroll"
 GAZE = "gaze"                            # x, y (screen px), confidence 0-1
 GESTURE = "gesture"                      # gesture: "nod" | "shake" | "tilt_left" | "tilt_right" | "brow_raise" (not "type": that key is the message name)
 DWELL = "dwell"                          # progress 0-1
+SCROLL = "scroll"                        # rate (notches/s, positive = up), offset (head tilt in degrees, chin down positive), ready (false while it learns "straight ahead", the first 0.4 s). About 10 a second in scroll mode
 TARGET_SEARCHING = "target_searching"    # label
 TARGET_FOUND = "target_found"            # x, y (screen px), label
 TARGET_NONE = "target_none"              # label

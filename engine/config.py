@@ -30,6 +30,8 @@ class Settings:
     brow_click: str = "left"       # "left": a raise with nothing waiting is the snap left click; "right": the old right click
     snap_trust_cursor: bool = True  # already on a link or button: click there without asking UI-Venus
     snap_max_px: int = 150         # UI-Venus may move a snap click at most this far
+    blink_click: bool = False      # a long, deliberate blink (0.4 to 1.2 s, both eyes) = the same click as an eyebrow
+                                   # raise; off until tests.blink_click_check passes on your face (or run with --blink)
     mouth_click: bool = True       # open the mouth and close it again (0.3 to 1.5 s) = right click
     dwell_ms: int = 1000           # with --dwell: rest the cursor this long = left click (off by default)
     dwell_clickable_only: bool = True   # Windows: dwell only on links, buttons, tabs... (engine/eyes/clickable.py);

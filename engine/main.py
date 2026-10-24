@@ -234,6 +234,9 @@ def main() -> None:
     p.add_argument("--dwell", action=argparse.BooleanOptionalAction, default=False,
                    help="resting the cursor dwell_ms (settings, 1 s) also left-clicks; off by default (the left click "
                         "is an eyebrow raise or \"click\", snapped onto the nearest button by UI-Venus)")
+    p.add_argument("--blink", action=argparse.BooleanOptionalAction, default=bool(getattr(settings, "blink_click", False)),
+                   help="a long, deliberate blink (0.4 to 1.2 s) is also a click, like an eyebrow raise; off by "
+                        "default until tests.blink_click_check passes on your face (blink_click in settings)")
     p.add_argument("--stdin", action="store_true", help="typed lines count as heard speech (testing)")
     p.add_argument("--confirm", choices=["brow", "nod", "both"], default="brow",
                    help="what says yes besides your voice: eyebrow raise (default), nod, or either")
@@ -242,6 +245,7 @@ def main() -> None:
                    help="clean up dictated text with a small local model before it's typed (Qwen2.5-1.5B on the "
                         "GPU, downloaded once, about 3 GB); on by default (rewrite_dictation), --no-rewrite turns it off")
     args = p.parse_args()
+    settings.blink_click = args.blink
     try:
         asyncio.run(run(args.wav, eyes=not args.no_eyes, pointer=args.pointer, dwell=args.dwell,
                         stdin=args.stdin, confirm=args.confirm, rewrite=args.rewrite))

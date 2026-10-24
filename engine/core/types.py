@@ -44,7 +44,7 @@ class GazePoint:
 @dataclass
 class Gesture:
     t_ms: int
-    type: str  # "nod" | "shake" | "tilt_left" | "tilt_right" | "brow_raise" | "mouth_open"
+    type: str  # "nod" | "shake" | "tilt_left" | "tilt_right" | "brow_raise" | "mouth_open" | "blink"
 
 
 @dataclass

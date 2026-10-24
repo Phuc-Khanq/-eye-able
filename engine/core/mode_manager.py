@@ -84,15 +84,16 @@ class Mode(Enum):
 
 # Gesture -> intent, per mode. Change the controls here, in one place.
 GESTURES: dict[Mode, dict[str, str]] = {
-    # brow_raise = "gesture_yes": yes if something waits, else the snap left click (Pointer only)
+    # brow_raise and blink (a long blink, when switched on) = "gesture_yes": yes if something waits, else the
+    # snap left click (Pointer only)
     Mode.POINTER:   {"tilt_left": "scroll_up", "tilt_right": "scroll_down", "brow_raise": "gesture_yes",
-                     "mouth_open": "right_click"},
-    Mode.DICTATION: {"nod": "yes", "shake": "no", "brow_raise": "gesture_yes"},
+                     "blink": "gesture_yes", "mouth_open": "right_click"},
+    Mode.DICTATION: {"nod": "yes", "shake": "no", "brow_raise": "gesture_yes", "blink": "gesture_yes"},
     Mode.MENU:      {"tilt_left": "menu_gesture", "tilt_right": "menu_gesture", "brow_raise": "menu_gesture",
-                     "nod": "menu_gesture", "shake": "close_menu"},
+                     "blink": "menu_gesture", "nod": "menu_gesture", "shake": "close_menu"},
     Mode.PAUSED:    {},
     # the head scrolls in Scroll mode (the eyes service), so its gestures mean nothing here
-    Mode.SCROLL:    {"brow_raise": "leave_scroll"},
+    Mode.SCROLL:    {"brow_raise": "leave_scroll", "blink": "leave_scroll"},
 }
 
 # Voice commands that still work while paused.
@@ -204,7 +205,7 @@ class ModeManager:
                 self._log("[mouth] ignored: the mic heard speech")
                 return
             if self.question:
-                if gesture.type in ("nod", "brow_raise"):
+                if gesture.type in ("nod", "brow_raise", "blink"):
                     self._answer(True)
                 elif gesture.type == "shake":
                     self._answer(False)
@@ -224,7 +225,7 @@ class ModeManager:
                         self.search.preconfirmed = True
                         self._status("info", f"Will click {self.search.label} as soon as it's found")
                 elif self.mode == Mode.POINTER:
-                    self._right_click() if self._brow_click == "right" else self._snap_click()
+                    self._right_click() if (self._brow_click == "right" and gesture.type == "brow_raise") else self._snap_click()
             elif intent:
                 self._do(Command(name=intent))
 

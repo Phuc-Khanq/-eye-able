@@ -24,10 +24,11 @@ the screen center. Say "calibrate" (or the UI's calibrate) to redo it after movi
 
 Clicks: an eyebrow raise = left click when nothing is waiting (the mode manager asks UI-Venus to snap it
 onto the button, link or box nearest the cursor); open the mouth and close it again (MouthOpenDetector,
-Gesture "mouth_open") = right click; dwell (rest the cursor dwell_ms; off by default, --dwell) = left
+Gesture "mouth_open") = right click; a long blink (BlinkDetector, Gesture "blink", blink_click / --blink) = the
+same click as a raise, without moving the head; dwell (rest the cursor dwell_ms; off by default, --dwell) = left
 click through DWELL_DONE.
-From the moment a raise starts (BrowRaiseDetector.raised), or once the mouth has been open
-a moment (MouthOpenDetector.held), the cursor freezes where it was, so the face moving can't nudge the click off the
+From the moment a raise starts (BrowRaiseDetector.raised), or once the eyes have been shut (BlinkDetector.held)
+or the mouth open (MouthOpenDetector.held) a moment, the cursor freezes where it was, so the face moving can't nudge the click off the
 button; the published gaze is the frozen spot, which is where the mode manager clicks. When the face
 relaxes the pointer carries on from there, no jump.
 Dwell is off, and comes back disarmed at the cursor (move away first), outside Pointer mode, while a
@@ -56,6 +57,7 @@ from engine.core import messages, topics
 from engine.core.types import GazePoint, Gesture, MouthSample
 from engine.eyes.cursor_driver import CursorDriver
 from engine.eyes.head_gestures import GestureDetector
+from engine.eyes.blink_gesture import BlinkDetector
 from engine.eyes.brow_gesture import BrowRaiseDetector
 from engine.eyes.dwell_click import DwellClicker
 from engine.eyes.look_click import ConfirmNod
@@ -120,6 +122,7 @@ class EyesService:
         self.gestures = GestureDetector()
         self.yes_nod = ConfirmNod()
         self.brows = BrowRaiseDetector()
+        self.blink = BlinkDetector() if getattr(settings, "blink_click", False) else None   # long blink = click
         self.jaw = MouthOpenDetector() if getattr(settings, "mouth_click", True) else None   # open + close = right click
         self.dwell = DwellClicker(dwell_ms=getattr(settings, "dwell_ms", 1000)) if dwell else None
         self._dwell_blocked = True       # comes back disarmed at the cursor, so the first stop must be a new one
@@ -327,13 +330,15 @@ class EyesService:
             self._scroll_frame(face.t_ms, pose, now)
             if self.jaw is not None:
                 self.jaw.update(face.t_ms, face.blendshapes or {})   # keeps its resting level; no right click here
-            self._gestures(face.t_ms, pose, now, self.brows.update(face.t_ms, face.blendshapes or {}))
+            self._gestures(face.t_ms, pose, now, self.brows.update(face.t_ms, face.blendshapes or {}),
+                           blink=self.blink.update(face.t_ms, face.blendshapes or {}) if self.blink else None)
             return
         if self._scrolling:
             self._end_scroll()
         point = self.pointer.update(face.t_ms, feats, pose)
         brow = self.brows.update(face.t_ms, face.blendshapes or {})
         mouth = self.jaw.update(face.t_ms, face.blendshapes or {}) if self.jaw is not None else None
+        blink = self.blink.update(face.t_ms, face.blendshapes or {}) if self.blink is not None else None
         with self._lock:
             if self.hold is not None and now > self.hold[2]:
                 self.hold = None
@@ -347,7 +352,7 @@ class EyesService:
         if not holding and self.mode not in ("menu", "paused"):
             self.driver.set_target(point.x, point.y)
 
-        self._gestures(face.t_ms, pose, now, brow, mouth)
+        self._gestures(face.t_ms, pose, now, brow, mouth, blink)
         if self.dwell is not None:
             self._dwell(face.t_ms, point, holding, now)
 
@@ -376,6 +381,8 @@ class EyesService:
         """(a click gesture is in progress, how far back it started in ms): the brows, or the mouth."""
         if self.brows.raised:
             return True, FREEZE_LOOKBACK_MS
+        if self.blink is not None and self.blink.held:
+            return True, self.blink.closed_ms + FREEZE_LOOKBACK_MS
         if self.jaw is not None and self.jaw.held:
             return True, self.jaw.open_ms + FREEZE_LOOKBACK_MS
         return False, 0
@@ -388,7 +395,7 @@ class EyesService:
         return (self._recent_cursor[0][1], self._recent_cursor[0][2]) if self._recent_cursor else (point.x, point.y)
 
     def _gestures(self, t_ms: int, pose, now: float, brow: Gesture | None = None,
-                  mouth: Gesture | None = None) -> None:
+                  mouth: Gesture | None = None, blink: Gesture | None = None) -> None:
         awaiting = self.question_open or self.preview_waiting   # "type <words>" previews in Pointer mode too
         if awaiting and not self._awaiting:
             self.yes_nod.arm()
@@ -403,6 +410,8 @@ class EyesService:
             self.bus.publish(topics.GESTURE, Gesture(t_ms=t_ms, type="nod"))
         if brow is not None and self.confirm != "nod":
             self.bus.publish(topics.GESTURE, brow)
+        if blink is not None:
+            self.bus.publish(topics.GESTURE, blink)   # a long blink: the same as a raise (yes, or the snap click)
         if mouth is not None:
             self.bus.publish(topics.GESTURE, mouth)   # the mode manager: right click (Pointer, nothing waiting)
 
@@ -485,6 +494,8 @@ class EyesService:
         self.gestures.reset()
         self.yes_nod.reset()
         self.brows.reset()   # relearn the resting brow level
+        if self.blink is not None:
+            self.blink.reset()
         if self.jaw is not None:
             self.jaw.reset()
         with self._lock:

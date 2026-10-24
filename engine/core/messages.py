@@ -6,7 +6,7 @@ Every message is a JSON object: {"type": <name>, ...fields}.
 # Engine -> UI
 MODE = "mode"                            # mode: "pointer" | "dictation" | "menu" | "paused" | "scroll"
 GAZE = "gaze"                            # x, y (screen px), confidence 0-1
-GESTURE = "gesture"                      # gesture: "nod" | "shake" | "tilt_left" | "tilt_right" | "brow_raise" | "mouth_open" (not "type": that key is the message name)
+GESTURE = "gesture"                      # gesture: "nod" | "shake" | "tilt_left" | "tilt_right" | "brow_raise" | "mouth_open" | "blink" (a long blink; not "type": that key is the message name)
 DWELL = "dwell"                          # progress 0-1, ready true/false (resting on something clickable
                                          # and dwell armed: show "this clicks" before it fills). Sent when
                                          # either changes. ready is new; an old UI can ignore it

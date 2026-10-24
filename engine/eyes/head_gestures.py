@@ -27,9 +27,9 @@ import numpy as np
 from engine.core.types import Gesture, HeadPose
 
 # Defaults; each user tunes them with tests/head_bars.py and the console settings panel.
-NOD_DEG = 8.0             # pitch move that counts as a nod
+NOD_DEG = 12.0
 SHAKE_DEG = 8.0           # half of the yaw swing that counts as a shake (the swing is 2x this)
-TILT_DEG = 15.0           # roll held this far counts as a tilt
+TILT_DEG = 18.0
 TILT_HOLD_MS = 400
 COOLDOWN_MS = 800         # ignore new gestures right after one
 

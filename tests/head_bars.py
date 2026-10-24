@@ -1,9 +1,9 @@
-"""Live view for head pose and gestures. Nothing is saved.
+"""Live view for head pose, head gestures and eyebrow raises. Nothing is saved.
 
 Run:  .\\.venv\\Scripts\\python.exe -m tests.head_bars
       .\\.venv\\Scripts\\python.exe -m tests.head_bars --camera 1   (if the picture is black)
 Keys: N = set neutral (look at the screen center first), [ ] = nod threshold, ; ' = shake threshold,
-      M = mirror on/off, Q or Esc = quit
+      - = = eyebrow threshold, M = mirror on/off, Q or Esc = quit
 
 Checks (pass = all true):
   1. Press N facing the screen. Turn to your right: yaw goes positive. Chin down: pitch goes
@@ -13,6 +13,9 @@ Checks (pass = all true):
   3. Read, talk and look around the screen for a minute: no gestures at all.
      If any fire, raise the thresholds; if real nods are missed, lower them.
      Note the values that work for you (shown at the bottom of the window).
+  4. Brow bar: the white tick is your resting level, the orange line is rest + threshold. Raise your
+     eyebrows 5 times: 5 "brow_raise", one per raise even if you hold it. Talk, read, look surprised:
+     none. If real raises are missed, press - to lower the threshold; if talking fires one, press =.
 """
 import argparse
 import time
@@ -22,14 +25,35 @@ import cv2
 import numpy as np
 
 from engine.config import settings
+from engine.eyes.brow_gesture import BrowRaiseDetector
 from engine.eyes.camera import Camera
 from engine.eyes.face_mesh import FaceMesh
 from engine.eyes.head_gestures import GestureDetector
 from engine.eyes.head_pose import HeadPoseEstimator
-from tests.eye_bars import BAD, BG, DISPLAY_H, GOOD, QUIET, TEXT, WARN, bar, text
+from tests.eye_bars import BAD, BAR_BG, BAR_FG, BG, DISPLAY_H, GOOD, QUIET, TEXT, WARN, bar, text
 
 WINDOW = "Diseyeble - head pose (Q to quit)"
 PANEL_W = 420
+
+
+def brow_bar(img, x, y, brow: BrowRaiseDetector, width=230) -> None:
+    """Brow score from 0 to 1: tick = resting level, line = rest + threshold (raised past it fires)."""
+    label = "brows UP" if brow.raised else "brows"
+    text(img, label, x, y + 11, GOOD if brow.raised else QUIET, 0.45)
+    bx = x + 105
+    cv2.rectangle(img, (bx, y), (bx + width, y + 14), BAR_BG, -1)
+    if brow.score is not None:
+        cv2.rectangle(img, (bx, y + 3), (bx + int(np.clip(brow.score, 0, 1) * width), y + 11),
+                      GOOD if brow.raised else BAR_FG, -1)
+        text(img, f"{brow.score:.2f}", bx + width + 8, y + 12, TEXT, 0.45)
+    if brow.rest is not None:
+        rx = bx + int(np.clip(brow.rest, 0, 1) * width)
+        cv2.line(img, (rx, y - 3), (rx, y + 17), TEXT, 2)
+        tx = bx + int(np.clip(brow.rest + brow.threshold, 0, 1) * width)
+        cv2.line(img, (tx, y - 5), (tx, y + 19), WARN, 2)
+        text(img, f"rest {brow.rest:.2f}   threshold +{brow.threshold:.2f}", bx, y + 32, QUIET, 0.4)
+    else:
+        text(img, "learning your resting level...", bx, y + 32, QUIET, 0.4)
 
 
 def render(preview: np.ndarray, info: dict) -> np.ndarray:
@@ -55,6 +79,10 @@ def render(preview: np.ndarray, info: dict) -> np.ndarray:
     bar(panel, 16, y + 44, "roll", pose.roll if pose else None, -30, 30, 0.0)
     y += 84
 
+    brow = info["brow"]
+    brow_bar(panel, 16, y, brow)
+    y += 54
+
     det = info["detector"]
     text(panel, f"nod {det.nod_deg:.1f} deg   shake {det.shake_deg:.1f} deg   tilt {det.tilt_deg:.1f} deg",
          16, y, QUIET, 0.45)
@@ -68,9 +96,9 @@ def render(preview: np.ndarray, info: dict) -> np.ndarray:
         y += 22
     counts = ", ".join(f"{k} {v}" for k, v in sorted(info["counts"].items())) or "none yet"
     text(panel, f"Totals: {counts}", 16, DISPLAY_H - 58, QUIET, 0.45)
-    text(panel, f"Your thresholds: nod_deg={det.nod_deg:.1f}, shake_deg={det.shake_deg:.1f}",
-         16, DISPLAY_H - 36, QUIET, 0.4)
-    text(panel, "N neutral  [ ] nod  ; ' shake  M mirror  Q quit", 16, DISPLAY_H - 14, QUIET, 0.45)
+    text(panel, f"Your thresholds: nod_deg={det.nod_deg:.1f}, shake_deg={det.shake_deg:.1f}, "
+                f"brow={brow.threshold:.2f}", 16, DISPLAY_H - 36, QUIET, 0.4)
+    text(panel, "N neutral  [ ] nod  ; ' shake  - = brow  M mirror  Q", 16, DISPLAY_H - 14, QUIET, 0.45)
     return np.hstack([view, panel])
 
 
@@ -86,7 +114,8 @@ def main() -> None:
     mesh = FaceMesh()
     estimator = HeadPoseEstimator()
     detector = GestureDetector()
-    gestures = deque(maxlen=8)
+    brow = BrowRaiseDetector()
+    gestures = deque(maxlen=6)
     counts: dict[str, int] = {}
     mirror = settings.preview_mirror
     proc_ms = deque(maxlen=30)
@@ -108,11 +137,16 @@ def main() -> None:
                     gestures.appendleft(g)
                     counts[g.type] = counts.get(g.type, 0) + 1
                     print(f"{g.type} at {g.t_ms} ms")
+            b = brow.update(t_ms, face.blendshapes if face is not None else {})
+            if b is not None:
+                gestures.appendleft(b)
+                counts[b.type] = counts.get(b.type, 0) + 1
+                print(f"{b.type} at {b.t_ms} ms")
             proc_ms.append((time.perf_counter() - t0) * 1000)
 
             preview = cv2.flip(frame, 1) if mirror else frame
             info = {"cam_fps": cam.measured_fps, "proc_ms": sum(proc_ms) / len(proc_ms),
-                    "pose": pose, "detector": detector, "gestures": list(gestures),
+                    "pose": pose, "detector": detector, "brow": brow, "gestures": list(gestures),
                     "counts": counts, "now_ms": t_ms}
             cv2.imshow(WINDOW, render(preview, info))
 
@@ -130,6 +164,10 @@ def main() -> None:
                 detector.set_thresholds(shake_deg=max(2.0, detector.shake_deg - 1))
             if key == ord("'"):
                 detector.set_thresholds(shake_deg=detector.shake_deg + 1)
+            if key == ord("-"):
+                brow.set_thresholds(threshold=max(0.05, round(brow.threshold - 0.05, 2)))
+            if key == ord("="):
+                brow.set_thresholds(threshold=min(0.9, round(brow.threshold + 0.05, 2)))
             if key == ord("m"):
                 mirror = not mirror
             if cv2.getWindowProperty(WINDOW, cv2.WND_PROP_VISIBLE) < 1:

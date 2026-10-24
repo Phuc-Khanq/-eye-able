@@ -67,10 +67,19 @@ FIXED_COMMANDS: dict[str, str] = {
     "confirm": "yes",
     "do it": "yes",
     "go ahead": "yes",
-    # Answering "Click Send?": without these, "click it" started a new search for a button named "It"
-    "click": "yes",
-    "click it": "yes",
-    "click that": "yes",
+    # Answering "Click Send?" (the mode manager reads these as yes when something waits; without them,
+    # "click it" started a new search for a button named "It"). With nothing waiting: the snap click,
+    # the left click at the cursor, onto the nearest button (UI-Venus)
+    "click": "click_here",
+    "click it": "click_here",
+    "click that": "click_here",
+    "click this": "click_here",
+    "click here": "click_here",
+    "click there": "click_here",
+    "right click": "right_click",
+    "go back": "go_back",
+    "escape": "escape",
+    "press escape": "escape",
     "no": "no",
     "nope": "no",
     "calibrate": "calibrate",
@@ -111,11 +120,11 @@ SCROLL_WORDS = ("scroll", "scrolling")
 NOT_A_SCROLL_REQUEST = {"stop", "done", "don't", "dont", "no", "not", "never", "quit", "end"}
 MAX_COMMAND_WORDS = 5      # longer utterances are never fixed commands
 MAX_LABEL_WORDS = 5        # "click <up to 5 words>"
-IT_EXTRA_WORDS = 2         # "click it" + up to 2 words ("now", "again", "right now") is a yes
 
 FILLER_WORDS = {"um", "uh", "umm", "uhh", "er", "hmm", "please", "ok", "okay", "hey", "so"}
 FILLER_PREFIXES = ("can you ", "could you ", "would you ")
 LABEL_LEADING_WORDS = {"on", "the", "a", "an"}  # "click on the Send button" -> "Send Button"
+POINTING_WORDS = {"it", "this", "that", "here", "there"}  # "click this video", "click it baby": the snap click
 
 
 @dataclass(frozen=True)
@@ -163,8 +172,8 @@ def _target(clean: str, verbs=TARGET_VERBS) -> Command | None:
         words.pop(0)
     if not words or len(words) > MAX_LABEL_WORDS:
         return None
-    if verb[0] == "click" and words[0] == "it" and len(words) <= 1 + IT_EXTRA_WORDS:
-        return Command(name="yes", score=verb[1])   # "click it now" / "click it again": yes, never a button "It"
+    if words[0] in POINTING_WORDS:
+        return Command(name="click_here", score=verb[1])   # the one under the cursor, not a button named "It"
     return Command(name="target", label=" ".join(words).title(), score=verb[1])
 
 
@@ -210,7 +219,8 @@ def split_clauses(words: list[dict]) -> list[Clause]:
             glued = close(after_punct=False)
             pending, trigger = True, w
             continue
-        if bare == "click" and cur and normalize(" ".join(str(x.get("text", "")) for x in cur)):
+        if (bare == "click" and cur and normalize(" ".join(str(x.get("text", "")) for x in cur))
+                and re.sub(r"[^\w']", "", str(cur[-1].get("text", "")).lower()) != "right"):   # "right click" stays one
             close(after_punct=False)
         if not cur and pending:
             triggered, pending = True, False

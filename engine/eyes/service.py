@@ -22,14 +22,22 @@ What the cursor does:
 The first face the camera sees starts a calibration, so the head's neutral pose is wherever you face
 the screen center. Say "calibrate" (or the UI's calibrate) to redo it after moving your chair.
 
-Clicks: dwell (rest the cursor dwell_ms, 1 s by default) = left click, through DWELL_DONE; an eyebrow raise =
-right click (the mode manager turns brow_raise into os.click with button "right" when nothing is waiting).
-From the moment a raise starts (BrowRaiseDetector.raised) the cursor freezes where it was, so raising the
-brows can't nudge the click off the button; the published gaze is the frozen spot, which is where the
-mode manager clicks. When the brows come down the pointer carries on from there, no jump.
+Clicks: an eyebrow raise = left click when nothing is waiting (the mode manager asks UI-Venus to snap it
+onto the button, link or box nearest the cursor); open the mouth and close it again (MouthOpenDetector,
+Gesture "mouth_open") = right click; a long blink (BlinkDetector, Gesture "blink", blink_click / --blink) = the
+same click as a raise, without moving the head; dwell (rest the cursor dwell_ms; off by default, --dwell) = left
+click through DWELL_DONE.
+From the moment a raise starts (BrowRaiseDetector.raised), or once the eyes have been shut (BlinkDetector.held)
+or the mouth open (MouthOpenDetector.held) a moment, the cursor freezes where it was, so the face moving can't nudge the click off the
+button; the published gaze is the frozen spot, which is where the mode manager clicks. When the face
+relaxes the pointer carries on from there, no jump.
 Dwell is off, and comes back disarmed at the cursor (move away first), outside Pointer mode, while a
 question or preview waits, while UI-Venus searches or holds a found target, during a raise and right
 after calibrating. Every click disarms it at the click spot. set_dwell(on) is the on/off switch.
+On Windows only clickable things count (settings.dwell_clickable_only): engine/eyes/clickable.py says
+what is under the cursor from a background thread, and a stop on a button or link gets a looser radius.
+The dwell message to the UI carries ready (resting on something clickable, dwell armed) besides the
+progress, so the ring can show "this clicks" before it fills; it is sent only when either changes.
 
 Yes: an eyebrow raise (Hung's BrowRaiseDetector, Gesture "brow_raise") is the default, because a nod
 moves the head pointer and with it the cursor. confirm="nod" brings the nod back: Hung's strict
@@ -49,9 +57,11 @@ from engine.core import messages, topics
 from engine.core.types import GazePoint, Gesture, MouthSample
 from engine.eyes.cursor_driver import CursorDriver
 from engine.eyes.head_gestures import GestureDetector
+from engine.eyes.blink_gesture import BlinkDetector
 from engine.eyes.brow_gesture import BrowRaiseDetector
 from engine.eyes.dwell_click import DwellClicker
 from engine.eyes.look_click import ConfirmNod
+from engine.eyes.mouth_gesture import MouthOpenDetector
 from engine.eyes.pointer import Pointer
 from engine.eyes.scroll import HeadScroll, SmoothScroller
 
@@ -72,10 +82,12 @@ SEARCH_TIMEOUT_S = 10.0   # UI-Venus searching blocks dwell at most this long
 class EyesService:
     def __init__(self, bus, settings=default_settings, pointer: str = "head", dwell: bool = False,
                  model_path: str | None = None, os_api=None, camera_factory=None, mesh_factory=None,
-                 features=None, head_pose=None, clock=time.monotonic, confirm: str = "brow") -> None:
+                 features=None, head_pose=None, clock=time.monotonic, confirm: str = "brow",
+                 probe=None) -> None:
         if confirm not in CONFIRMS:
             raise ValueError(f"confirm must be one of {CONFIRMS}")
         self.confirm = confirm
+        real_os = os_api is None
         if os_api is None:
             from engine.eyes import os_input as os_api
         self.bus, self.settings, self.os, self.clock = bus, settings, os_api, clock
@@ -110,9 +122,17 @@ class EyesService:
         self.gestures = GestureDetector()
         self.yes_nod = ConfirmNod()
         self.brows = BrowRaiseDetector()
+        self.blink = BlinkDetector() if getattr(settings, "blink_click", False) else None   # long blink = click
+        self.jaw = MouthOpenDetector() if getattr(settings, "mouth_click", True) else None   # open + close = right click
         self.dwell = DwellClicker(dwell_ms=getattr(settings, "dwell_ms", 1000)) if dwell else None
         self._dwell_blocked = True       # comes back disarmed at the cursor, so the first stop must be a new one
-        self._dwell_shown = False        # a non-zero dwell progress went to the UI
+        self._dwell_sent = (0.0, False)  # the last (progress, ready) that went to the UI
+        if probe is None and real_os:
+            from engine.eyes.clickable import make_probe   # None off Windows: dwell clicks anywhere, as before
+            probe, note = make_probe(getattr(settings, "dwell_uia", True))
+            if note:
+                self._notes.append(note)
+        self.probe = probe               # what's under the cursor: for dwell, and for the snap click (target_service)
         self._frozen: tuple[float, float, float] | None = None   # x, y, since: cursor held during a raise
         self._freeze_spent = False       # this raise already used up MAX_FREEZE_S
         self._recent_cursor: deque[tuple[int, float, float]] = deque(maxlen=30)   # t_ms, x, y
@@ -162,6 +182,8 @@ class EyesService:
             self._status("warn", note)
         self.driver.start()
         self.scroller.start()
+        if self.probe is not None:
+            self.probe.start()
         self._thread = threading.Thread(target=self._run, name="eyes", daemon=True)
         self._thread.start()
 
@@ -171,6 +193,8 @@ class EyesService:
             self._thread.join(timeout=3)
         self.scroller.stop()
         self.driver.stop()
+        if self.probe is not None:
+            self.probe.stop()
 
     def _wheel(self, units: int) -> None:
         """One smooth wheel step: 1/120 notch units where the OS takes them, else whole notches."""
@@ -304,12 +328,17 @@ class EyesService:
 
         if self.mode == "scroll":
             self._scroll_frame(face.t_ms, pose, now)
-            self._gestures(face.t_ms, pose, now, self.brows.update(face.t_ms, face.blendshapes or {}))
+            if self.jaw is not None:
+                self.jaw.update(face.t_ms, face.blendshapes or {})   # keeps its resting level; no right click here
+            self._gestures(face.t_ms, pose, now, self.brows.update(face.t_ms, face.blendshapes or {}),
+                           blink=self.blink.update(face.t_ms, face.blendshapes or {}) if self.blink else None)
             return
         if self._scrolling:
             self._end_scroll()
         point = self.pointer.update(face.t_ms, feats, pose)
         brow = self.brows.update(face.t_ms, face.blendshapes or {})
+        mouth = self.jaw.update(face.t_ms, face.blendshapes or {}) if self.jaw is not None else None
+        blink = self.blink.update(face.t_ms, face.blendshapes or {}) if self.blink is not None else None
         with self._lock:
             if self.hold is not None and now > self.hold[2]:
                 self.hold = None
@@ -323,28 +352,40 @@ class EyesService:
         if not holding and self.mode not in ("menu", "paused"):
             self.driver.set_target(point.x, point.y)
 
-        self._gestures(face.t_ms, pose, now, brow)
+        self._gestures(face.t_ms, pose, now, brow, mouth, blink)
         if self.dwell is not None:
             self._dwell(face.t_ms, point, holding, now)
 
     def _freeze(self, point: GazePoint, now: float, holding: bool) -> GazePoint:
-        """Hold the cursor where it was when a raise started, until the brows come down (or MAX_FREEZE_S)."""
-        if not self.brows.raised:
+        """Hold the cursor where it was when a raise (or a held-open mouth) started, until the face relaxes
+        (or MAX_FREEZE_S)."""
+        raised, lookback_ms = self._face_held()
+        if not raised:
             self._freeze_spent = False
         elif holding:
             self._freeze_spent = True   # this raise answers the found target; the hold already keeps the cursor
         if self._frozen is None:
-            if self.brows.raised and not self._freeze_spent and not holding and self.mode in FREEZE_MODES:
-                x, y = self._cursor_before(point.t_ms - FREEZE_LOOKBACK_MS, point)
+            if raised and not self._freeze_spent and not holding and self.mode in FREEZE_MODES:
+                x, y = self._cursor_before(point.t_ms - lookback_ms, point)
                 self._frozen = (x, y, now)
             else:
                 return point
         x, y, since = self._frozen
-        if not self.brows.raised or holding or now - since > MAX_FREEZE_S:
+        if not raised or holding or now - since > MAX_FREEZE_S:
             self._frozen = None
-            self._freeze_spent = self.brows.raised
+            self._freeze_spent = raised
             self.pointer.place(x, y)   # carry on from the held spot, no jump
         return GazePoint(t_ms=point.t_ms, x=x, y=y, confidence=point.confidence)
+
+    def _face_held(self) -> tuple[bool, int]:
+        """(a click gesture is in progress, how far back it started in ms): the brows, or the mouth."""
+        if self.brows.raised:
+            return True, FREEZE_LOOKBACK_MS
+        if self.blink is not None and self.blink.held:
+            return True, self.blink.closed_ms + FREEZE_LOOKBACK_MS
+        if self.jaw is not None and self.jaw.held:
+            return True, self.jaw.open_ms + FREEZE_LOOKBACK_MS
+        return False, 0
 
     def _cursor_before(self, t_ms: int, point: GazePoint) -> tuple[float, float]:
         """Where the cursor was at t_ms: the newest position at or before it (or the oldest one kept)."""
@@ -353,7 +394,8 @@ class EyesService:
                 return x, y
         return (self._recent_cursor[0][1], self._recent_cursor[0][2]) if self._recent_cursor else (point.x, point.y)
 
-    def _gestures(self, t_ms: int, pose, now: float, brow: Gesture | None = None) -> None:
+    def _gestures(self, t_ms: int, pose, now: float, brow: Gesture | None = None,
+                  mouth: Gesture | None = None, blink: Gesture | None = None) -> None:
         awaiting = self.question_open or self.preview_waiting   # "type <words>" previews in Pointer mode too
         if awaiting and not self._awaiting:
             self.yes_nod.arm()
@@ -368,6 +410,10 @@ class EyesService:
             self.bus.publish(topics.GESTURE, Gesture(t_ms=t_ms, type="nod"))
         if brow is not None and self.confirm != "nod":
             self.bus.publish(topics.GESTURE, brow)
+        if blink is not None:
+            self.bus.publish(topics.GESTURE, blink)   # a long blink: the same as a raise (yes, or the snap click)
+        if mouth is not None:
+            self.bus.publish(topics.GESTURE, mouth)   # the mode manager: right click (Pointer, nothing waiting)
 
     def _scroll_frame(self, t_ms: int, pose, now: float) -> None:
         """Scroll mode, one frame: the cursor stays; the head's tilt sets the speed."""
@@ -400,11 +446,15 @@ class EyesService:
         elif self._dwell_blocked:   # allowed again: not where the cursor already rests, only after a move
             self._dwell_blocked = False
             self.dwell.disarm(point.x, point.y)
-        at = None if blocked else self.dwell.update(t_ms, point.x, point.y)
+        over = self.probe.over_at(point.x, point.y, now) if self.probe is not None else None
+        gate = self.probe is not None and getattr(self.settings, "dwell_clickable_only", True)
+        at = None if blocked else self.dwell.update(t_ms, point.x, point.y, over=over, gate=gate)
         shown = 1.0 if at is not None else self.dwell.progress
-        if shown > 0 or self._dwell_shown:   # the ring: fills while resting, one 0 after it stops or clicks
-            self._ui(messages.DWELL, progress=round(shown, 2))
-            self._dwell_shown = shown > 0
+        ready = not blocked and over is not None and over.clickable and self.dwell.armed
+        sent = (round(shown, 2), bool(ready))
+        if sent != self._dwell_sent:   # the ring: fills while resting, one 0 after it stops or clicks
+            self._ui(messages.DWELL, progress=sent[0], ready=sent[1])
+            self._dwell_sent = sent
         if at is not None:
             self.bus.publish(topics.DWELL_DONE, GazePoint(t_ms=t_ms, x=at[0], y=at[1], confidence=point.confidence))
 
@@ -444,6 +494,10 @@ class EyesService:
         self.gestures.reset()
         self.yes_nod.reset()
         self.brows.reset()   # relearn the resting brow level
+        if self.blink is not None:
+            self.blink.reset()
+        if self.jaw is not None:
+            self.jaw.reset()
         with self._lock:
             self.calib = None
         self._ui(messages.CALIB_RESULT, error_px=round(shift_px, 1), ok=True)

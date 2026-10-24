@@ -8,17 +8,23 @@ Every message is a JSON object: {"type": <name>, ...fields}.
 MODE = "mode"                            # mode: "pointer" | "dictation" | "menu" | "paused" | "scroll". On every change,
                                          # and once when a UI connects
 GAZE = "gaze"                            # x, y (screen px, 0.1 px), confidence 0-1. Every camera frame with a face
-GESTURE = "gesture"                      # gesture: "nod" | "tilt_left" | "tilt_right" | "brow_raise". Only in menu mode
-                                         # (the UI moves / picks in the menu); a shake there closes it (a mode message).
+GESTURE = "gesture"                      # gesture: "nod" | "tilt_left" | "tilt_right" | "brow_raise" | "blink" (a long
+                                         # blink). Only in menu mode (the UI moves / picks in the menu); a shake there
+                                         # closes it (a mode message). "shake" and "mouth_open" aren't sent yet.
                                          # Not "type": that key is the message name
-DWELL = "dwell"                          # progress 0-1 (2 decimals): the ring fills while the cursor rests, 1.0 at the
-                                         # click, then one 0 when it stops or clicks
+DWELL = "dwell"                          # progress 0-1 (2 decimals), ready true/false (resting on something clickable and
+                                         # dwell armed: show "this clicks" before it fills). Sent when either changes:
+                                         # fills while the cursor rests, 1.0 at the click, then 0. Dwell is off by default
 SCROLL = "scroll"                        # rate (notches/s, positive = up, 0.1), offset (head tilt in degrees, chin down
                                          # positive), ready (false while it learns "straight ahead", the first 0.4 s).
                                          # About 10 a second in scroll mode, and one rate=0, offset=0, ready=false at the end
-TARGET_SEARCHING = "target_searching"    # label ("Search Bar"): UI-Venus is looking
-TARGET_FOUND = "target_found"            # x, y (screen px), label. A confirm "Click <label>?" usually follows
-TARGET_NONE = "target_none"              # label: not found, or the search timed out (6 s)
+TARGET_SEARCHING = "target_searching"    # label ("Search Bar"): UI-Venus is looking. snap: true (only then) for a click
+                                         # with no name (a raise or "click"; label "here"): it clicks as soon as it's
+                                         # found, no question
+TARGET_FOUND = "target_found"            # x, y (screen px), label; snap: true as above. Without snap a confirm
+                                         # "Click <label>?" follows
+TARGET_NONE = "target_none"              # label: not found, or the search timed out (6 s); snap: true as above (it then
+                                         # clicks at the cursor)
 CALIB_TARGET = "calib_target"            # index, x, y (screen px), total. One-look calibration: index 0, total 1, the center
 CALIB_RESULT = "calib_result"            # error_px (how far the gaze was shifted, 0.1 px), ok (false = cancelled)
 LISTENING = "listening"                  # level 0-1, speaking true/false. About 10 a second while the mic is on
@@ -40,11 +46,11 @@ FIELDS: dict[str, tuple[set[str], set[str]]] = {
     MODE: ({"mode"}, set()),
     GAZE: ({"x", "y", "confidence"}, set()),
     GESTURE: ({"gesture"}, set()),
-    DWELL: ({"progress"}, set()),
+    DWELL: ({"progress", "ready"}, set()),
     SCROLL: ({"rate", "offset", "ready"}, set()),
-    TARGET_SEARCHING: ({"label"}, set()),
-    TARGET_FOUND: ({"x", "y", "label"}, set()),
-    TARGET_NONE: ({"label"}, set()),
+    TARGET_SEARCHING: ({"label"}, {"snap"}),
+    TARGET_FOUND: ({"x", "y", "label"}, {"snap"}),
+    TARGET_NONE: ({"label"}, {"snap"}),
     CALIB_TARGET: ({"index", "x", "y", "total"}, set()),
     CALIB_RESULT: ({"error_px", "ok"}, set()),
     LISTENING: ({"level", "speaking"}, set()),

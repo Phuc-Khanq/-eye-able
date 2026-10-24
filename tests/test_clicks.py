@@ -1,6 +1,8 @@
 """Run with: python -m unittest tests.test_clicks
 
-Task 6 (team decision): dwell = LEFT click, an eyebrow raise = RIGHT click when nothing is waiting.
+With nothing waiting: an eyebrow raise = the LEFT click, snapped onto the nearest button by UI-Venus
+(more in tests/test_snap_click.py); opening the mouth and closing it, or "right click" = the RIGHT click.
+brow_click "right" (settings) brings back the old raise = right click (Task 6).
 A raise still means yes when a question, a preview or a UI-Venus search is waiting.
 """
 import unittest
@@ -32,26 +34,66 @@ class Base(unittest.TestCase):
         return self.bus.of(topics.OS_CLICK)
 
 
-class TestRightClick(Base):
-    def test_a_raise_with_nothing_waiting_right_clicks_at_the_cursor(self):
-        self.raise_brows()
-        self.assertEqual(self.clicks(), [{"x": 500, "y": 300, "button": "right"}])
+class TestRaiseLeftClicks(Base):
+    def answer(self, found=True, x=0, y=0):
+        req = self.bus.of(topics.TARGET_REQUEST)[-1]
+        self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, found, x, y))
+        return req
 
-    def test_it_clicks_where_the_cursor_froze(self):
+    def test_a_raise_with_nothing_waiting_snap_clicks(self):
+        self.raise_brows()
+        req = self.answer(True, 512, 296)
+        self.assertEqual((req.gaze_x, req.gaze_y, req.snap), (500, 300, True))
+        self.assertEqual(self.clicks(), [{"x": 512, "y": 296}])
+
+    def test_it_asks_from_where_the_cursor_froze(self):
         self.bus.publish(topics.GAZE, GazePoint(0, 612.7, 410.2, 0.9))   # the frozen spot during the raise
         self.raise_brows()
-        self.assertEqual(self.clicks(), [{"x": 612, "y": 410, "button": "right"}])
+        req = self.answer(False)
+        self.assertEqual((req.gaze_x, req.gaze_y), (612, 410))
+        self.assertEqual(self.clicks(), [{"x": 612, "y": 410}])          # nothing to snap to: clicks there
 
     def test_no_cursor_yet_says_so_and_does_not_click(self):
         self.setUp(gaze=None)
         self.raise_brows()
         self.assertEqual(self.clicks(), [])
-        self.assertIn("right-click", self.bus.ui(messages.STATUS)[-1]["text"])
+        self.assertIn("Can't click", self.bus.ui(messages.STATUS)[-1]["text"])
 
-    def test_a_raise_while_talking_does_not_right_click(self):
+    def test_a_raise_while_talking_does_not_click(self):
         self.setUp(mouth=FakeMouth(moving=[(98_000, 101_000)]))
         self.raise_brows()
+        self.assertEqual(self.bus.of(topics.TARGET_REQUEST), [])
         self.assertEqual(self.clicks(), [])
+
+    def test_brow_click_right_keeps_the_old_right_click(self):
+        self.bus = FakeBus()
+        self.mm = ModeManager(self.bus, settings=SimpleNamespace(brow_click="right"), log=lambda s: None)
+        self.bus.publish(topics.GAZE, GazePoint(0, 500, 300, 0.9))
+        self.raise_brows()
+        self.assertEqual(self.clicks(), [{"x": 500, "y": 300, "button": "right"}])
+
+
+class TestRightClick(Base):
+    def test_mouth_open_right_clicks_at_the_cursor(self):
+        self.bus.publish(topics.GESTURE, Gesture(t_ms=100_000, type="mouth_open"))
+        self.assertEqual(self.clicks(), [{"x": 500, "y": 300, "button": "right"}])
+
+    def test_saying_right_click(self):
+        self.say("right click")
+        self.assertEqual(self.clicks(), [{"x": 500, "y": 300, "button": "right"}])
+
+    def test_mouth_open_while_the_mic_hears_speech_is_ignored(self):
+        self.bus.publish(topics.TO_UI, messages.make(messages.LISTENING, level=0.4, speaking=True))
+        self.bus.publish(topics.GESTURE, Gesture(t_ms=100_000, type="mouth_open"))
+        self.assertEqual(self.clicks(), [])
+
+    def test_mouth_open_does_not_answer_a_question(self):
+        self.say("click send")
+        req = self.bus.of(topics.TARGET_REQUEST)[-1]
+        self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 410, 220))
+        self.bus.publish(topics.GESTURE, Gesture(t_ms=100_000, type="mouth_open"))
+        self.assertEqual(self.clicks(), [])
+        self.assertIsNotNone(self.mm.question)
 
 
 class TestStillYesWhenSomethingWaits(Base):

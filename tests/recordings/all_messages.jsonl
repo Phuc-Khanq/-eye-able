@@ -35,35 +35,35 @@
 {"t": 4.29, "msg": {"type": "gaze", "x": 1049.8, "y": 539.5, "confidence": 1.0}}
 {"t": 4.389, "msg": {"type": "gaze", "x": 1087.3, "y": 539.5, "confidence": 1.0}}
 {"t": 4.488, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
-{"t": 4.488, "msg": {"type": "dwell", "progress": 0.21}}
-{"t": 4.521, "msg": {"type": "dwell", "progress": 0.25}}
-{"t": 4.554, "msg": {"type": "dwell", "progress": 0.29}}
+{"t": 4.488, "msg": {"type": "dwell", "progress": 0.21, "ready": false}}
+{"t": 4.521, "msg": {"type": "dwell", "progress": 0.25, "ready": false}}
+{"t": 4.554, "msg": {"type": "dwell", "progress": 0.29, "ready": false}}
 {"t": 4.587, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 4.587, "msg": {"type": "dwell", "progress": 0.33}}
-{"t": 4.62, "msg": {"type": "dwell", "progress": 0.37}}
-{"t": 4.653, "msg": {"type": "dwell", "progress": 0.41}}
+{"t": 4.587, "msg": {"type": "dwell", "progress": 0.33, "ready": false}}
+{"t": 4.62, "msg": {"type": "dwell", "progress": 0.37, "ready": false}}
+{"t": 4.653, "msg": {"type": "dwell", "progress": 0.41, "ready": false}}
 {"t": 4.686, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 4.686, "msg": {"type": "dwell", "progress": 0.45}}
-{"t": 4.719, "msg": {"type": "dwell", "progress": 0.49}}
-{"t": 4.752, "msg": {"type": "dwell", "progress": 0.54}}
+{"t": 4.686, "msg": {"type": "dwell", "progress": 0.45, "ready": false}}
+{"t": 4.719, "msg": {"type": "dwell", "progress": 0.49, "ready": false}}
+{"t": 4.752, "msg": {"type": "dwell", "progress": 0.54, "ready": false}}
 {"t": 4.785, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 4.785, "msg": {"type": "dwell", "progress": 0.58}}
-{"t": 4.818, "msg": {"type": "dwell", "progress": 0.62}}
-{"t": 4.851, "msg": {"type": "dwell", "progress": 0.66}}
+{"t": 4.785, "msg": {"type": "dwell", "progress": 0.58, "ready": false}}
+{"t": 4.818, "msg": {"type": "dwell", "progress": 0.62, "ready": false}}
+{"t": 4.851, "msg": {"type": "dwell", "progress": 0.66, "ready": false}}
 {"t": 4.884, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 4.884, "msg": {"type": "dwell", "progress": 0.7}}
-{"t": 4.917, "msg": {"type": "dwell", "progress": 0.74}}
-{"t": 4.95, "msg": {"type": "dwell", "progress": 0.78}}
+{"t": 4.884, "msg": {"type": "dwell", "progress": 0.7, "ready": false}}
+{"t": 4.917, "msg": {"type": "dwell", "progress": 0.74, "ready": false}}
+{"t": 4.95, "msg": {"type": "dwell", "progress": 0.78, "ready": false}}
 {"t": 4.983, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 4.983, "msg": {"type": "dwell", "progress": 0.82}}
-{"t": 5.016, "msg": {"type": "dwell", "progress": 0.87}}
-{"t": 5.049, "msg": {"type": "dwell", "progress": 0.91}}
+{"t": 4.983, "msg": {"type": "dwell", "progress": 0.82, "ready": false}}
+{"t": 5.016, "msg": {"type": "dwell", "progress": 0.87, "ready": false}}
+{"t": 5.049, "msg": {"type": "dwell", "progress": 0.91, "ready": false}}
 {"t": 5.082, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 5.082, "msg": {"type": "dwell", "progress": 0.95}}
-{"t": 5.115, "msg": {"type": "dwell", "progress": 0.99}}
-{"t": 5.148, "msg": {"type": "dwell", "progress": 1.0}}
+{"t": 5.082, "msg": {"type": "dwell", "progress": 0.95, "ready": false}}
+{"t": 5.115, "msg": {"type": "dwell", "progress": 0.99, "ready": false}}
+{"t": 5.148, "msg": {"type": "dwell", "progress": 1.0, "ready": false}}
 {"t": 5.181, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 5.181, "msg": {"type": "dwell", "progress": 0.0}}
+{"t": 5.181, "msg": {"type": "dwell", "progress": 0.0, "ready": false}}
 {"t": 5.28, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
 {"t": 5.379, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
 {"t": 5.478, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
@@ -363,38 +363,38 @@
 {"t": 32.198, "msg": {"type": "gaze", "x": 1055.7, "y": 549.0, "confidence": 1.0}}
 {"t": 32.297, "msg": {"type": "gaze", "x": 991.0, "y": 549.0, "confidence": 1.0}}
 {"t": 32.396, "msg": {"type": "gaze", "x": 988.6, "y": 549.0, "confidence": 1.0}}
-{"t": 32.429, "msg": {"type": "dwell", "progress": 0.21}}
-{"t": 32.462, "msg": {"type": "dwell", "progress": 0.25}}
+{"t": 32.429, "msg": {"type": "dwell", "progress": 0.21, "ready": false}}
+{"t": 32.462, "msg": {"type": "dwell", "progress": 0.25, "ready": false}}
 {"t": 32.495, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
-{"t": 32.495, "msg": {"type": "dwell", "progress": 0.29}}
-{"t": 32.528, "msg": {"type": "dwell", "progress": 0.33}}
-{"t": 32.561, "msg": {"type": "dwell", "progress": 0.37}}
+{"t": 32.495, "msg": {"type": "dwell", "progress": 0.29, "ready": false}}
+{"t": 32.528, "msg": {"type": "dwell", "progress": 0.33, "ready": false}}
+{"t": 32.561, "msg": {"type": "dwell", "progress": 0.37, "ready": false}}
 {"t": 32.594, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
-{"t": 32.594, "msg": {"type": "dwell", "progress": 0.41}}
-{"t": 32.627, "msg": {"type": "dwell", "progress": 0.45}}
-{"t": 32.66, "msg": {"type": "dwell", "progress": 0.49}}
+{"t": 32.594, "msg": {"type": "dwell", "progress": 0.41, "ready": false}}
+{"t": 32.627, "msg": {"type": "dwell", "progress": 0.45, "ready": false}}
+{"t": 32.66, "msg": {"type": "dwell", "progress": 0.49, "ready": false}}
 {"t": 32.693, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
-{"t": 32.693, "msg": {"type": "dwell", "progress": 0.54}}
-{"t": 32.726, "msg": {"type": "dwell", "progress": 0.58}}
-{"t": 32.759, "msg": {"type": "dwell", "progress": 0.62}}
+{"t": 32.693, "msg": {"type": "dwell", "progress": 0.54, "ready": false}}
+{"t": 32.726, "msg": {"type": "dwell", "progress": 0.58, "ready": false}}
+{"t": 32.759, "msg": {"type": "dwell", "progress": 0.62, "ready": false}}
 {"t": 32.792, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
-{"t": 32.792, "msg": {"type": "dwell", "progress": 0.66}}
-{"t": 32.825, "msg": {"type": "dwell", "progress": 0.7}}
-{"t": 32.858, "msg": {"type": "dwell", "progress": 0.74}}
+{"t": 32.792, "msg": {"type": "dwell", "progress": 0.66, "ready": false}}
+{"t": 32.825, "msg": {"type": "dwell", "progress": 0.7, "ready": false}}
+{"t": 32.858, "msg": {"type": "dwell", "progress": 0.74, "ready": false}}
 {"t": 32.891, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
-{"t": 32.891, "msg": {"type": "dwell", "progress": 0.78}}
-{"t": 32.924, "msg": {"type": "dwell", "progress": 0.82}}
-{"t": 32.957, "msg": {"type": "dwell", "progress": 0.87}}
+{"t": 32.891, "msg": {"type": "dwell", "progress": 0.78, "ready": false}}
+{"t": 32.924, "msg": {"type": "dwell", "progress": 0.82, "ready": false}}
+{"t": 32.957, "msg": {"type": "dwell", "progress": 0.87, "ready": false}}
 {"t": 32.99, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
-{"t": 32.99, "msg": {"type": "dwell", "progress": 0.91}}
-{"t": 33.023, "msg": {"type": "dwell", "progress": 0.95}}
-{"t": 33.056, "msg": {"type": "dwell", "progress": 0.99}}
+{"t": 32.99, "msg": {"type": "dwell", "progress": 0.91, "ready": false}}
+{"t": 33.023, "msg": {"type": "dwell", "progress": 0.95, "ready": false}}
+{"t": 33.056, "msg": {"type": "dwell", "progress": 0.99, "ready": false}}
 {"t": 33.089, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
-{"t": 33.089, "msg": {"type": "dwell", "progress": 1.0}}
-{"t": 33.122, "msg": {"type": "dwell", "progress": 0.0}}
+{"t": 33.089, "msg": {"type": "dwell", "progress": 1.0, "ready": false}}
+{"t": 33.122, "msg": {"type": "dwell", "progress": 0.0, "ready": false}}
+{"t": 33.188, "msg": {"type": "status", "level": "error", "text": "Couldn't click: PermissionError: the window is run as administrator"}}
 {"t": 33.188, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
 {"t": 33.287, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
-{"t": 33.386, "msg": {"type": "status", "level": "error", "text": "Couldn't click: PermissionError: the window is run as administrator"}}
 {"t": 33.386, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
 {"t": 33.485, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}
 {"t": 33.584, "msg": {"type": "gaze", "x": 988.5, "y": 549.0, "confidence": 1.0}}

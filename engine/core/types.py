@@ -44,7 +44,7 @@ class GazePoint:
 @dataclass
 class Gesture:
     t_ms: int
-    type: str  # "nod" | "shake" | "tilt_left" | "tilt_right"
+    type: str  # "nod" | "shake" | "tilt_left" | "tilt_right" | "brow_raise" | "mouth_open" | "blink"
 
 
 @dataclass
@@ -52,6 +52,7 @@ class TargetRequest:
     gaze_x: int  # screen pixels (physical)
     gaze_y: int
     label: str   # e.g. "Send"
+    snap: bool = False  # no name: the clickable element nearest the point (a brow raise or "click here")
 
 
 @dataclass

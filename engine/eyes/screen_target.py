@@ -17,11 +17,16 @@ look-alikes (one channel avatar instead of twenty). Experimental hints (hint=) a
   "mark"    draws a red ring at the pointer and adds "the one at or nearest the red circle"
   "none"    UI-Venus's own prompt, unchanged
 
+Snap (request.snap, no name: a brow raise or "click here"): only the zoom box, asking for SNAP_TARGET,
+the clickable thing closest to the center, i.e. to the pointer. An answer further than snap_max_px from
+the pointer is "not found", so a snap only fixes a near miss and never jumps across the screen.
+
 Prompt and output format come from UI-Venus's own grounding evaluation
 (models/grounding/eval_screenspot_pro.py on the UI-Venus-1.5 branch):
   the model answers "[x,y]" on a 0-1000 scale of the image it was shown, or "[-1,-1]" when the
   target isn't there. Some answers are a box "[x1,y1,x2,y2]"; we use its center.
 """
+import math
 import re
 import threading
 import time
@@ -34,6 +39,9 @@ from engine.core.types import TargetRequest, TargetResult
 PROMPT = ("Output the center point of the position corresponding to the following instruction: \n{instruction}. \n\n"
           "The output should just be the coordinates of a point, in the format [x,y]. Additionally, if the task "
           "is infeasible (e.g., the task is not related to the image), the output should be [-1,-1].")
+
+SNAP_TARGET = "the button, link, icon, tab or text box"   # what a snap asks for (the hint adds "closest to the center")
+SNAP_MAX_PX = 150         # a snap answer further than this from the pointer is a wrong guess
 
 _BOX = re.compile(r"\[\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\]")
 _POINT = re.compile(r"\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\]")
@@ -102,7 +110,7 @@ class ScreenTarget:
 
     def __init__(self, model_id: str | None = None, device: str | None = None,
                  crop: tuple[int, int] | None = None, zoom: tuple[int, int] | None = (640, 360),
-                 max_new_tokens: int = 32, hint: str = "center") -> None:
+                 max_new_tokens: int = 32, hint: str = "center", snap_max_px: float | None = None) -> None:
         self.model_id = model_id or settings.ui_venus_model
         self.device = device or settings.ui_venus_device
         self.crop_w, self.crop_h = crop or (settings.crop_width, settings.crop_height)
@@ -110,6 +118,7 @@ class ScreenTarget:
         self.trace: list[Stage] = []          # what each step saw and said, for the console and the bench
         self.max_new_tokens = max_new_tokens
         self.hint = hint                      # "center" (default), "mark" or "none"; see the module notes
+        self.snap_max_px = float(snap_max_px if snap_max_px is not None else getattr(settings, "snap_max_px", SNAP_MAX_PX))
         self.model = None
         self.processor = None
         self.model_class = ""
@@ -174,18 +183,24 @@ class ScreenTarget:
         ox, oy = origin or (0, 0)
         gx, gy = request.gaze_x - ox, request.gaze_y - oy
         steps = ([("zoom", self.zoom)] if self.zoom else []) + [("wide", (self.crop_w, self.crop_h))]
+        label = request.label
+        if getattr(request, "snap", False):
+            steps = [("zoom", self.zoom or (640, 360))]   # near the pointer only
+            label = SNAP_TARGET
         self.trace, total_ms = [], 0.0
         for name, (cw, ch) in steps:
             left, top, w, h = crop_box(gx, gy, screen.width, screen.height, cw, ch)
             image = screen.crop((left, top, left + w, top + h))
             if name == "zoom":  # enlarge so the model gets more detail on small icons
                 image = image.resize((w * 2, h * 2), resample=3)  # 3 = bicubic
-            ans = self.ask(*self._hinted(image, request.label, gx - left, gy - top, 2.0 if name == "zoom" else 1.0))
+            ans = self.ask(*self._hinted(image, label, gx - left, gy - top, 2.0 if name == "zoom" else 1.0))
             total_ms += ans.ms
             self.trace.append(Stage(name=name, box=(left + ox, top + oy, w, h), answer=ans))
             if ans.point is not None and ans.point[0] >= 0:
-                return TargetResult(label=request.label, found=True, x=int(round(left + ox + ans.point[0] * w)),
-                                    y=int(round(top + oy + ans.point[1] * h)), ms=total_ms)
+                x, y = int(round(left + ox + ans.point[0] * w)), int(round(top + oy + ans.point[1] * h))
+                if getattr(request, "snap", False) and math.hypot(x - request.gaze_x, y - request.gaze_y) > self.snap_max_px:
+                    break                     # too far from where the user pointed: not what they meant
+                return TargetResult(label=request.label, found=True, x=x, y=y, ms=total_ms)
         return TargetResult(label=request.label, found=False, ms=total_ms)
 
     def _hinted(self, image, label: str, px: float, py: float, scale: float):

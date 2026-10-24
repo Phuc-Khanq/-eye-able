@@ -60,9 +60,12 @@ class TestOkayAndSureAreNotYes(Base):
         self.assertEqual(self.questions()[-1][1], "open")
 
     def test_the_other_yes_words_still_work(self):
-        for text in ["Yes.", "yeah", "Click.", "Click it.", "Do it.", "Go ahead."]:
+        for text in ["Yes.", "yeah", "Do it.", "Go ahead."]:
             with self.subTest(text=text):
                 self.assertEqual(parse(text).name, "yes")
+        for text in ["Click.", "Click it."]:                  # yes while "Click Send?" is open (below)
+            with self.subTest(text=text):
+                self.assertEqual(parse(text).name, "click_here")
         self.say("click send")
         self.found()
         self.say("click it")
@@ -272,7 +275,9 @@ class TestKnowIsNoWhileAsked(Base):
 
 
 class TestClickItSomethingIsYes(Base):
-    """"click it now" / "click it again" started a search for a button named "It Now" / "It Again"."""
+    """"click it now" / "click it again" started a search for a button named "It Now" / "It Again".
+    Since Khang's click rework it is the snap click ("click it" = the thing under the cursor), and
+    it still answers an open question."""
 
     def test_answers_the_question(self):
         for text in ["click it now", "Click it again.", "click it then", "click it please", "click it, now"]:
@@ -284,21 +289,21 @@ class TestClickItSomethingIsYes(Base):
                 self.assertEqual(self.questions()[-1], ("Click Search Box?", "confirmed"))
                 self.assertEqual(self.searches(), ["Search Box"])
 
-    def test_with_nothing_asked_it_never_searches_for_it(self):
+    def test_with_nothing_asked_it_is_a_snap_click_never_a_search_for_it(self):
         for text in ["click it now", "click it again", "click it then"]:
             with self.subTest(text=text):
                 self.setUp()
                 self.say(text)
-                self.assertEqual(self.searches(), [])
-                self.assertEqual(self.os(), [])
+                [req] = self.bus.of(topics.TARGET_REQUEST)
+                self.assertEqual((req.label, req.snap), ("here", True))     # not "It Now"
+                self.assertEqual(self.questions(), [])                      # a snap click doesn't ask
 
     def test_real_targets_still_work(self):
         for text, label in [("click item list", "Item List"), ("click its settings", "Its Settings"),
                             ("click the italic button", "Italic Button"), ("click send", "Send")]:
             with self.subTest(text=text):
                 self.assertEqual(parse(text).label, label)
-        self.assertEqual(parse("click it now please").name, "yes")
-        self.assertEqual(parse("click it all the way down").name, "target")   # too long to be a yes
+        self.assertEqual(parse("click it now please").name, "click_here")
 
 
 if __name__ == "__main__":

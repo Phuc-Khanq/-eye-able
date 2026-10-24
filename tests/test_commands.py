@@ -39,9 +39,13 @@ class TestCommands(unittest.TestCase):
         # "click it" used to start a new search for a button named "It".
         # "Okay." / "OK" / "Sure." are no longer yes (part D review): said in passing they confirmed
         # "send" and "delete my voice data". See tests/test_command_fixes.py.
-        for text in ["Yes.", "Click.", "Click it.", "Do it.", "Go ahead."]:
+        for text in ["Yes.", "Do it.", "Go ahead."]:
             with self.subTest(text=text):
                 self.assertEqual(parse(text).name, "yes")
+        # the click words are their own command: yes when something waits, else the snap click
+        for text in ["Click.", "Click it.", "click that", "click here", "click this video", "Click it baby"]:
+            with self.subTest(text=text):
+                self.assertEqual(parse(text).name, "click_here")
         self.assertEqual(parse("okay click send").label, "Send")   # a filler before a target still works
 
     def test_type_and_dictate_are_one_shot_dictation(self):

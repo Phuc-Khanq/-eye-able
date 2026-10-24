@@ -72,12 +72,16 @@ def decode(text) -> dict | None:
 
 
 # -------------------------------------------------------------- WebSocket
+STICKY = {"mode"}   # a UI window that connects later still gets the latest of these
+
+
 class WebSocketRelay:
     """Bus topics.TO_UI -> every connected UI window; UI messages -> bus from_ui(type)."""
 
     def __init__(self, bus: EventBus) -> None:
         self.bus = bus
         self.clients: set = set()
+        self._latest: dict[str, str] = {}   # STICKY type -> last JSON sent
         self._loop: asyncio.AbstractEventLoop | None = None
         self._server = None
 
@@ -109,6 +113,8 @@ class WebSocketRelay:
         except TypeError as exc:
             print(f"WebSocket: dropped a '{msg.get('type')}' message: {exc}")
             return
+        if msg.get("type") in STICKY:
+            self._latest[msg["type"]] = text
         try:
             self._loop.call_soon_threadsafe(self._broadcast, text)
         except RuntimeError:               # the loop already closed during shutdown
@@ -122,6 +128,8 @@ class WebSocketRelay:
     async def _handle(self, connection) -> None:
         self.clients.add(connection)
         try:
+            for text in list(self._latest.values()):
+                await connection.send(text)
             async for text in connection:
                 msg = decode(text)
                 if msg is None:

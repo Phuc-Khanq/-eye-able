@@ -125,6 +125,26 @@ class TestWebSocketLoopback(unittest.TestCase):
             asyncio.run(run())
         self.assertEqual(from_ui, [{"type": "set_mode", "mode": "paused"}])
 
+    def test_a_late_ui_window_still_gets_the_current_mode(self):
+        bus = EventBus()
+
+        async def run():
+            from websockets.asyncio.client import connect
+
+            relay = WebSocketRelay(bus)
+            await relay.start("127.0.0.1", 0)
+            try:
+                bus.publish(topics.TO_UI, messages.make(messages.MODE, mode="pointer"))
+                bus.publish(topics.TO_UI, messages.make(messages.MODE, mode="paused"))
+                bus.publish(topics.TO_UI, messages.make(messages.LISTENING, level=0.1, speaking=False))
+                await asyncio.sleep(0.05)                # let the broadcasts run (no one listening)
+                async with connect(f"ws://127.0.0.1:{relay.port}") as ui:
+                    return decode(await asyncio.wait_for(ui.recv(), 2))
+            finally:
+                await relay.close()
+
+        self.assertEqual(asyncio.run(run()), {"type": "mode", "mode": "paused"})
+
 
 if __name__ == "__main__":
     unittest.main()

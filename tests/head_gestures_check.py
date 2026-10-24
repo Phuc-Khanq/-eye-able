@@ -98,6 +98,14 @@ SCENARIOS = [
     ("tilt left held", lambda: run(flat, flat, -tilt_track()), ["tilt_left"]),
     ("tilt right with roll flicker", lambda: run(flat, flat, flicker(tilt_track())), ["tilt_right"]),
     ("brief tilt", lambda: run(flat, flat, tilt_track(length=5)), []),
+    ("tilt held 3 s fires once", lambda: run(np.zeros(200), np.zeros(200), tilt_track(200, 20, 90)), ["tilt_right"]),
+    ("tilt right, release, tilt right again", lambda: run(np.zeros(240), np.zeros(240),
+        tilt_track(240, 20, 30) + tilt_track(240, 120, 30)), ["tilt_right", "tilt_right"]),
+    ("shaking for 4 s is one shake", lambda: run(shake_track(200, 20, amp=14, cycles=8, frames=120), np.zeros(200)), ["shake"]),
+    ("two nods 1.6 s apart", lambda: run(np.zeros(200), bump(200, 20, 14, 14) + bump(200, 75, 14, 14)), ["nod", "nod"]),
+    ("three quick nods in a row count once", lambda: run(np.zeros(200), bump(200, 20, 14, 14) + bump(200, 38, 14, 14)
+                                                           + bump(200, 56, 14, 14)), ["nod"]),
+    ("nod, pause, shake", lambda: run(shake_track(200, 90), bump(200, 20, 14, 14)), ["nod", "shake"]),
 ]
 
 

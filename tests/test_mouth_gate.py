@@ -1,7 +1,7 @@
 """Run with: python -m unittest tests.test_mouth_gate
 
-Only the user's voice counts: DictationWorker keeps a word only if the camera saw the user's
-mouth moving while it was said. No camera, no mic, no model: FakeMouth stands in for
+Only the user's voice counts: DictationWorker keeps an utterance only if the camera saw the
+user's mouth moving while it was said (mouth_gate_mode "word": each word on its own, the old gate). No camera, no mic, no model: FakeMouth stands in for
 engine.eyes.mouth.MouthTracker and FakeWhisperModel says word i from 0.4*i to 0.4*(i+1) s.
 """
 import unittest
@@ -9,13 +9,16 @@ from types import SimpleNamespace
 
 from engine.core import messages, topics
 from engine.core.mode_manager import Mode, ModeManager
+from engine.core.types import GazePoint
 from engine.voice import dictation
 from engine.voice.dictation import Dictation, DictationWorker
 from tests.helpers import FakeBus, FakeWhisperModel
 
 S = 10_000.0          # span start (ms) used in most tests
 FRAME_MS = 1000 / 30
-GATE = SimpleNamespace(mouth_gate=True, mouth_min_moving=0.3, mouth_pad_ms=150.0, mouth_status_every_s=10.0)
+GATE = SimpleNamespace(mouth_gate=True, mouth_gate_mode="utterance", mouth_min_moving=0.3, mouth_pad_ms=150.0,
+                       mouth_status_every_s=10.0)
+WORD_GATE = SimpleNamespace(**{**vars(GATE), "mouth_gate_mode": "word"})   # the old per-word gate
 
 
 def overlaps(t, intervals):
@@ -73,10 +76,91 @@ def span(start=S, words=4):
     return {"start_ms": start, "end_ms": start + 400 * words}
 
 
+class TestPerUtterance(unittest.TestCase):
+    """The default: the whole utterance is kept or dropped on one number."""
+
+    def test_click_search_bar_keeps_search(self):
+        # Khang's live log: the jaw barely moves on "search" (0.4-0.8 s), so on its own it scored
+        # 0.10 and was dropped, and UI-Venus clicked "Bar". Over the utterance it's 0.55.
+        mouth = FakeMouth(moving=[(S - 100, S + 300), (S + 900, S + 1300)])
+        self.assertLess(mouth.moving_fraction(S + 400 - 150, S + 800 + 150), 0.3)   # the old gate dropped it
+        bus, clock, log = FakeBus(), Clock(), []
+        mm = ModeManager(bus, clock=clock, log=lambda s: None)
+        worker = DictationWorker(bus, Dictation(model=FakeWhisperModel()), mouth=mouth, settings=GATE,
+                                 clock=clock, log=log.append)
+        bus.publish(topics.GAZE, GazePoint(0, 500, 300, 0.9))
+        worker.process("Click search bar", span(words=3))
+        self.assertEqual(bus.of(topics.TRANSCRIPT)[0]["text"], "Click search bar")
+        self.assertEqual(bus.of(topics.TARGET_REQUEST)[-1].label, "Search Bar")
+        self.assertEqual(mm.mode, Mode.POINTER)
+        self.assertTrue(log[0].startswith("[mouth] utterance 0.55 >= 0.30: kept 3/3: Click("), log[0])
+        self.assertIn("search(0.10)", log[0])
+
+    def test_the_utterance_window_is_first_word_to_last_word_plus_padding(self):
+        mouth = FakeMouth(moving=[(0, 1e9)])
+        worker, *_ = make(mouth)
+        worker.process("hi mom", span(start=5000.0))
+        self.assertEqual(mouth.calls[-1], (5000 - 150, 5800 + 150))
+
+    def test_a_teammate_talking_while_the_mouth_is_still_drops_it_all(self):
+        worker, bus, _, log = make(FakeMouth(moving=[]))
+        worker.process("click send", span(words=2))
+        self.assertEqual(bus.of(topics.TRANSCRIPT), [])
+        self.assertTrue(log[0].startswith("[mouth] utterance 0.00 < 0.30: dropped 2/2"), log[0])
+        self.assertEqual(len(bus.ui(messages.STATUS)), 1)
+
+    def test_a_single_yes(self):
+        worker, bus, _, _ = make(FakeMouth(moving=[(S, S + 400)]))
+        worker.process("yes", span(words=1))
+        self.assertEqual(bus.of(topics.TRANSCRIPT)[0]["text"], "yes")
+        worker, bus, _, _ = make(FakeMouth(moving=[]))
+        worker.process("yes", span(words=1))
+        self.assertEqual(bus.of(topics.TRANSCRIPT), [])
+
+    def test_face_lost_for_part_of_it(self):
+        # face seen for the first 1.0 s of a 1.6 s utterance (more than half), talking the whole time
+        worker, bus, _, _ = make(FakeMouth(moving=[(0, 1e9)], face=[(0, S + 1000)]))
+        worker.process("hi mom home tonight", span())
+        self.assertEqual(bus.of(topics.TRANSCRIPT)[0]["text"], "hi mom home tonight")
+        # ...and still, in the part that was seen: dropped
+        worker, bus, _, _ = make(FakeMouth(moving=[], face=[(0, S + 1000)]))
+        worker.process("hi mom home tonight", span())
+        self.assertEqual(bus.of(topics.TRANSCRIPT), [])
+        # seen for under half of it: can't tell, kept
+        worker, bus, _, log = make(FakeMouth(moving=[], face=[(0, S + 300)]))
+        worker.process("hi mom home tonight", span())
+        self.assertEqual(bus.of(topics.TRANSCRIPT)[0]["text"], "hi mom home tonight")
+        self.assertTrue(log[0].startswith("[mouth] utterance -: kept 4/4"), log[0])
+
+    def test_closed_mouth_pause_between_words_still_keeps_it(self):
+        # "yes" (0-0.4 s), mouth closed for 0.8 s, "click send" (1.2-2.0 s)
+        bus = FakeBus()
+        worker = DictationWorker(bus, Dictation(model=PausedModel()), settings=GATE, log=lambda s: None,
+                                 mouth=FakeMouth(moving=[(S, S + 400), (S + 1200, S + 2000)]))
+        worker.process("(audio)", {"start_ms": S, "end_ms": S + 2000})
+        self.assertEqual(bus.of(topics.TRANSCRIPT)[0]["text"], "yes click send")   # 0.52 over 2.3 s
+
+    def test_user_talking_over_a_teammate_keeps_every_word(self):
+        # the trade-off: "hi mom" (user) and "yes okay" (teammate) in one utterance, 0.5 -> all kept
+        worker, bus, _, _ = make(FakeMouth(moving=[(S, S + 800)]))
+        worker.process("hi mom yes okay", span())
+        self.assertEqual(bus.of(topics.TRANSCRIPT)[0]["text"], "hi mom yes okay")
+
+
+class PausedModel:
+    """Says "yes" at 0-0.4 s, then "click send" at 1.2-2.0 s (a closed-mouth pause between)."""
+
+    def transcribe(self, audio, **kwargs):
+        words = [SimpleNamespace(word=" yes", start=0.0, end=0.4, probability=0.95),
+                 SimpleNamespace(word=" click", start=1.2, end=1.6, probability=0.95),
+                 SimpleNamespace(word=" send", start=1.6, end=2.0, probability=0.95)]
+        return iter([SimpleNamespace(words=words, no_speech_prob=0.0)]), None
+
+
 class TestMouthGate(unittest.TestCase):
-    def test_mixed_utterance_keeps_only_the_users_words(self):
+    def test_mixed_utterance_keeps_only_the_users_words_in_word_mode(self):
         # the user says "hi mom" (0-0.8 s), a teammate's "yes okay" follows (0.8-1.6 s)
-        worker, bus, _, log = make(FakeMouth(moving=[(S, S + 800)]))
+        worker, bus, _, log = make(FakeMouth(moving=[(S, S + 800)]), WORD_GATE)
         worker.process("hi mom yes okay", span())
         [t] = bus.of(topics.TRANSCRIPT)
         self.assertEqual(t["text"], "hi mom")
@@ -87,7 +171,7 @@ class TestMouthGate(unittest.TestCase):
 
     def test_word_windows_are_the_whisper_times_on_the_span_clock_plus_padding(self):
         mouth = FakeMouth(moving=[(0, 1e9)])
-        worker, *_ = make(mouth)
+        worker, *_ = make(mouth, WORD_GATE)
         worker.process("hi mom", span(start=5000.0))
         self.assertEqual(mouth.calls, [(5000 - 150, 5400 + 150), (5400 - 150, 5800 + 150)])
 
@@ -160,9 +244,10 @@ class TestMouthGate(unittest.TestCase):
         worker.process("yes", span(words=1))
         self.assertEqual(bus.of(topics.TRANSCRIPT)[0]["text"], "yes")
 
-    def test_leftover_unsure_words_are_noise(self):
+    def test_leftover_unsure_words_are_noise_in_word_mode(self):
         # the user's only kept word is one Whisper wasn't sure of: drop it like any short unsure result
-        worker, bus, _, _ = make(FakeMouth(moving=[(S, S + 400)]))
+        # (word mode only: the utterance gate never leaves leftovers)
+        worker, bus, _, _ = make(FakeMouth(moving=[(S, S + 400)]), WORD_GATE)
         worker.process("um? yes okay", span(words=3))
         self.assertEqual(bus.of(topics.TRANSCRIPT), [])
 

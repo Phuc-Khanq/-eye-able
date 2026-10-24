@@ -118,10 +118,13 @@ class DictationWorker:
 
     Only the user's voice counts (the mouth gate). With teammates talking near the mic, Whisper
     hears them too. audio_in publishes topics.SPEECH_SPAN (when the clip was spoken) right before
-    each UTTERANCE; with `mouth` (engine.eyes.mouth.MouthTracker) a word is kept only if the
-    camera saw the user's mouth moving while it was said:
-        f = mouth.moving_fraction(span start + word start - pad, span start + word end + pad)
-        keep the word if f is None or f >= mouth_min_moving
+    each UTTERANCE; with `mouth` (engine.eyes.mouth.MouthTracker) the utterance is kept only if
+    the camera saw the user's mouth moving while it was said (mouth_gate_mode "utterance"):
+        f = mouth.moving_fraction(span start + first word start - pad, span start + last word end + pad)
+        keep every word if f is None or f >= mouth_min_moving, else drop them all
+    Per utterance, not per word: a word with little jaw movement ("search" in "Click search bar")
+    scored low on its own and was dropped, so UI-Venus clicked "Bar". mouth_gate_mode "word" is
+    the old gate (the same test on each word's own window), kept as a fallback.
     MouthTracker's contract (confirmed with Khang): it returns None when the face was seen in
     under half of the window's expected frames ("can't tell", so we keep the word); otherwise
     the share of moving frames among the frames where the face was seen. It is thread-safe
@@ -139,6 +142,7 @@ class DictationWorker:
         self.dictation = dictation
         self.mouth = mouth
         self.gate = bool(getattr(settings, "mouth_gate", True))
+        self.gate_mode = str(getattr(settings, "mouth_gate_mode", "utterance"))
         self.min_moving = float(getattr(settings, "mouth_min_moving", 0.3))
         self.pad_ms = float(getattr(settings, "mouth_pad_ms", 150.0))
         self.status_every_s = float(getattr(settings, "mouth_status_every_s", 10.0))
@@ -217,25 +221,37 @@ class DictationWorker:
         })
 
     # ----------------------------------------------------------- mouth gate
+    def _fraction(self, start_ms: float, end_ms: float) -> float | None:
+        """mouth.moving_fraction, or None (keep) if the tracker fails."""
+        try:
+            return self.mouth.moving_fraction(start_ms, end_ms)
+        except Exception as exc:
+            now = self._clock()
+            if now - self._last_warning >= 60:
+                self._last_warning = now
+                self._log(f"[mouth] the mouth tracker failed ({exc}); keeping the words")
+            return None
+
     def _mouth_gate(self, words: list[dict], span: dict) -> list[dict]:
         """The words said while the user's mouth moved (see the class docstring)."""
         start = float(span["start_ms"])
-        kept, dropped = [], []
-        for w in words:
-            try:
-                f = self.mouth.moving_fraction(start + w["start"] * 1000 - self.pad_ms,
-                                               start + w["end"] * 1000 + self.pad_ms)
-            except Exception as exc:
-                f = None
-                now = self._clock()
-                if now - self._last_warning >= 60:
-                    self._last_warning = now
-                    self._log(f"[mouth] the mouth tracker failed ({exc}); keeping the words")
-            (kept if f is None or f >= self.min_moving else dropped).append((w, f))
+        per_word = [(w, self._fraction(start + w["start"] * 1000 - self.pad_ms,
+                                       start + w["end"] * 1000 + self.pad_ms)) for w in words]
 
         def show(pairs):
             return " ".join(f"{w['text']}({'-' if f is None else f'{f:.2f}'})" for w, f in pairs)
 
+        if self.gate_mode != "word":
+            f = self._fraction(start + words[0]["start"] * 1000 - self.pad_ms,
+                               start + words[-1]["end"] * 1000 + self.pad_ms)
+            keep = f is None or f >= self.min_moving
+            number = "-" if f is None else f"{f:.2f} {'>=' if keep else '<'} {self.min_moving:.2f}"
+            self._log(f"[mouth] utterance {number}: {'kept' if keep else 'dropped'} "
+                      f"{len(words)}/{len(words)}: {show(per_word)}")
+            return list(words) if keep else []
+
+        kept = [(w, f) for w, f in per_word if f is None or f >= self.min_moving]
+        dropped = [(w, f) for w, f in per_word if not (f is None or f >= self.min_moving)]
         line = f"[mouth] kept {len(kept)}/{len(words)}: {show(kept)}"
         self._log(line + (f"  dropped: {show(dropped)}" if dropped else ""))
         kept_words = [w for w, _ in kept]

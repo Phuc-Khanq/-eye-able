@@ -7,7 +7,15 @@ __pycache__/
 models/*
 !models/README.md
 recordings/
+!tests/recordings/
+tests/recordings/*
+!tests/recordings/*.jsonl
 calibration/
+
+# Training data, checkpoints and downloaded Kaggle results (TORGO is never published)
+data/
+checkpoints/
+downloads/
 *.wav
 *.mp4
 

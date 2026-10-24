@@ -1,0 +1,216 @@
+"""Talk into the mic and see what Whisper heard, with timings. Nothing is saved.
+
+Route: Khoi and Khoa
+Runs the real voice chain: mic -> audio_in (gain + Silero VAD) -> DictationWorker -> transcript.
+Uses the Whisper settings from engine/config.py plus config.local.json.
+
+Run from the repo root:
+    python -m engine.voice.live_check                 # one sentence: speak, pause, see the text, done
+    python -m engine.voice.live_check --pause 1.0     # end the sentence after 1 s of silence
+    python -m engine.voice.live_check --debug         # show level, gain and speech probability
+    python -m engine.voice.live_check --loop          # keep listening until Ctrl+C
+    python -m engine.voice.live_check --loop --seconds 60    # ...or until 60 s have passed
+
+By default it listens for ONE utterance: when you stop talking for the pause time, the mic
+turns off, Whisper transcribes, the text is printed and the program exits. If nobody speaks
+within --wait seconds (default 30), it says so and exits.
+
+Each result shows:
+    speech    how long you spoke (the utterance audio)
+    whisper   time Whisper took (the transcript's "ms")
+    after     time from the end of the utterance to the printed text
+
+It warns if the mic sends no audio or only silence, so it never just sits there quietly.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+import threading
+import time
+
+from engine.core import messages, topics
+from engine.core.events import EventBus
+
+NO_AUDIO_WARN_S = 3.0     # no chunks at all from the mic
+SILENT_WARN_S = 8.0       # chunks arrive but the level stays near zero
+SILENT_LEVEL = 0.15       # 0-1 meter: about -51 dBFS
+DEBUG_EVERY_S = 0.5
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--pause", type=float, default=None,
+                        help="seconds of silence that end an utterance (1 to 4; default from settings)")
+    parser.add_argument("--mic", type=int, default=None, help="mic number from 'python -m engine.voice.mic'")
+    parser.add_argument("--loop", action="store_true",
+                        help="keep listening after each transcript (until Ctrl+C or --seconds)")
+    parser.add_argument("--wait", type=float, default=30.0,
+                        help="one-sentence mode: give up if nobody speaks within this many seconds")
+    parser.add_argument("--seconds", type=float, default=None, help="--loop: stop by itself after this long")
+    parser.add_argument("--debug", action="store_true",
+                        help="print level, gain and Silero speech probability twice a second")
+    args = parser.parse_args(argv)
+
+    from engine.config import settings
+    from engine.voice import mic
+    from engine.voice.audio_in import AudioIn
+    from engine.voice.dictation import Dictation, DictationWorker, resolve_model
+
+    if args.pause is not None:
+        settings.pause_seconds = args.pause
+    bus = EventBus()
+    sent_at: list[tuple[float, float]] = []      # (time an utterance was published, its seconds)
+    lock = threading.Lock()
+    heard = threading.Event()                    # an utterance ended (one-sentence mode stops the mic)
+    finished = threading.Event()                 # its transcript (or "dropped") was printed
+
+    def on_utterance(audio) -> None:
+        with lock:
+            sent_at.append((time.perf_counter(), len(audio) / 16000))
+        heard.set()
+
+    class ReportingDictation(Dictation):
+        """Dictation that also says when Whisper's answer was dropped (the app stays quiet)."""
+
+        def transcribe(self, audio):
+            words = super().transcribe(audio)
+            if not words:
+                with lock:
+                    _, secs = sent_at.pop(0) if sent_at else (0.0, 0.0)
+                print(f"  (Whisper heard nothing it trusts in {secs:.1f} s of audio: dropped. "
+                      "Speak a bit louder or longer.)", flush=True)
+                finished.set()
+            return words
+
+    def on_transcript(t: dict) -> None:
+        now = time.perf_counter()
+        with lock:
+            sent, secs = sent_at.pop(0) if sent_at else (now, 0.0)
+        print(f'  "{t["text"]}"\n    speech {secs:4.1f} s | whisper {t["ms"]:6.0f} ms | '
+              f"after {1000 * (now - sent):6.0f} ms", flush=True)
+        finished.set()
+
+    def on_ui(msg: dict) -> None:
+        if msg["type"] == messages.LISTENING:
+            speaking = msg["speaking"]
+            if speaking != on_ui.speaking:
+                on_ui.speaking = speaking
+                print("  [speaking...]" if speaking else "  [done, transcribing]", flush=True)
+        elif msg["type"] == messages.STATUS:
+            print(f'  {msg["level"]}: {msg["text"]}', flush=True)
+    on_ui.speaking = False
+
+    bus.subscribe(topics.UTTERANCE, on_utterance)          # before the worker: times are honest
+    worker = DictationWorker(bus, ReportingDictation(settings))
+    bus.subscribe(topics.TRANSCRIPT, on_transcript)
+    bus.subscribe(topics.TO_UI, on_ui)
+
+    # Whisper loads and warms up in the background while the mic already listens; anything
+    # said meanwhile waits in the worker's queue, so startup feels much quicker.
+    model = resolve_model(settings.whisper_model)
+    print(f"Loading Whisper {model} on {settings.whisper_device} ({settings.whisper_compute_type}) "
+          "in the background...", flush=True)
+    load_failed = threading.Event()
+
+    def load_whisper() -> None:
+        import numpy as np
+
+        t0 = time.perf_counter()
+        try:
+            worker.dictation.load()
+            Dictation.transcribe(worker.dictation, np.zeros(16000, np.float32))  # warm up
+        except Exception as exc:
+            print(f"Whisper could not load: {exc}", flush=True)
+            load_failed.set()
+            return
+        print(f"  (Whisper ready after {time.perf_counter() - t0:.1f} s)", flush=True)
+        worker.start(warm_up=False)
+
+    threading.Thread(target=load_whisper, name="whisper-load", daemon=True).start()
+
+    try:
+        chosen = mic.open_settings(preferred=args.mic, verbose=True) if args.mic is not None else None
+        audio_in = AudioIn(bus, settings, mic_settings=chosen)
+        audio_in.start()
+    except Exception as exc:
+        print(f"Could not open the mic: {exc}")
+        return 1
+    if args.loop:
+        print(f"Listening. Speak, then stay quiet {audio_in.pause_seconds:.1f} s. Ctrl+C to stop.\n",
+              flush=True)
+    else:
+        print(f"Listening for one sentence. Speak, then stay quiet {audio_in.pause_seconds:.1f} s "
+              f"(gives up after {args.wait:.0f} s if nobody speaks).\n", flush=True)
+
+    t_end = time.monotonic() + args.seconds if (args.loop and args.seconds) else None
+    started = time.monotonic()
+    last_chunks, last_chunk_t = 0, started
+    loud_t = started
+    warned_no_audio = warned_silent = False
+    next_debug = started
+    code = 0
+    try:
+        while t_end is None or time.monotonic() < t_end:
+            time.sleep(0.1)
+            now = time.monotonic()
+            if load_failed.is_set():
+                code = 1
+                break
+            if not args.loop:
+                if heard.is_set():
+                    break                       # the sentence ended: stop listening
+                if not audio_in.speaking and now - started > args.wait:
+                    print(f"  Nobody spoke in {args.wait:.0f} s. Stopping.", flush=True)
+                    code = 2
+                    break
+            if audio_in.chunks != last_chunks:
+                last_chunks, last_chunk_t = audio_in.chunks, now
+                warned_no_audio = False
+            elif now - last_chunk_t > NO_AUDIO_WARN_S and not warned_no_audio:
+                print("  WARNING: the mic sends no audio. Another app may hold it, or it was "
+                      "unplugged. Try --mic <number> (list: python -m engine.voice.mic).", flush=True)
+                warned_no_audio = True
+            if audio_in.level >= SILENT_LEVEL:
+                loud_t, warned_silent = now, False
+            elif now - loud_t > SILENT_WARN_S and not warned_silent:
+                print("  WARNING: the mic hears almost nothing. It is probably MUTED in Windows:\n"
+                      "    press the mic-mute key on the keyboard (a microphone icon), or open\n"
+                      "    Settings > System > Sound > Input, pick your microphone and unmute it.\n"
+                      "    Still silent? Try --mic <number> (list: python -m engine.voice.mic) "
+                      "or --debug to watch the level.", flush=True)
+                warned_silent = True
+            if args.debug and now >= next_debug:
+                next_debug = now + DEBUG_EVERY_S
+                bar = "#" * int(audio_in.level * 20)
+                print(f"  level {audio_in.level:4.2f} {bar:<20} gain {audio_in._gain.gain:4.1f}x "
+                      f"speech {audio_in.speech_prob:4.2f} "
+                      f"{'SPEAKING' if audio_in.speaking else ''}", flush=True)
+    except KeyboardInterrupt:
+        pass
+    audio_in.stop()                             # mic off before Whisper finishes
+    if heard.is_set() and not args.loop:
+        print("  Mic off. Waiting for Whisper...", flush=True)
+        give_up = time.monotonic() + 120
+        try:
+            while not finished.wait(timeout=0.2):
+                if load_failed.is_set():
+                    code = 1
+                    break
+                if time.monotonic() > give_up:
+                    print("  Whisper took longer than 2 minutes. Stopping.", flush=True)
+                    code = 1
+                    break
+        except KeyboardInterrupt:
+            pass
+    worker.stop()
+    if audio_in.dropped_chunks:
+        print(f"Warning: {audio_in.dropped_chunks} mic chunks dropped (the computer was too busy)")
+    print("Stopped.")
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

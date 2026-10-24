@@ -11,9 +11,11 @@ APIs: plain Python (enum, threading)
 Only this module asks os_input to click or type, so stray signals can't act alone.
 
 What each input means (one table per mode: GESTURES below):
-  Pointer    dwell = click at the cursor, tilt left/right = scroll up/down, eyebrow raise = yes,
-             "click/open/select <name>" = look-and-say, "type <words>" = one-shot dictation
-             (the words go to the preview; "yes" types them)
+  Pointer    dwell (rest the cursor 1 s) = LEFT click at the cursor; eyebrow raise = yes when a
+             question, preview or search is waiting, otherwise the RIGHT click at the cursor;
+             tilt left/right = scroll up/down; "click/open/select <name>" = look-and-say,
+             "type <words>" = one-shot dictation (the words go to the preview; "yes" types them)
+             An eyebrow raise made while the mouth is moving is ignored (talking, not a click).
   Dictation  speech -> preview bubble; eyebrow raise, nod or "yes" inserts, shake or "no" discards;
              "click <name>" still clicks (only "click": "open the door..." stays text)
   Menu       tilts and nods go to the UI's radial menu; shake closes it;
@@ -63,6 +65,7 @@ class Mode(Enum):
 
 # Gesture -> intent, per mode. Change the controls here, in one place.
 GESTURES: dict[Mode, dict[str, str]] = {
+    # brow_raise = "gesture_yes": yes if something waits, else the right click (Pointer only)
     Mode.POINTER:   {"tilt_left": "scroll_up", "tilt_right": "scroll_down", "brow_raise": "gesture_yes"},
     Mode.DICTATION: {"nod": "yes", "shake": "no", "brow_raise": "gesture_yes"},
     Mode.MENU:      {"tilt_left": "menu_gesture", "tilt_right": "menu_gesture", "brow_raise": "menu_gesture",
@@ -175,13 +178,17 @@ class ModeManager:
             if intent == "menu_gesture":
                 self._ui(messages.GESTURE, gesture=gesture.type)
             elif intent == "gesture_yes":
-                # An eyebrow raise only answers something that is waiting. With nothing waiting it does
-                # nothing, because a raise can also happen while talking (about 0.8 a minute in Hung's test).
+                # An eyebrow raise answers whatever is waiting. With nothing waiting it is the RIGHT
+                # click in Pointer mode (dwell is the left click), at the cursor: the eyes service
+                # freezes the cursor during a raise, so the last gaze is where it froze. A raise while
+                # talking never gets here (_raised_while_talking).
                 if self.preview:
                     self._insert_preview()
                 elif self.search:
                     self.search.preconfirmed = True
                     self._status("info", f"Will click {self.search.label} as soon as it's found")
+                elif self.mode == Mode.POINTER:
+                    self._right_click()
             elif intent:
                 self._do(Command(name=intent))
 
@@ -437,6 +444,13 @@ class ModeManager:
                 self._show_preview()
 
     # ------------------------------------------------------------ look-and-say
+    def _right_click(self) -> None:
+        g = self.last_gaze
+        if g is None:
+            self._status("info", "Can't right-click yet: the cursor position isn't known")
+            return
+        self._os(topics.OS_CLICK, x=int(g.x), y=int(g.y), button="right")
+
     def _click_target(self, label: str, x: int, y: int) -> None:
         self._last_click = (label, self.clock())
         self._os(topics.OS_CLICK, x=x, y=y)

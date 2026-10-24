@@ -141,8 +141,7 @@ class TestEyesServiceClicks(unittest.TestCase):
         r = self.r
         self.move_and_rest(frames=5)
         r.frames(40, yaw=4.0, brow=0.45)         # a long raise on a resting cursor: 1.3 s
-        x, y = self.gaze()
-        r.bus.publish(topics.OS_CLICK, {"x": int(x), "y": int(y), "button": "right"})   # what Khoi's line will do
+        x, y = self.gaze()                       # the mode manager right-clicked here (the raise, nothing waiting)
         r.frames(60, yaw=4.0)                    # the context menu is open right under the cursor
         r.out.flush()
         self.assertEqual(r.os.clicks, [(int(x), int(y), "right")])

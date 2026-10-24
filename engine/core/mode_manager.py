@@ -3,7 +3,7 @@
 Route: Khoi and Khoa (Khoi leads)
 Publishes: to the UI (topics.TO_UI): mode, dictation_preview, confirm, target_searching,
            target_found, target_none, gesture (menu only), status
-           to the engine: TargetRequest, os.click / os.type / os.key / os.scroll / os.undo,
+           to the engine: TargetRequest, os.click / os.type / os.key / os.scroll / os.undo / os.launch,
            eyes.calibrate, voice.delete_data
 Subscribes: GazePoint, dwell, Gesture, transcripts, TargetResult, UI messages
 APIs: plain Python (enum, threading)
@@ -18,6 +18,9 @@ What each input means (one table per mode: GESTURES below):
              tilt left/right = scroll up/down; "click/open/select <name>" = look-and-say,
              "type <words>" = one-shot dictation (the words go to the preview; "yes" types them);
              "go back" = Alt+Left, "escape" = Esc (close a menu)
+             "open Chrome" / "go to youtube.com" / "search for cats" = open an allowed app or site, no
+             question (engine/voice/launch.py; also after a trigger word in any mode); any other
+             "open <name>" stays look-and-say
              An eyebrow raise made while the mouth is moving is ignored (talking, not a click), and so
              is a mouth gesture while the mic hears speech.
              brow_click "right" (settings) brings back the old raise = right click.
@@ -62,7 +65,7 @@ from typing import Callable
 
 from engine.core import messages, topics
 from engine.core.types import GazePoint, Gesture, TargetRequest, TargetResult
-from engine.voice import commands
+from engine.voice import commands, launch
 from engine.voice.commands import Command
 
 CONFIRM_TIMEOUT_S = 12.0  # Whisper only answers after the pause, so a spoken "yes" lands 2-4 s late
@@ -138,6 +141,7 @@ class ModeManager:
         self._brow_min_moving = float(getattr(settings, "brow_talk_min_moving", 0.3))
         self._brow_warned = float("-inf")   # clock time of the last "tracker failed" warning
         self._log = log                     # console lines for tuning
+        self._settings = settings           # launch.match reads launch_apps / launch_aliases from it
         self._scroll_idle_s = float(getattr(settings, "scroll_idle_s", 10.0))
         self._scroll_seen = 0.0             # clock time scroll mode started or the head last scrolled
         self._brow_click = str(getattr(settings, "brow_click", "left"))   # "left" (snap) or "right"
@@ -288,6 +292,14 @@ class ModeManager:
             done, last, i = False, None, 0
             while i < len(clauses):
                 c = clauses[i]
+                payload = self._launch_payload(c)
+                if payload:                   # "open Chrome": no question, it only opens things
+                    done = True
+                    if ("launch", str(payload)) != last:
+                        self._os(topics.OS_LAUNCH, **payload)
+                    last = ("launch", str(payload))
+                    i += 1
+                    continue
                 cmd = self._clause_command(c)
                 if cmd is None:
                     if self.mode == Mode.DICTATION:
@@ -313,6 +325,18 @@ class ModeManager:
                 i += 1
             if not done and self.mode != Mode.DICTATION:
                 self._status("info", f'Heard "{transcript["text"]}" (not a command)')
+
+    def _launch_payload(self, c) -> dict | None:
+        """The os.launch payload for "open Chrome" / "go to youtube.com" / "search for cats" in Pointer
+        mode, or after a trigger word in any mode. None otherwise: "open compose" stays look-and-say,
+        and plain dictation ("search for a new job") stays text."""
+        text, said_trigger = launch.strip_trigger(c.text)
+        triggered = c.triggered or said_trigger   # "Venus, go to ..." keeps its trigger word (split_clauses)
+        if not (triggered or self.mode == Mode.POINTER):
+            return None
+        if not (triggered or c.starts_sentence):
+            return None   # cut from mid-sentence, as in _clause_command
+        return launch.match(text, self._settings)
 
     def _clause_command(self, c) -> Command | None:
         if c.triggered or self.mode == Mode.POINTER:

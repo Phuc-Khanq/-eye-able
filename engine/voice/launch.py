@@ -1,8 +1,8 @@
 """Opening apps and sites by voice ("tier 2" OS control): which spoken phrases start something.
 
 Route: Khoi and Khoa (Khoa leads)
-Publishes: nothing itself. The mode manager calls match() and publishes topics.OS_LAUNCH with the result;
-           engine/eyes/os_output.py starts it
+Publishes: nothing itself. The mode manager (ModeManager._launch_payload) calls match() and publishes
+           topics.OS_LAUNCH with the result; engine/eyes/os_output.py starts it
 Subscribes: nothing
 APIs: re, urllib.parse (standard library only)
 
@@ -34,6 +34,7 @@ APP_LEADING_WORDS = {"the"}            # "open the settings"
 # A host name: labels of letters, digits and inner hyphens, joined by dots, then an optional path.
 _LABEL = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
 _HOST = re.compile(rf"^{_LABEL}(?:\.{_LABEL})*(?:/[a-z0-9\-._~/%?=&+#]*)?$")
+_TRIGGER = re.compile(rf"^\W*(?:{'|'.join(commands.TRIGGER_WORDS)})\b\W*", re.IGNORECASE)
 
 # Example phrases (the message to Khoi and the tests use them).
 PHRASES = [
@@ -41,6 +42,14 @@ PHRASES = [
     "open settings", "open mail", "go to youtube.com", "go to youtube dot com", "go to wikipedia.org",
     "search for cats", "search for how to bake bread",
 ]
+
+
+def strip_trigger(text: str) -> tuple[str, bool]:
+    """("go to youtube.com", True) for "Venus, go to youtube.com". commands.split_clauses only takes the
+    trigger word off a clause commands.parse knows ("Venus, open Chrome"), so "go to" and "search"
+    clauses still start with it."""
+    m = _TRIGGER.match(text)
+    return (text[m.end():], True) if m else (text, False)
 
 
 def _words(text: str) -> list[str]:

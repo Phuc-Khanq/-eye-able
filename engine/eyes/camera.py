@@ -43,7 +43,9 @@ class CameraMode:
 def fourcc_to_str(value: float) -> str:
     code = int(value)
     text = "".join(chr((code >> (8 * i)) & 0xFF) for i in range(4))
-    return text.strip("\x00 ") or "?"
+    if not all(32 < ord(ch) < 127 for ch in text):
+        return "?"  # the driver didn't report a readable format
+    return text
 
 
 def open_capture(index: int, backend: str, fourcc: str, width: int, height: int, fps: int):
@@ -60,8 +62,15 @@ def open_capture(index: int, backend: str, fourcc: str, width: int, height: int,
     cap.set(cv2.CAP_PROP_FPS, fps)
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # keeps latency low where the backend supports it
 
-    ok, frame = cap.read()
-    if not ok or frame is None:
+    # Some webcams fail the first few reads while they start up, so give them half a second.
+    frame = None
+    for _ in range(10):
+        ok, frame = cap.read()
+        if ok and frame is not None:
+            break
+        frame = None
+        time.sleep(0.05)
+    if frame is None:
         cap.release()
         return None, None
     mode = CameraMode(

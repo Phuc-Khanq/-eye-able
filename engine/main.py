@@ -117,6 +117,28 @@ class Engine:
         self.bus.publish(topics.TO_UI, messages.make(messages.STATUS, level=level, text=text))
 
 
+def use_cpu_without_gpu(s, cuda_devices: int | None = None) -> bool:
+    """Whisper set to CUDA on a laptop with no NVIDIA GPU can't load, so voice would not work.
+    Use the CPU (int8) for this run instead and say so. Returns True if it switched.
+    The defaults in config.py stay as they are (CONTRIBUTING rule 3)."""
+    if s.whisper_device != "cuda":
+        return False
+    if cuda_devices is None:
+        try:
+            import ctranslate2  # comes with faster-whisper; importing it needs no GPU
+
+            cuda_devices = ctranslate2.get_cuda_device_count()
+        except Exception:
+            cuda_devices = 0
+    if cuda_devices > 0:
+        return False
+    s.whisper_device, s.whisper_compute_type = "cpu", "int8"
+    print("No NVIDIA GPU found: Whisper runs on the CPU (int8) this time. To make that "
+          'permanent, put {"whisper_device": "cpu", "whisper_compute_type": "int8"} '
+          "in config.local.json.")
+    return True
+
+
 def read_wav(path: str):
     """(rate, float32 audio) from a WAV file. Only reads; nothing is written."""
     import numpy as np
@@ -208,6 +230,8 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
     relay = WebSocketRelay(bus)
     await relay.start(settings.ws_host, settings.ws_port)
     log_to_console(bus)
+    if getattr(settings, "stt_backend", "whisper") == "whisper":
+        use_cpu_without_gpu(settings)
     stop = threading.Event()
     if wav:
         from engine.voice.audio_in import load_vad

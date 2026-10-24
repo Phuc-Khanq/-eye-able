@@ -26,6 +26,10 @@ class Settings:
 
     # Pointing
     dwell_ms: int = 1000           # rest the cursor this long = left click
+    dwell_clickable_only: bool = True   # Windows: dwell only on links, buttons, tabs... (engine/eyes/clickable.py);
+                                        # false for canvas apps and games, which show neither
+    dwell_uia: bool = True         # also ask Windows UI Automation (native buttons, text boxes; pip install uiautomation)
+    dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py), no Electron UI needed
     sensitivity: float = 1.0
 
     # UI-Venus

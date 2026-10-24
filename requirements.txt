@@ -12,6 +12,7 @@ mss
 pillow
 transformers>=4.57
 accelerate
+uiautomation==2.0.29; sys_platform == "win32"   # dwell: native buttons and text boxes count as clickable (optional)
 
 # Voice
 faster-whisper==1.2.1

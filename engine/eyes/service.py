@@ -30,6 +30,10 @@ mode manager clicks. When the brows come down the pointer carries on from there,
 Dwell is off, and comes back disarmed at the cursor (move away first), outside Pointer mode, while a
 question or preview waits, while UI-Venus searches or holds a found target, during a raise and right
 after calibrating. Every click disarms it at the click spot. set_dwell(on) is the on/off switch.
+On Windows only clickable things count (settings.dwell_clickable_only): engine/eyes/clickable.py says
+what is under the cursor from a background thread, and a stop on a button or link gets a looser radius.
+The dwell message to the UI carries ready (resting on something clickable, dwell armed) besides the
+progress, so the ring can show "this clicks" before it fills; it is sent only when either changes.
 
 Yes: an eyebrow raise (Hung's BrowRaiseDetector, Gesture "brow_raise") is the default, because a nod
 moves the head pointer and with it the cursor. confirm="nod" brings the nod back: Hung's strict
@@ -72,10 +76,12 @@ SEARCH_TIMEOUT_S = 10.0   # UI-Venus searching blocks dwell at most this long
 class EyesService:
     def __init__(self, bus, settings=default_settings, pointer: str = "head", dwell: bool = False,
                  model_path: str | None = None, os_api=None, camera_factory=None, mesh_factory=None,
-                 features=None, head_pose=None, clock=time.monotonic, confirm: str = "brow") -> None:
+                 features=None, head_pose=None, clock=time.monotonic, confirm: str = "brow",
+                 probe=None) -> None:
         if confirm not in CONFIRMS:
             raise ValueError(f"confirm must be one of {CONFIRMS}")
         self.confirm = confirm
+        real_os = os_api is None
         if os_api is None:
             from engine.eyes import os_input as os_api
         self.bus, self.settings, self.os, self.clock = bus, settings, os_api, clock
@@ -112,7 +118,13 @@ class EyesService:
         self.brows = BrowRaiseDetector()
         self.dwell = DwellClicker(dwell_ms=getattr(settings, "dwell_ms", 1000)) if dwell else None
         self._dwell_blocked = True       # comes back disarmed at the cursor, so the first stop must be a new one
-        self._dwell_shown = False        # a non-zero dwell progress went to the UI
+        self._dwell_sent = (0.0, False)  # the last (progress, ready) that went to the UI
+        if probe is None and real_os and getattr(settings, "dwell_clickable_only", True):
+            from engine.eyes.clickable import make_probe   # None off Windows: dwell clicks anywhere, as before
+            probe, note = make_probe(getattr(settings, "dwell_uia", True))
+            if note:
+                self._notes.append(note)
+        self.probe = probe               # what's under the cursor: only clickable things start a dwell
         self._frozen: tuple[float, float, float] | None = None   # x, y, since: cursor held during a raise
         self._freeze_spent = False       # this raise already used up MAX_FREEZE_S
         self._recent_cursor: deque[tuple[int, float, float]] = deque(maxlen=30)   # t_ms, x, y
@@ -162,6 +174,8 @@ class EyesService:
             self._status("warn", note)
         self.driver.start()
         self.scroller.start()
+        if self.probe is not None:
+            self.probe.start()
         self._thread = threading.Thread(target=self._run, name="eyes", daemon=True)
         self._thread.start()
 
@@ -171,6 +185,8 @@ class EyesService:
             self._thread.join(timeout=3)
         self.scroller.stop()
         self.driver.stop()
+        if self.probe is not None:
+            self.probe.stop()
 
     def _wheel(self, units: int) -> None:
         """One smooth wheel step: 1/120 notch units where the OS takes them, else whole notches."""
@@ -400,11 +416,15 @@ class EyesService:
         elif self._dwell_blocked:   # allowed again: not where the cursor already rests, only after a move
             self._dwell_blocked = False
             self.dwell.disarm(point.x, point.y)
-        at = None if blocked else self.dwell.update(t_ms, point.x, point.y)
+        over = self.probe.over_at(point.x, point.y, now) if self.probe is not None else None
+        gate = self.probe is not None and getattr(self.settings, "dwell_clickable_only", True)
+        at = None if blocked else self.dwell.update(t_ms, point.x, point.y, over=over, gate=gate)
         shown = 1.0 if at is not None else self.dwell.progress
-        if shown > 0 or self._dwell_shown:   # the ring: fills while resting, one 0 after it stops or clicks
-            self._ui(messages.DWELL, progress=round(shown, 2))
-            self._dwell_shown = shown > 0
+        ready = not blocked and over is not None and over.clickable and self.dwell.armed
+        sent = (round(shown, 2), bool(ready))
+        if sent != self._dwell_sent:   # the ring: fills while resting, one 0 after it stops or clicks
+            self._ui(messages.DWELL, progress=sent[0], ready=sent[1])
+            self._dwell_sent = sent
         if at is not None:
             self.bus.publish(topics.DWELL_DONE, GazePoint(t_ms=t_ms, x=at[0], y=at[1], confidence=point.confidence))
 

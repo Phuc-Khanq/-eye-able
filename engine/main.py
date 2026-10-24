@@ -50,7 +50,7 @@ class Engine:
         #    the cursor, plus head_gestures; UI-Venus answers target requests; os_output carries out
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
         #    the cursor or the keyboard; run() turns it on.
-        self.eyes = self.targets = self.os_output = self.mouth = None
+        self.eyes = self.targets = self.os_output = self.mouth = self.meter = None
         if eyes:
             from engine.eyes.mouth import MouthTracker
             from engine.eyes.os_output import OsOutput
@@ -62,6 +62,9 @@ class Engine:
             # Was the user's mouth moving? For the voice route's "only the user's voice" gate.
             self.mouth = MouthTracker(bus)
             self.mode_manager.mouth = self.mouth     # an eyebrow raise while talking is ignored
+            if getattr(settings, "dwell_meter", True):
+                from engine.eyes.dwell_meter import DwellMeter
+                self.meter = DwellMeter(bus)         # the dwell ring at the cursor, without the Electron UI
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
         #    (without eyes, mouth is None: no gate, every word counts)
         self.dictation = DictationWorker(bus, dictation or Dictation(settings), mouth=self.mouth,
@@ -76,6 +79,8 @@ class Engine:
         if self.eyes:
             self.targets.start()                     # UI-Venus loads on its own worker thread
             self.eyes.start()                        # camera thread and the cursor glide
+            if self.meter:
+                self.meter.start()                   # its own Tk thread (Windows only)
         self.dictation.start(warm_up=self.warm_up)   # Whisper loads on its own thread
         if self.rewrite:
             self.rewrite.start(warm_up=self.warm_up)  # the clean-up model loads on its own thread
@@ -95,6 +100,8 @@ class Engine:
             self.eyes.stop()
             self.targets.stop()
             self.os_output.stop()
+            if self.meter:
+                self.meter.stop()
 
     def _status(self, level: str, text: str) -> None:
         self.bus.publish(topics.TO_UI, messages.make(messages.STATUS, level=level, text=text))

@@ -146,5 +146,110 @@ class TestWebSocketLoopback(unittest.TestCase):
         self.assertEqual(asyncio.run(run()), {"type": "mode", "mode": "paused"})
 
 
+class TestRelayMoreCases(unittest.TestCase):
+    """Several UI windows, a window that leaves, bursts, bad payloads, ports."""
+
+    def relay_with(self, n_clients, body, bus=None):
+        """Start a relay on a free port, connect n UI windows, run body(bus, relay, uis)."""
+        bus = bus or EventBus()
+
+        async def run():
+            from websockets.asyncio.client import connect
+
+            relay = WebSocketRelay(bus)
+            await relay.start("127.0.0.1", 0)
+            uis = []
+            try:
+                for _ in range(n_clients):
+                    uis.append(await connect(f"ws://127.0.0.1:{relay.port}"))
+                while len(relay.clients) < n_clients:       # wait until the server sees all
+                    await asyncio.sleep(0.01)
+                return await body(bus, relay, uis)
+            finally:
+                for ui in uis:
+                    await ui.close()
+                await relay.close()
+
+        return asyncio.run(run())
+
+    def test_every_window_gets_every_message_in_order(self):
+        sent = [messages.make(messages.DWELL, progress=i / 10) for i in range(10)]
+
+        async def body(bus, relay, uis):
+            for m in sent:
+                bus.publish(topics.TO_UI, m)
+            return [[decode(await asyncio.wait_for(ui.recv(), 2)) for _ in sent] for ui in uis]
+
+        a, b = self.relay_with(2, body)
+        self.assertEqual(a, sent)
+        self.assertEqual(b, sent)
+
+    def test_a_window_that_leaves_does_not_break_the_others(self):
+        async def body(bus, relay, uis):
+            await uis[0].close()
+            while len(relay.clients) > 1:
+                await asyncio.sleep(0.01)
+            bus.publish(topics.TO_UI, messages.make(messages.MODE, mode="menu"))
+            return decode(await asyncio.wait_for(uis[1].recv(), 2))
+
+        self.assertEqual(self.relay_with(2, body), {"type": "mode", "mode": "menu"})
+
+    def test_a_burst_does_not_block_the_publisher_and_all_arrive(self):
+        """500 gaze messages from a camera thread: publish returns at once, none are lost."""
+        import time
+
+        async def body(bus, relay, uis):
+            def camera():
+                t0 = time.perf_counter()
+                for i in range(500):
+                    bus.publish(topics.TO_UI, messages.make(messages.GAZE, x=i, y=i, confidence=1.0))
+                camera.seconds = time.perf_counter() - t0
+
+            t = threading.Thread(target=camera)
+            t.start()
+            t.join()
+            xs = [decode(await asyncio.wait_for(uis[0].recv(), 2))["x"] for _ in range(500)]
+            return camera.seconds, xs
+
+        seconds, xs = self.relay_with(1, body)
+        self.assertLess(seconds, 1.0)
+        self.assertEqual(xs, list(range(500)))
+
+    def test_a_payload_that_cant_be_json_is_dropped_and_the_next_one_goes(self):
+        async def body(bus, relay, uis):
+            with redirect_stdout(StringIO()) as out:
+                bus.publish(topics.TO_UI, {"type": "status", "bad": object()})
+            bus.publish(topics.TO_UI, messages.make(messages.STATUS, level="info", text="ok"))
+            return out.getvalue(), decode(await asyncio.wait_for(uis[0].recv(), 2))
+
+        note, msg = self.relay_with(1, body)
+        self.assertIn("dropped", note)
+        self.assertEqual(msg["text"], "ok")
+
+    def test_a_taken_port_raises_and_stopping_frees_it(self):
+        import socket
+
+        from engine.core.events import serve_websocket
+
+        async def run():
+            first = WebSocketRelay(EventBus())
+            await first.start("127.0.0.1", 0)
+            port = first.port
+            try:
+                with self.assertRaises(OSError):            # what engine.main reports to the user
+                    await WebSocketRelay(EventBus()).start("127.0.0.1", port)
+            finally:
+                await first.close()
+            task = asyncio.create_task(serve_websocket(EventBus(), "127.0.0.1", port))
+            await asyncio.sleep(0.2)
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            return port
+
+        port = asyncio.run(run())
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", port))                     # free again after Ctrl+C
+
+
 if __name__ == "__main__":
     unittest.main()

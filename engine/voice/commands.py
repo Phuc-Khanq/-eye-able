@@ -88,6 +88,10 @@ FIXED_COMMANDS: dict[str, str] = {
     "clean it up": "clean_up",
 }
 
+# Answers Whisper mishears, read as the answer only while a question is open ("Click Send?" -> "Know."):
+# anywhere else "know" is just a word, and "I know" never matches
+ANSWER_MISHEARINGS: dict[str, str] = {"know": "no"}
+
 # Verbs that start a look-and-say target request.
 TARGET_VERBS = ("click", "open", "select")
 DICTATION_TARGET_VERBS = ("click",)   # while dictating, only "click <name>" is a command...

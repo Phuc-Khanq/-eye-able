@@ -239,6 +239,10 @@ class ModeManager:
             self.tick()
             words = transcript.get("words") or [{"text": w, "conf": 1.0} for w in transcript["text"].split()]
             clauses = commands.split_clauses(words)
+            heard = commands.ANSWER_MISHEARINGS.get(commands.normalize(transcript["text"]))
+            if heard and self.question:
+                self._answer(heard == "yes")   # "Know." answering "Click Send?" is a no
+                return
             if self.mode == Mode.SCROLL:
                 self._scroll_transcript(transcript, clauses)
                 return

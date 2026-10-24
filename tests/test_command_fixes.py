@@ -231,5 +231,45 @@ class TestOneWordReplies(Base):
         self.assertIn("Nothing is waiting", self.bus.ui(messages.STATUS)[-1]["text"])
 
 
+class TestKnowIsNoWhileAsked(Base):
+    """Khang's live log: answering "Click Search Box?" with "no", Whisper wrote "Know."."""
+
+    def test_know_answers_no(self):
+        for text in ["Know.", "know", "Know!"]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.say("click search box")
+                self.found()
+                self.say(text)
+                self.assertEqual(self.questions()[-1], ("Click Search Box?", "cancelled"))
+                self.assertEqual(self.os(), [])
+
+    def test_know_cancels_send_while_dictating_and_keeps_the_preview(self):
+        self.say("start dictation")
+        self.say("hi mom")
+        self.say("send it")
+        self.say("Know.")
+        self.assertEqual(self.questions()[-1], ('Insert "hi mom" and send?', "cancelled"))
+        self.assertEqual(self.os(), [])
+        self.assertEqual(self.mm._preview_text(), "hi mom")
+
+    def test_know_with_nothing_asked_is_just_a_word(self):
+        self.say("start dictation")
+        self.say("know")
+        self.assertEqual(self.mm._preview_text(), "know")
+        self.assertIsNone(parse("know"))
+
+    def test_i_know_stays_text(self):
+        self.say("start dictation")
+        self.say("hi mom")
+        self.say("send it")
+        self.say("I know")
+        self.assertEqual(self.questions()[-1][1], "open")
+        self.setUp()
+        self.say("start dictation")
+        self.say("I know")
+        self.assertEqual(self.mm._preview_text(), "I know")
+
+
 if __name__ == "__main__":
     unittest.main()

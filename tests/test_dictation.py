@@ -128,5 +128,61 @@ class TestResolveModel(unittest.TestCase):
             del sys.modules["faster_whisper"]
 
 
+class RealWordsModel:
+    """Returns faster-whisper's own Word and Segment types, so the attribute names are the real ones."""
+
+    def __init__(self, words, no_speech_prob=0.01):
+        self.words = words
+        self.no_speech_prob = no_speech_prob
+
+    def transcribe(self, audio, **kwargs):
+        from faster_whisper.transcribe import Segment, Word
+
+        words = [Word(start=s, end=e, word=w, probability=p) for s, e, w, p in self.words]
+        seg = Segment(id=0, seek=0, start=0.0, end=words[-1].end if words else 0.0, text="", tokens=[],
+                      avg_logprob=-0.1, compression_ratio=1.0, no_speech_prob=self.no_speech_prob,
+                      words=words, temperature=0.0)
+        return iter([seg]), SimpleNamespace(language="en")
+
+
+class TestWordTimes(unittest.TestCase):
+    def test_words_get_start_and_end_from_whisper(self):
+        d = Dictation(model=RealWordsModel([(0.12345, 0.4, " Hi", 0.9), (0.42, 0.8, " mom,", 0.8)]))
+        self.assertEqual(d.transcribe(None), [
+            {"text": "Hi", "conf": 0.9, "start": 0.123, "end": 0.4},
+            {"text": "mom,", "conf": 0.8, "start": 0.42, "end": 0.8}])
+
+    def test_end_before_start_is_fixed(self):
+        [w] = Dictation(model=RealWordsModel([(1.5, 1.2, " yes", 0.9)])).transcribe(None)
+        self.assertEqual((w["start"], w["end"]), (1.5, 1.5))
+
+    def test_fake_whisper_words_are_timed_in_order(self):
+        words = Dictation(model=FakeWhisperModel()).transcribe("one two three")
+        self.assertEqual([(w["start"], w["end"]) for w in words], [(0.0, 0.4), (0.4, 0.8), (0.8, 1.2)])
+
+    def test_transcript_keeps_the_text_and_conf_contract(self):
+        bus = FakeBus()
+        DictationWorker(bus, Dictation(model=RealWordsModel([(0.0, 0.3, " Send", 0.9),
+                                                             (0.3, 0.5, " it.", 0.9)]))).process(None)
+        [t] = bus.of(topics.TRANSCRIPT)
+        self.assertEqual(t["text"], "Send it.")
+        self.assertEqual(t["words"], [{"text": "Send", "conf": 0.9}, {"text": "it.", "conf": 0.9}])
+
+    def test_hallucination_filter_still_works_with_times(self):
+        self.assertEqual(Dictation(model=RealWordsModel([(0.0, 0.5, " Thank", 0.2),
+                                                         (0.5, 0.9, " you.", 0.25)])).transcribe(None), [])
+        self.assertEqual(Dictation(model=RealWordsModel([(0.0, 0.5, " Hi", 0.9)],
+                                                        no_speech_prob=0.9)).transcribe(None), [])
+
+    def test_warm_up_still_works(self):
+        import numpy as np
+
+        model = SlowModel(delay=0)
+        d = Dictation(model=model)
+        d.warm_up()                                   # one second of silence through the model
+        self.assertEqual(len(model.calls), 1)
+        self.assertEqual(Dictation(model=RealWordsModel([])).transcribe(np.zeros(16000, np.float32)), [])
+
+
 if __name__ == "__main__":
     unittest.main()

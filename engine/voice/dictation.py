@@ -70,7 +70,12 @@ class Dictation:
         self.transcribe(np.zeros(16000, dtype=np.float32))
 
     def transcribe(self, audio) -> list[dict]:
-        """Return [{"text": str, "conf": float}, ...] for the preview bubble."""
+        """Return [{"text": str, "conf": float, "start": s, "end": s}, ...].
+
+        start / end are seconds from the start of `audio` (Whisper's word timestamps). The
+        DictationWorker uses them to line words up with the camera, then drops them: the
+        transcript and the preview bubble only get "text" and "conf".
+        """
         self.load()
         segments, _info = self._model.transcribe(
             audio,
@@ -88,7 +93,10 @@ class Dictation:
             for w in seg.words or []:
                 text = w.word.strip()
                 if text:
-                    words.append({"text": text, "conf": round(float(w.probability), 3)})
+                    start = float(getattr(w, "start", None) or 0.0)
+                    end = max(start, float(getattr(w, "end", None) or 0.0))
+                    words.append({"text": text, "conf": round(float(w.probability), 3),
+                                  "start": round(start, 3), "end": round(end, 3)})
         if words and len(words) <= 3 and max(w["conf"] for w in words) < HALLUCINATION_CONF:
             return []
         return words
@@ -97,6 +105,11 @@ class Dictation:
 def words_to_text(words: list[dict]) -> str:
     # Whisper keeps punctuation on the word ("hello,"), so joining with spaces is enough.
     return " ".join(w["text"] for w in words)
+
+
+def public_words(words: list[dict]) -> list[dict]:
+    """Words as the transcript and the UI get them: text and confidence, no timing."""
+    return [{"text": w["text"], "conf": w["conf"]} for w in words]
 
 
 class DictationWorker:
@@ -155,7 +168,7 @@ class DictationWorker:
             return
         self.bus.publish(topics.TRANSCRIPT, {
             "text": words_to_text(words),
-            "words": words,
+            "words": public_words(words),
             "ms": round((time.perf_counter() - t0) * 1000, 1),
         })
 

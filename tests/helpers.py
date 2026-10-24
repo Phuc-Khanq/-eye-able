@@ -32,12 +32,16 @@ class FakeBus:
 
 class FakeWhisperModel:
     """Looks like faster_whisper.WhisperModel. The "audio" is the text to return.
-    A word ending in "?" comes back with low confidence: "meet at nine? today"."""
+    A word ending in "?" comes back with low confidence: "meet at nine? today".
+    Word i is said from WORD_S * i to WORD_S * (i + 1) seconds into the clip."""
+
+    WORD_S = 0.4
 
     def transcribe(self, audio, **kwargs):
         words = []
-        for token in str(audio).split():
+        for i, token in enumerate(str(audio).split()):
             conf = 0.3 if token.endswith("?") and len(token) > 1 else 0.95
-            words.append(SimpleNamespace(word=" " + token.rstrip("?"), probability=conf))
+            words.append(SimpleNamespace(word=" " + token.rstrip("?"), probability=conf,
+                                         start=self.WORD_S * i, end=self.WORD_S * (i + 1)))
         seg = SimpleNamespace(words=words, no_speech_prob=0.01)
         return iter([seg] if words else []), SimpleNamespace(language="en")

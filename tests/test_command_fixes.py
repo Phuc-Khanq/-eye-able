@@ -271,5 +271,35 @@ class TestKnowIsNoWhileAsked(Base):
         self.assertEqual(self.mm._preview_text(), "I know")
 
 
+class TestClickItSomethingIsYes(Base):
+    """"click it now" / "click it again" started a search for a button named "It Now" / "It Again"."""
+
+    def test_answers_the_question(self):
+        for text in ["click it now", "Click it again.", "click it then", "click it please", "click it, now"]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.say("click search box")
+                self.found()
+                self.say(text)
+                self.assertEqual(self.questions()[-1], ("Click Search Box?", "confirmed"))
+                self.assertEqual(self.searches(), ["Search Box"])
+
+    def test_with_nothing_asked_it_never_searches_for_it(self):
+        for text in ["click it now", "click it again", "click it then"]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.say(text)
+                self.assertEqual(self.searches(), [])
+                self.assertEqual(self.os(), [])
+
+    def test_real_targets_still_work(self):
+        for text, label in [("click item list", "Item List"), ("click its settings", "Its Settings"),
+                            ("click the italic button", "Italic Button"), ("click send", "Send")]:
+            with self.subTest(text=text):
+                self.assertEqual(parse(text).label, label)
+        self.assertEqual(parse("click it now please").name, "yes")
+        self.assertEqual(parse("click it all the way down").name, "target")   # too long to be a yes
+
+
 if __name__ == "__main__":
     unittest.main()

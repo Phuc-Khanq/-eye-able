@@ -111,6 +111,7 @@ SCROLL_WORDS = ("scroll", "scrolling")
 NOT_A_SCROLL_REQUEST = {"stop", "done", "don't", "dont", "no", "not", "never", "quit", "end"}
 MAX_COMMAND_WORDS = 5      # longer utterances are never fixed commands
 MAX_LABEL_WORDS = 5        # "click <up to 5 words>"
+IT_EXTRA_WORDS = 2         # "click it" + up to 2 words ("now", "again", "right now") is a yes
 
 FILLER_WORDS = {"um", "uh", "umm", "uhh", "er", "hmm", "please", "ok", "okay", "hey", "so"}
 FILLER_PREFIXES = ("can you ", "could you ", "would you ")
@@ -162,6 +163,8 @@ def _target(clean: str, verbs=TARGET_VERBS) -> Command | None:
         words.pop(0)
     if not words or len(words) > MAX_LABEL_WORDS:
         return None
+    if verb[0] == "click" and words[0] == "it" and len(words) <= 1 + IT_EXTRA_WORDS:
+        return Command(name="yes", score=verb[1])   # "click it now" / "click it again": yes, never a button "It"
     return Command(name="target", label=" ".join(words).title(), score=verb[1])
 
 

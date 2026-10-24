@@ -1,10 +1,12 @@
 """The whole demo, 5 times in a row in one process, through the real engine pieces: calibrate, search,
-open a result, write and send an email, hands in lap. It FINDS where the demo breaks (it fixes nothing):
+open a result, write and send an email, a right click, hands in lap. The click is Khang's snap click
+(an eyebrow raise or saying "click", snapped onto the nearest button by UI-Venus, no question), never dwell. It FINDS where the demo breaks (it fixes nothing):
 every step prints PASS or FAIL with what happened, and the exit code is 0 only if every step passed.
 
 Khang's Rig (tests/test_eyes_service.py) is the camera: the real EyesService, ModeManager,
-TargetService and OsOutput with a simulated face (calibration, gaze, brow raises). UI-Venus finds every
-label next to the cursor, and the dictation clean-up (Qwen) is faked. State carries over from run to run,
+TargetService and OsOutput with a simulated face (calibration, gaze, brow raises). UI-Venus finds the
+nearest button 32 px from the cursor (inside the 150 px snap limit), except once per run when it finds
+nothing (the click then lands at the cursor); the dictation clean-up (Qwen) is faked. State carries over from run to run,
 like a real rehearsal.
 
     python -m tests.demo_full_dryrun                     # FakeWhisperModel: hears exactly what was said
@@ -30,10 +32,10 @@ QUERY = "funny cat videos"
 EMAIL = "hi mom home at seven tonight"
 EMAIL_CLEAN = "Hi Mom, home at seven tonight."
 CLIPS = {                        # what is said -> its clip id in tests/speech_phrases.csv
-    "calibrate": "demo_010", "click search bar": "demo_011", "start dictation": "demo_002",
-    QUERY: "demo_012", "send it": "demo_005", "stop dictation": "demo_006",
-    "open first result": "demo_013", "click compose": "demo_001", EMAIL: "demo_004",
+    "calibrate": "demo_010", "start dictation": "demo_002", QUERY: "demo_012", "send it": "demo_005",
+    "stop dictation": "demo_006", "click": "short_001", EMAIL: "demo_004", "right click": "short_007",
 }
+MISS_STEP = {1: "search bar", 2: "result", 3: "compose", 4: "result", 5: "search bar"}   # UI-Venus misses once a run
 
 
 class Demo:
@@ -125,6 +127,60 @@ class Demo:
         return [m["state"] for m in self.kinds(d["ui"], messages.CONFIRM)]
 
     # ------------------------------------------------------------ the demo
+    def snap(self, run: int, what: str, how: str) -> dict:
+        """Look at `what` and click it the new way (how: "raise" or "click"); UI-Venus misses once a run."""
+        r = self.r
+        submit = r.finder.submit
+        miss = MISS_STEP.get((run - 1) % 5 + 1) == what
+        if miss:
+            def nothing(req):
+                from concurrent.futures import Future
+
+                from engine.core.types import TargetResult
+
+                f = Future()
+                f.set_result(TargetResult(label=req.label, found=False))
+                return f
+
+            r.finder.submit = nothing
+        s = self.snapshot()
+        if how == "raise":
+            self.raise_brows()
+        else:
+            self.say("click")
+            r.out.flush()
+        self.wait(0.5)
+        r.out.flush()
+        r.finder.submit = submit
+        d = self.since(s)
+        found = self.kinds(d["ui"], messages.TARGET_FOUND) + self.kinds(d["ui"], messages.TARGET_NONE)
+        gaze = r.bus.of(topics.GAZE)[-1]
+        ok = (len(d["clicks"]) == 1 and len(d["clicks"][0]) == 2 and not self.ask_then_yes(d)
+              and all(m.get("snap") for m in found) and len(found) == 1)
+        where = "at the cursor (UI-Venus missed)" if miss else "snapped"
+        self.check(run, f"{what}: {how} = snap click", ok,
+                   f"heard {d['heard']}, {where}, clicks {d['clicks']} (gaze {gaze.x:.0f},{gaze.y:.0f}), "
+                   f"confirm {self.ask_then_yes(d)}, target {[(m['type'], m.get('snap')) for m in found]}")
+        return d
+
+    def dictate_and_send(self, run: int, what: str, text: str, typed_ok) -> None:
+        r, mm = self.r, self.r.mm
+        s = self.snapshot()
+        self.say("start dictation")
+        self.say(text)
+        previews = self.kinds(self.since(s)["ui"], messages.DICTATION_PREVIEW)
+        cleaned = any(p.get("cleaned") for p in previews)
+        self.say("send it")
+        self.raise_brows()
+        self.wait(2.0)
+        self.say("stop dictation")
+        d = self.since(s)
+        self.check(run, f"{what}: dictate + send it",
+                   typed_ok(d["typed"], cleaned) and d["keys"] == ["enter"] and mm.mode == Mode.POINTER
+                   and not d["clicks"],
+                   f"heard {d['heard']}, cleaned preview {cleaned}, typed {d['typed']}, keys {d['keys']}, "
+                   f"clicks {d['clicks']}, mode {mm.mode.value}")
+
     def run(self, n: int) -> None:
         r, mm = self.r, self.r.mm
 
@@ -138,66 +194,31 @@ class Demo:
         self.check(n, "calibrate", bool(res) and res[-1]["ok"] and not d["clicks"],
                    f"heard {d['heard']}, calib_result {res[-1] if res else None}, clicks {d['clicks']}")
 
-        # 2. search: look at the search bar, "click search bar", raise, dictate the query, send it
-        s = self.snapshot()
+        # 2. search: look at the search bar, raise; dictate the query, "send it", raise
         self.look(-4.0)
-        self.say("click search bar")
-        r.out.flush()
-        self.raise_brows()
-        d = self.since(s)
-        self.check(n, "search: click search bar", len(d["clicks"]) == 1 and "confirmed" in self.ask_then_yes(d),
-                   f"heard {d['heard']}, confirm {self.ask_then_yes(d)}, clicks {d['clicks']}")
-        s = self.snapshot()
-        self.say("start dictation")
-        self.say(QUERY)
-        self.say("send it")
-        self.raise_brows()
-        self.wait(2.0)
-        self.say("stop dictation")
-        d = self.since(s)
-        typed = "".join(d["typed"]).strip().lower().rstrip(".")
-        self.check(n, "search: type query + enter",
-                   typed == QUERY and d["keys"] == ["enter"] and mm.mode == Mode.POINTER and not d["clicks"],
-                   f"heard {d['heard']}, typed {d['typed']}, keys {d['keys']}, clicks {d['clicks']}, "
-                   f"mode {mm.mode.value}")
+        self.snap(n, "search bar", "raise")
+        self.dictate_and_send(n, "search", QUERY,
+                              lambda typed, _c: "".join(typed).strip().lower().rstrip(".") == QUERY)
 
-        # 3. open a result
-        s = self.snapshot()
+        # 3. open a result: look at it, say "click"
         self.look(2.0)
-        self.say("open first result")
-        r.out.flush()
-        self.raise_brows()
-        self.wait(1.0)
-        d = self.since(s)
-        self.check(n, "open first result", len(d["clicks"]) == 1 and "confirmed" in self.ask_then_yes(d),
-                   f"heard {d['heard']}, confirm {self.ask_then_yes(d)}, clicks {d['clicks']}")
+        self.snap(n, "result", "click")
 
-        # 4. write and send an email
-        s = self.snapshot()
+        # 4. write and send an email: look at Compose, raise; dictate, clean-up, "send it", raise
         self.look(-6.0)
-        self.say("click compose")
-        r.out.flush()
-        self.raise_brows()
-        d = self.since(s)
-        self.check(n, "email: click compose", len(d["clicks"]) == 1,
-                   f"heard {d['heard']}, confirm {self.ask_then_yes(d)}, clicks {d['clicks']}")
-        s = self.snapshot()
-        self.say("start dictation")
-        self.say(EMAIL)
-        previews = self.kinds(self.since(s)["ui"], messages.DICTATION_PREVIEW)
-        cleaned = any(p.get("cleaned") for p in previews)
-        self.say("send it")
-        self.raise_brows()
-        self.wait(2.0)
-        self.say("stop dictation")
-        d = self.since(s)
-        self.check(n, "email: dictate, clean, send",
-                   d["typed"] == [EMAIL_CLEAN + " "] and d["keys"] == ["enter"] and cleaned
-                   and mm.mode == Mode.POINTER and not d["clicks"],
-                   f"heard {d['heard']}, cleaned preview {cleaned}, typed {d['typed']}, keys {d['keys']}, "
-                   f"clicks {d['clicks']}, mode {mm.mode.value}")
+        self.snap(n, "compose", "raise")
+        self.dictate_and_send(n, "email", EMAIL, lambda typed, cleaned: typed == [EMAIL_CLEAN + " "] and cleaned)
 
-        # 5. hands in lap: a minute of sitting there, looking at the screen
+        # 5. one right click
+        s = self.snapshot()
+        self.look(3.0)
+        self.say("right click")
+        r.out.flush()
+        d = self.since(s)
+        self.check(n, "right click", [len(c) for c in d["clicks"]] == [3] and d["clicks"][0][2] == "right",
+                   f"heard {d['heard']}, clicks {d['clicks']}")
+
+        # 6. hands in lap: a minute of sitting there, looking at the screen
         s = self.snapshot()
         mode = mm.mode
         self.wait(LAP_S)

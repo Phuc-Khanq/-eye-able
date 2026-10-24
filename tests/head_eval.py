@@ -1,15 +1,21 @@
-"""Record a scripted head session and score nod, shake and tilt detection on it. Saves angles only.
+"""Record a scripted head session and score nod, shake, tilt and eyebrow-raise detection on it.
+Saves angles and five brow/blink scores only.
 
-Record (about 3 minutes, needs the webcam):
+Record (about 4.5 minutes, needs the webcam):
     .\\.venv\\Scripts\\python.exe -m tests.head_eval
+Eyebrow raises only (about 1.5 minutes):
+    .\\.venv\\Scripts\\python.exe -m tests.head_eval --brows
 Score a saved session again with the current code, or try other thresholds on it:
     .\\.venv\\Scripts\\python.exe -m tests.head_eval --replay calibration\\head_session_XXXX.json
     .\\.venv\\Scripts\\python.exe -m tests.head_eval --replay calibration\\head_session_XXXX.json --sweep
-    .\\.venv\\Scripts\\python.exe -m tests.head_eval --replay FILE --nod-deg 6 --shake-deg 7
+    .\\.venv\\Scripts\\python.exe -m tests.head_eval --replay FILE --nod-deg 6 --shake-deg 7 --brow-threshold 0.2
 
 The session follows on-screen prompts: a quiet stretch (nothing should fire), then 10 nods, 10 shakes,
-5 tilts each way, a stretch of natural movement (nothing should fire), then gentle nods and shakes.
-Camera frames are never saved, only yaw, pitch and roll over time, in calibration/ (git ignores it).
+5 tilts each way, a stretch of natural movement (nothing should fire), gentle nods and shakes, then
+10 eyebrow raises and a minute of reading aloud, talking and looking surprised (nothing should fire).
+Camera frames are never saved, only yaw, pitch and roll and the brow and blink scores over time,
+in calibration/ (git ignores it). With --brows only brow_raise is scored, so a nod while talking
+doesn't count against the eyebrows.
 Recording once is enough: replay re-scores the same motion after any code change, so before and after
 are measured on identical input.
 
@@ -23,6 +29,7 @@ from pathlib import Path
 import numpy as np
 
 from engine.core.types import HeadPose
+from engine.eyes.brow_gesture import BrowRaiseDetector
 from engine.eyes.head_gestures import GestureDetector
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -39,15 +46,26 @@ SEGMENTS = [
     ("natural", None, 30.0, "Move naturally: stretch, lean in, look at the keyboard or your phone, turn to a friend."),
     ("nod_soft", "nod", 6, "small, gentle NOD"),
     ("shake_soft", "shake", 6, "small, gentle SHAKE"),
+] + [
+    ("brow", "brow_raise", 10, "RAISE your EYEBROWS"),
+    ("expressive", None, 60.0, "Read this aloud, talk, laugh, look surprised. No eyebrow raise on purpose."),
 ]
-QUIET_LABELS = ("idle", "natural")
+BROW_SEGMENTS = [
+    ("idle", None, 15.0, "Look around the screen and read. Brows relaxed."),
+    ("brow", "brow_raise", 10, "RAISE your EYEBROWS"),
+    ("expressive", None, 60.0, "Read this aloud, talk, laugh, look surprised. No eyebrow raise on purpose."),
+]
+QUIET_LABELS = ("idle", "natural", "expressive")
+BROW_KEYS = ("browInnerUp", "browOuterUpLeft", "browOuterUpRight", "eyeBlinkLeft", "eyeBlinkRight")
+READ_ALOUD = ("The quick brown fox jumps over the lazy dog. Wait, really? No way!",
+              "Tell a friend about your day, ask them a question, react to their answer.")
 
 
-def build_schedule() -> list[dict]:
+def build_schedule(segments=SEGMENTS) -> list[dict]:
     """Segments with start and end in ms from the end of the countdown, and their slots."""
     t = 0.0
     out = []
-    for label, expected, size, text in SEGMENTS:
+    for label, expected, size, text in segments:
         if expected is None:
             start, end, slots = t, t + size, []
             t = end
@@ -71,9 +89,22 @@ def run_detector(poses, make_detector) -> list[tuple[float, str]]:
     return found
 
 
-def score(session: dict, make_detector=GestureDetector) -> dict:
-    """Replay the recorded angles through a fresh detector and compare with the prompts."""
-    gestures = run_detector(session["poses"], make_detector)
+def run_brow(brows, make_brow) -> list[tuple[float, str]]:
+    det = make_brow()
+    found = []
+    for t, *values in brows:
+        g = det.update(int(t), dict(zip(BROW_KEYS, values)))
+        if g is not None:
+            found.append((float(g.t_ms), g.type))
+    return found
+
+
+def score(session: dict, make_detector=GestureDetector, make_brow=BrowRaiseDetector) -> dict:
+    """Replay the recorded angles and brow scores through fresh detectors and compare with the prompts.
+    Sessions recorded before brows were added simply have no brow_raise."""
+    gestures = run_brow(session.get("brows", []), make_brow)
+    if session.get("mode") != "brows":
+        gestures = sorted(gestures + run_detector(session["poses"], make_detector))
     used = set()
     rows = {}
     for seg in session["segments"]:
@@ -137,13 +168,21 @@ def print_report(result: dict, title: str = "") -> None:
 
 def sweep(session: dict) -> None:
     """Try other thresholds on the same recording. 'extra' and 'false' count as false triggers."""
-    grids = [("nod_deg", [5, 6, 7, 8, 10, 12], ("nod", "nod_soft")),
-             ("shake_deg", [5, 6, 7, 8, 10, 12], ("shake", "shake_soft")),
-             ("tilt_deg", [10, 12, 15, 18, 20], ("tilt_left", "tilt_right"))]
-    for name, values, labels in grids:
+    head = lambda name, v: (lambda: GestureDetector(**{name: float(v)}), BrowRaiseDetector)
+    brow = lambda name, v: (GestureDetector, lambda: BrowRaiseDetector(**{name: v}))
+    grids = [("nod_deg", [5, 6, 7, 8, 10, 12], ("nod", "nod_soft"), head),
+             ("shake_deg", [5, 6, 7, 8, 10, 12], ("shake", "shake_soft"), head),
+             ("tilt_deg", [10, 12, 15, 18, 20], ("tilt_left", "tilt_right"), head),
+             ("threshold", [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4], ("brow",), brow),
+             ("hold_ms", [150, 200, 250, 300, 400], ("brow",), brow)]
+    if session.get("mode") == "brows":
+        grids = grids[3:]
+    elif not session.get("brows"):
+        grids = grids[:3]
+    for name, values, labels, makers in grids:
         print(f"\n{name}: hits on {', '.join(labels)} / false triggers (whole session)")
         for v in values:
-            res = score(session, lambda v=v, name=name: GestureDetector(**{name: float(v)}))
+            res = score(session, *makers(name, v))
             hits = sum(res["rows"][l]["hit"] for l in labels if l in res["rows"])
             asked = sum(res["rows"][l]["n"] for l in labels if l in res["rows"])
             print(f"  {v:>4}: {hits:>3}/{asked:<3}  false {res['false_total']}")
@@ -153,6 +192,11 @@ def make_detector_from(args) -> "callable":
     kw = {k: v for k, v in (("nod_deg", args.nod_deg), ("shake_deg", args.shake_deg), ("tilt_deg", args.tilt_deg))
           if v is not None}
     return lambda: GestureDetector(**kw)
+
+
+def make_brow_from(args) -> "callable":
+    kw = {k: v for k, v in (("threshold", args.brow_threshold), ("hold_ms", args.brow_hold_ms)) if v is not None}
+    return lambda: BrowRaiseDetector(**kw)
 
 
 def record(args) -> None:
@@ -165,7 +209,7 @@ def record(args) -> None:
     BG, TEXT, QUIET = (32, 28, 26), (235, 235, 235), (150, 150, 150)
     GOOD, WARN, BAD, ACCENT = (120, 210, 120), (60, 170, 240), (90, 90, 230), (240, 200, 90)
     FONT = cv2.FONT_HERSHEY_SIMPLEX
-    schedule = build_schedule()
+    schedule = build_schedule(BROW_SEGMENTS if args.brows else SEGMENTS)
     total_ms = schedule[-1]["end_ms"]
 
     cam = Camera(index=args.camera, fps=args.fps)
@@ -175,6 +219,7 @@ def record(args) -> None:
     mesh = FaceMesh()
     estimator = HeadPoseEstimator()
     live = GestureDetector()
+    live_brow = make_brow_from(args)()
     window = "Diseyeble head session (Q to quit)"
     cv2.namedWindow(window, cv2.WINDOW_AUTOSIZE)
 
@@ -185,7 +230,7 @@ def record(args) -> None:
 
     state, start_wall = "ready", 0.0
     t0_ms = None
-    poses, live_gestures = [], []
+    poses, brows, live_gestures = [], [], []
     last_gesture = ("", -10.0)
     neutral_done = False
     frame_id = 0
@@ -208,34 +253,45 @@ def record(args) -> None:
                     neutral_done = True
                 state, t0_ms = "running", t_ms
                 live.reset()
+                live_brow.reset()
                 print("Recording...")
             if state == "running":
                 rel = t_ms - t0_ms
                 if pose is not None:
                     poses.append([rel, round(pose.yaw, 3), round(pose.pitch, 3), round(pose.roll, 3)])
                     g = live.update(HeadPose(t_ms=int(rel), yaw=pose.yaw, pitch=pose.pitch, roll=pose.roll))
-                    if g is not None:
+                    if g is not None and not args.brows:
                         live_gestures.append([g.t_ms, g.type])
                         last_gesture = (g.type, now)
+                    brows.append([rel] + [round(face.blendshapes.get(k, 0.0), 4) for k in BROW_KEYS])
+                    b = live_brow.update(int(rel), face.blendshapes)
+                    if b is not None:
+                        live_gestures.append([b.t_ms, b.type])
+                        last_gesture = (b.type, now)
                 if rel >= total_ms:
                     state = "done"
-                    session = {"version": 1, "created": time.strftime("%Y-%m-%d %H:%M:%S"), "camera": camera_label,
+                    session = {"version": 2, "created": time.strftime("%Y-%m-%d %H:%M:%S"), "camera": camera_label,
+                               "mode": "brows" if args.brows else "all",
                                "neutral": [round(v, 3) for v in estimator.neutral], "segments": schedule,
-                               "poses": poses, "live_gestures": live_gestures}
-                    out = REPO_ROOT / "calibration" / f"head_session_{time.strftime('%Y%m%d_%H%M%S')}.json"
+                               "poses": poses, "brows": brows, "live_gestures": live_gestures}
+                    name = "brow_session" if args.brows else "head_session"
+                    out = REPO_ROOT / "calibration" / f"{name}_{time.strftime('%Y%m%d_%H%M%S')}.json"
                     out.parent.mkdir(parents=True, exist_ok=True)
                     out.write_text(json.dumps(session), encoding="utf-8")
                     saved = out
                     print(f"Saved {out} ({len(poses)} frames, angles only)\n")
-                    print_report(score(session, make_detector_from(args)), "Score with the current code")
+                    print_report(score(session, make_detector_from(args), make_brow_from(args)),
+                                 "Score with the current code")
 
             img = np.full((540, 960, 3), BG, dtype=np.uint8)
             if not face and state != "done":
                 put(img, "NO FACE: face the camera, add light", 520, 0.6, BAD)
             if state == "ready":
-                put(img, "Head gesture session", 90, 1.2, TEXT, 2)
-                put(img, "About 3 minutes. Sit as you normally would, hands off the keyboard.", 170, 0.7)
-                put(img, "You will be asked to nod, shake, tilt, and also to just move naturally.", 210, 0.7)
+                put(img, "Eyebrow session" if args.brows else "Head gesture session", 90, 1.2, TEXT, 2)
+                put(img, f"About {total_ms / 60000:.1f} minutes. Sit as you normally would, hands off the keyboard.",
+                    170, 0.7)
+                put(img, "You will be asked to raise your eyebrows, then to read aloud and talk." if args.brows else
+                    "You will be asked to nod, shake, tilt, raise your eyebrows, and to just move naturally.", 210, 0.7)
                 put(img, "Only angles are saved. No camera pictures.", 250, 0.7, QUIET)
                 put(img, "SPACE to start   Q to quit", 330, 0.8, GOOD if face else QUIET)
             elif state == "countdown":
@@ -246,8 +302,12 @@ def record(args) -> None:
                 seg = next((s for s in schedule if s["start_ms"] <= (t_ms - t0_ms) < s["end_ms"]), schedule[-1])
                 put(img, f"{seg['label']}   {100 * (t_ms - t0_ms) / total_ms:.0f}% done", 40, 0.6, QUIET)
                 if seg["expected"] is None:
-                    put(img, "Natural movement" if seg["label"] == "natural" else "Quiet", 160, 1.2, ACCENT, 2)
+                    title = {"natural": "Natural movement", "expressive": "Read aloud and talk"}.get(seg["label"], "Quiet")
+                    put(img, title, 160, 1.2, ACCENT, 2)
                     put(img, seg["text"], 230, 0.65)
+                    if seg["label"] == "expressive":
+                        for i, line in enumerate(READ_ALOUD):
+                            put(img, line, 290 + 40 * i, 0.65, QUIET)
                 else:
                     k = int(((t_ms - t0_ms) - seg["start_ms"]) // (SLOT_S * 1000))
                     k = min(max(k, 0), len(seg["slots"]) - 1)
@@ -289,13 +349,17 @@ def main() -> None:
     parser.add_argument("--nod-deg", type=float, default=None)
     parser.add_argument("--shake-deg", type=float, default=None)
     parser.add_argument("--tilt-deg", type=float, default=None)
+    parser.add_argument("--brow-threshold", type=float, default=None)
+    parser.add_argument("--brow-hold-ms", type=int, default=None)
+    parser.add_argument("--brows", action="store_true", help="record only the eyebrow part (about 1.5 minutes)")
     parser.add_argument("--camera", type=int, default=None)
     parser.add_argument("--fps", type=int, default=None)
     args = parser.parse_args()
 
     if args.replay:
         session = json.loads(Path(args.replay).read_text(encoding="utf-8"))
-        print_report(score(session, make_detector_from(args)), f"{args.replay}  ({session.get('camera', '')})")
+        print_report(score(session, make_detector_from(args), make_brow_from(args)),
+                     f"{args.replay}  ({session.get('camera', '')})")
         if args.sweep:
             sweep(session)
     else:

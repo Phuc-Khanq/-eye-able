@@ -9,6 +9,10 @@ How to measure (do both, in this order):
   2. Steadiness: look at one point in the middle and hold still for 2 seconds.
 The table then shows, for each signal, the edge-to-edge range, the jitter while holding still,
 and the cursor wobble that jitter would cause on a 1920-pixel-wide screen. Lower wobble is better.
+
+Eyelid check: "lid now" is this frame; "lid held" is what calibration gets, frozen at the last
+open-eye value while "blink score" is above the threshold line. Close your eyes: lid now should
+drop well below its open value, blink score should cross the line, and lid held should stay put.
 """
 import argparse
 import time
@@ -142,8 +146,10 @@ def render(preview: np.ndarray, info: dict) -> np.ndarray:
     bar(panel, x0, y, "h raw", raw_h, 0.2, 0.8, 0.5)
     bar(panel, x0, y + 22, "h smoothed", info["h_smooth"], 0.2, 0.8, 0.5)
     bar(panel, x0, y + 44, "v smoothed", info["v_smooth"], -0.25, 0.25, 0.0)
-    bar(panel, x0, y + 66, "lid", feats.lid if feats else None, 0.0, 0.5)
-    y += 96
+    bar(panel, x0, y + 66, "lid now", info["lid_now"], 0.0, 0.5)                 # this frame
+    bar(panel, x0, y + 88, "lid held", feats.lid if feats else None, 0.0, 0.5)  # frozen during blinks
+    bar(panel, x0, y + 110, "blink score", info["blink_score"], 0.0, 1.0, settings.blink_threshold)
+    y += 140
     text(panel, "Each eye (should move together)", x0, y, TEXT, 0.48)
     y += 10
     bar(panel, x0, y, "your right h", info["right"].h if info["right"] else None, 0.2, 0.8, 0.5)
@@ -224,6 +230,8 @@ def main() -> None:
                 "right": extractor.right if has_face else None, "left": extractor.left if has_face else None,
                 "blend_h": extractor.blend_h if has_face else None,
                 "blend_v": extractor.blend_v if has_face else None,
+                "lid_now": extractor.lid_now if has_face else None,
+                "blink_score": extractor.blink_score if has_face else None,
                 "signals": signals,
             }
             cv2.imshow(WINDOW, render(preview, info))

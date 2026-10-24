@@ -8,7 +8,7 @@ APIs: NumPy; blendshapes eyeBlinkLeft / eyeBlinkRight for blink skipping
 Per eye, with corner A (image left) and corner B (image right):
   h   = how far along A->B the iris center sits, divided by eye width (0 at A, 1 at B)
   v   = how far below the A->B line the iris center sits, divided by eye width (positive = down)
-  lid = gap between upper and lower lid, divided by eye width
+  lid = gap between upper and lower lid, measured across the eye, divided by eye width
 Dividing by width cancels leaning in and out; measuring along the eye's own line cancels head tilt.
 
 Experiments (compare them live in tests/eye_bars.py):
@@ -55,7 +55,9 @@ def measure_eye(points_px: np.ndarray, eye: dict, iris_mode: str = "center") -> 
     u = ab / width                    # along the eye
     n = np.array([-u[1], u[0]])       # at a right angle, pointing down in the image
     d = iris - a
-    lid = float(np.hypot(*(points_px[eye["upper"]] - points_px[eye["lower"]])))
+    # Lid gap measured across the eye only (along n). The two lid points aren't exactly above each
+    # other, so a straight-line distance would never reach 0 for a closed eye.
+    lid = max(0.0, float((points_px[eye["lower"]] - points_px[eye["upper"]]) @ n))
     return EyeMeasure(h=float(d @ u) / width, v=float(d @ n) / width, lid=lid / width, width_px=width)
 
 
@@ -70,7 +72,12 @@ def blendshape_gaze(bs: dict) -> tuple[float, float]:
 
 
 class EyeFeatureExtractor:
-    """Keeps the last good value so blinks don't make the cursor jump."""
+    """Keeps the last good value so blinks don't make the cursor jump.
+
+    While a blink is detected (either eyeBlink score above the threshold), compute() returns the
+    LAST OPEN-EYE values with usable=False. So the returned lid never shows a closed eye; that's on
+    purpose. For debugging, `lid_now` and `blink_score` always describe the current frame.
+    """
 
     def __init__(self, blink_threshold: float | None = None, iris_mode: str = "center") -> None:
         self.blink_threshold = settings.blink_threshold if blink_threshold is None else blink_threshold
@@ -79,6 +86,8 @@ class EyeFeatureExtractor:
         self.right: EyeMeasure | None = None
         self.left: EyeMeasure | None = None
         self.blinking = False
+        self.blink_score = float("nan")  # higher of the two eyeBlink scores, this frame
+        self.lid_now = float("nan")      # lid this frame, even during a blink
         self.blend_h = float("nan")
         self.blend_v = float("nan")
 
@@ -89,7 +98,13 @@ class EyeFeatureExtractor:
         self.left = measure_eye(points_px, LEFT_EYE, self.iris_mode)
         bs = face.blendshapes
         self.blend_h, self.blend_v = blendshape_gaze(bs)
-        self.blinking = max(bs.get("eyeBlinkLeft", 0.0), bs.get("eyeBlinkRight", 0.0)) > self.blink_threshold
+        self.blink_score = max(bs.get("eyeBlinkLeft", 0.0), bs.get("eyeBlinkRight", 0.0))
+        self.blinking = self.blink_score > self.blink_threshold
+        if self.right is not None and self.left is not None:
+            wr, wl = self.right.width_px, self.left.width_px
+            self.lid_now = (self.right.lid * wr + self.left.lid * wl) / (wr + wl)
+        else:
+            self.lid_now = float("nan")
 
         if self.blinking or self.right is None or self.left is None:
             if self.last is None:

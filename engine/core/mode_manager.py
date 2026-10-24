@@ -200,6 +200,9 @@ class ModeManager:
                 if (whole and whole.name != "type_text" and len(clauses) <= 1
                         and not (whole.name == "target"
                                  and len(whole.label.split()) > commands.DICTATION_MAX_LABEL_WORDS)):
+                    if whole.name in ("yes", "no") and not (self.question or self.preview or self.search):
+                        self._add_to_preview(words)   # nothing is waiting: a one-word reply to dictate
+                        return
                     self._do(whole)
                     return
             done, last, i = False, None, 0

@@ -198,5 +198,38 @@ class TestTypeOf(Base):
         self.assertEqual(self.mm._preview_text(), "offer accepted")
 
 
+class TestOneWordReplies(Base):
+    """Fix 6: dictating a one-word reply ("Yes.", "No.", "Okay.") gave "Nothing is waiting" instead."""
+
+    def test_with_nothing_waiting_the_word_is_dictated(self):
+        for text in ["Yes.", "No.", "Yeah!", "Nope.", "Okay.", "Sure."]:
+            with self.subTest(text=text):
+                self.setUp()
+                self.say("start dictation")
+                self.say(text)
+                self.assertEqual(self.mm._preview_text(), text)
+                self.assertEqual(self.bus.ui(messages.STATUS), [])
+                self.say("yes")                               # now it IS waiting: yes types it
+                self.assertEqual(self.os(), [(topics.OS_TYPE, {"text": text + " "})])
+
+    def test_with_something_waiting_yes_and_no_still_answer(self):
+        self.say("start dictation")
+        self.say("hi mom")
+        self.say("yes")
+        self.assertEqual(self.os(), [(topics.OS_TYPE, {"text": "hi mom "})])
+        self.say("see you")
+        self.say("no")
+        self.assertEqual(self.mm.preview, [])                 # discarded, not dictated
+        self.say("click send")                                # a search is waiting
+        self.say("yes")
+        self.assertEqual(self.mm.preview, [])
+        self.found()
+        self.assertEqual(self.os()[-1], (topics.OS_CLICK, {"x": 410, "y": 220}))
+
+    def test_pointer_mode_still_says_nothing_is_waiting(self):
+        self.say("yes")
+        self.assertIn("Nothing is waiting", self.bus.ui(messages.STATUS)[-1]["text"])
+
+
 if __name__ == "__main__":
     unittest.main()

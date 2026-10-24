@@ -34,6 +34,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 
 from engine.config import settings
+from engine.core import hf
 from engine.core.types import TargetRequest, TargetResult
 
 PROMPT = ("Output the center point of the position corresponding to the following instruction: \n{instruction}. \n\n"
@@ -130,6 +131,12 @@ class ScreenTarget:
         """Loads the model (downloads it on first use). Returns seconds taken. Safe to call twice."""
         if self.model is not None:
             return 0.0
+        with hf.LOAD_LOCK:                 # one model loads at a time (see engine/core/hf.py)
+            if self.model is not None:
+                return 0.0
+            return self._load()
+
+    def _load(self) -> float:
         t0 = time.perf_counter()
         import torch
         import transformers

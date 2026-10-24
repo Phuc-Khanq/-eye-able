@@ -24,6 +24,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 
+from engine.core import hf
 from engine.voice.voice_check import normalize_words
 
 # ------------------------------------------------------------------ the guard
@@ -304,6 +305,12 @@ class Rewriter:
     def load(self) -> None:
         if self._model is not None and self._tokenizer is not None:
             return
+        with hf.LOAD_LOCK:                                       # one model loads at a time (engine/core/hf.py)
+            if self._model is not None and self._tokenizer is not None:
+                return
+            self._load()
+
+    def _load(self) -> None:
         import torch                                             # heavy: import only when used (rule 6)
         from transformers import AutoModelForCausalLM, AutoTokenizer
 

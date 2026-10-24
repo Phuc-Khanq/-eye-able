@@ -1,9 +1,11 @@
 """Run with: python -m unittest tests.test_command_bench  (the scoring only; no audio, no Whisper)"""
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
-from engine.voice.command_bench import PHRASES, run, score
-from engine.voice.dictation import Dictation, words_to_text
-from tests.helpers import FakeWhisperModel
+from engine.voice import command_bench
+from engine.voice.command_bench import clips, headline, label, load_phrases, run, score, table, wrong
 
 
 class TestScore(unittest.TestCase):
@@ -20,6 +22,8 @@ class TestScore(unittest.TestCase):
         self.assertEqual((s["text"], s["command"], s["became"]), (False, False, "none"))
         s = score("scroll", "pointer", ["Scroll up."])
         self.assertEqual((s["command"], s["became"]), (False, "scroll_up"))
+        s = score("send it", "pointer", ["Sent it."])
+        self.assertEqual((s["text"], s["command"]), (False, True))   # wrong words, but the app still sends
 
     def test_empty(self):
         self.assertEqual(score("stop", "scroll", []),
@@ -40,37 +44,91 @@ class TestScore(unittest.TestCase):
     def test_two_utterances_for_one_clip_is_wrong(self):
         self.assertFalse(score("send it", "pointer", ["Send.", "It."])["command"])
 
+    def test_exact_ignores_case_punctuation_and_fillers(self):
+        for heard in ["Yes.", "YES!", "Um, yes please.", "okay yes"]:
+            with self.subTest(heard=heard):
+                self.assertTrue(score("yes", "pointer", [heard])["text"])
+        self.assertTrue(score("right click", "pointer", ["Right-click."])["text"])
+        self.assertFalse(score("yes", "pointer", ["Yes, yes."])["text"])
 
-class TestRun(unittest.TestCase):
-    def test_counts_with_a_fake_whisper(self):
-        # every phrase's clip "says" its own text, except "no", which comes back as "know"
-        dictation = Dictation(model=FakeWhisperModel())
-        rows = {pid: [{"id": pid, "mode": "scroll" if text == "stop" else "pointer",
-                       "voice": "fake", "variant": "normal", "text": text}] for pid, text in PHRASES}
+    def test_no_app_command_falls_back_to_exact(self):
+        # "new tab" and "copy" aren't app commands: parse() says none for any text, so the words decide
+        self.assertTrue(score("new tab", "pointer", ["New tab."])["command"])
+        self.assertTrue(score("copy", "pointer", ["Copy."])["command"])
+        for heard in ["Knew tab.", "Coffee.", "New tap.", "Cop."]:
+            with self.subTest(heard=heard):
+                phrase = "copy" if heard.lower().startswith("co") else "new tab"
+                self.assertEqual(score(phrase, "pointer", [heard])["command"], False)
 
-        def transcribe(row):
-            text = "know" if row["text"] == "no" else row["text"]
-            return [words_to_text(dictation.transcribe(text))]
 
-        logged = []
-        result = run(dictation, None, rows, transcribe=transcribe, log=logged.append)
-        self.assertEqual(result["total"], {"clips": 9, "text_right": 8, "command_right": 8,
-                                           "command_wrong": 1, "empty": 0})
-        self.assertEqual(result["per_phrase"]["command_092"]["command_wrong"], 1)
-        self.assertEqual(len(logged), 1)
-        self.assertIn("'no'", logged[0])
+class TestPhrasesAndClips(unittest.TestCase):
+    def test_the_eleven_phrases(self):
+        phrases = load_phrases()
+        self.assertEqual([p["text"] for p in phrases], ["yes", "no", "click", "right click", "go back", "escape",
+                                                         "scroll", "stop", "send it", "new tab", "copy"])
+        self.assertEqual(len({p["id"] for p in phrases}), 11)
+        self.assertEqual({p["text"]: p["mode"] for p in phrases if p["mode"] != "pointer"}, {"stop": "scroll"})
 
-    def test_khangs_nine_phrases_all_in_the_phrase_list(self):
+    def test_not_in_khois_voice_check_set(self):
         import csv
-        from pathlib import Path
 
         with (Path(__file__).resolve().parent / "speech_phrases.csv").open(encoding="utf-8", newline="") as f:
-            texts = {r["id"]: r["text"] for r in csv.DictReader(f)}
-        self.assertEqual(len(PHRASES), 9)
-        for pid, text in PHRASES:
-            self.assertEqual(texts.get(pid), text, pid)
-        self.assertEqual([t for _, t in PHRASES], ["yes", "no", "click", "right click", "go back", "escape",
-                                                    "scroll", "stop", "send it"])
+            ids = {r["id"] for r in csv.DictReader(f)}
+        self.assertFalse(ids & {p["id"] for p in load_phrases()})
+
+    def test_clips_order_and_missing_files(self):
+        phrases = [{"id": "a", "text": "yes", "mode": "pointer"}, {"id": "b", "text": "no", "mode": "pointer"}]
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            rows = [("b", "zira", "slow"), ("a", "david", "slow"), ("b", "david", "normal"), ("a", "david", "normal"),
+                    ("a", "zira", "quiet")]
+            lines = ["id,text,mode,voice,variant,rate,volume,file"]
+            for pid, voice, variant in rows:
+                lines.append(f"{pid},x,pointer,{voice},{variant},0,100,{pid}__{voice}__{variant}.wav")
+                if (pid, voice, variant) != ("a", "zira", "quiet"):        # this WAV is missing
+                    (d / f"{pid}__{voice}__{variant}.wav").write_bytes(b"")
+            (d / "manifest.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+            with mock.patch.object(command_bench, "CLIPS", d):
+                got = clips(phrases, d / "manifest.csv")
+        self.assertEqual([(c["phrase"], c["voice"], c["variant"]) for c in got],
+                         [("yes", "david", "normal"), ("no", "david", "normal"), ("yes", "david", "slow"),
+                          ("no", "zira", "slow")])
+
+
+class TestRunAndReport(unittest.TestCase):
+    ITEMS = [{"phrase": p, "mode": "scroll" if p == "stop" else "pointer", "voice": v, "variant": var}
+             for var in ("normal", "slow") for v in ("david",) for p in ("yes", "stop", "copy")]
+
+    def results(self):
+        # the "stock" model hears everything right except slow "copy" ("Coffee."); "tuned" gets it all
+        stock = run(self.ITEMS, lambda it: ["Coffee."] if (it["phrase"], it["variant"]) == ("copy", "slow")
+                    else [it["phrase"].capitalize() + "."], log=lambda s: None)
+        tuned = run(self.ITEMS, lambda it: [it["phrase"] + "."], log=lambda s: None)
+        return {"stock tiny": stock, "fine-tuned elder": tuned}
+
+    def test_headline_same_audio(self):
+        self.assertEqual(headline(self.ITEMS, self.results()),
+                         "Short commands, 3 phrases x 2 clips: stock tiny 83% (5/6) vs fine-tuned elder 100% (6/6), "
+                         "same audio")
+
+    def test_table_per_phrase_variant_and_total(self):
+        rows = table(self.ITEMS, self.results())
+        self.assertEqual(rows[0], "| phrase | variant | clips | stock tiny exact | stock tiny command | "
+                                  "fine-tuned elder exact | fine-tuned elder command |")
+        self.assertIn("| copy | slow | 1 | 0/1 | 0/1 | 1/1 | 1/1 |", rows)
+        self.assertIn("| all | slow | 3 | 2/3 | 2/3 | 3/3 | 3/3 |", rows)
+        self.assertEqual(rows[-1], "| **TOTAL** | all | 6 | 5/6 | 5/6 | 6/6 | 6/6 |")
+
+    def test_wrong_lists_what_each_model_heard(self):
+        self.assertEqual(wrong(self.ITEMS, self.results()),
+                         ["- 'copy' (david/slow): stock tiny: 'Coffee.' WRONG -> none; fine-tuned elder: 'copy.' ok"])
+        right = {"a": [{"command": True, "heard": "yes", "became": "yes"}]}
+        self.assertEqual(wrong(self.ITEMS[:1], right), ["- none"])
+
+    def test_label(self):
+        self.assertEqual(label("large-v3-turbo"), "stock large-v3-turbo")
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(label(d), f"fine-tuned {Path(d).name}")
 
 
 if __name__ == "__main__":

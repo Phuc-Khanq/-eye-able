@@ -1,0 +1,12 @@
+id,text,mode
+cmd_yes,yes,pointer
+cmd_no,no,pointer
+cmd_click,click,pointer
+cmd_right_click,right click,pointer
+cmd_go_back,go back,pointer
+cmd_escape,escape,pointer
+cmd_scroll,scroll,pointer
+cmd_stop,stop,scroll
+cmd_send_it,send it,pointer
+cmd_new_tab,new tab,pointer
+cmd_copy,copy,pointer

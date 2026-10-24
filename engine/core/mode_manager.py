@@ -36,6 +36,7 @@ handler takes one lock.
 from __future__ import annotations
 
 import itertools
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -92,7 +93,10 @@ class _Search:
 
 
 class ModeManager:
-    def __init__(self, bus, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(self, bus, clock: Callable[[], float] = time.monotonic,
+                 rewrite_wait_s: float | None = None) -> None:
+        """rewrite_wait_s: the dictation clean-up is on (engine/voice/rewrite.py's RewriteWorker is
+        running) and "yes" waits at most this long for it. None (the default): off, exactly as before."""
         self.bus = bus
         self.clock = clock
         self.mode = Mode.POINTER
@@ -103,6 +107,13 @@ class ModeManager:
         self.last_gaze: GazePoint | None = None
         self._ids = itertools.count(1)
         self._last_click: tuple[str, float] | None = None   # (label, time) of the last look-and-say click
+        # Dictation clean-up (see _preview_changed): only the latest request's result counts
+        self.rewrite_wait_s = rewrite_wait_s
+        self._rw_id = 0
+        self._rw_running = False                 # a clean-up of the current preview is still running
+        self._clean: list[dict] | None = None    # the accepted clean words for the current preview
+        self._use_clean = True                   # "use original" turns it off for this preview only
+        self._pending: tuple[float, Callable[[], None] | None] | None = None  # (deadline, then): a waiting insert
         self._lock = threading.RLock()
         self._stop = threading.Event()
 
@@ -116,6 +127,7 @@ class ModeManager:
         bus.subscribe(topics.from_ui(messages.DICTATION), self.on_ui_dictation)
         bus.subscribe(topics.from_ui(messages.TARGET), self.on_ui_target)
         bus.subscribe(topics.from_ui(messages.CONFIRM_ANSWER), self.on_ui_confirm_answer)
+        bus.subscribe(topics.REWRITE_RESULT, self.on_rewrite_result)
 
     def start(self) -> None:
         """Start the timer thread that expires old questions and searches."""
@@ -246,6 +258,8 @@ class ModeManager:
             if self.search and now >= self.search.expires_at:
                 s, self.search = self.search, None
                 self._ui(messages.TARGET_NONE, label=s.label)
+            if self._pending and now >= self._pending[0]:
+                self._type_now(self._pending[1])   # the clean-up took too long: type what's showing
 
     # ------------------------------------------------------------- UI messages
     def on_ui_set_mode(self, msg: dict) -> None:
@@ -275,10 +289,13 @@ class ModeManager:
             elif action == "discard":
                 self._discard_preview()
             elif action == "edit_word":
+                shown = self._shown_words()
                 i = msg.get("index", -1)
-                if 0 <= i < len(self.preview) and msg.get("text"):
+                if 0 <= i < len(shown) and msg.get("text"):
+                    # the index is into what the UI shows; a fixed word is final, so no new clean-up
+                    self.preview = [dict(w) for w in shown]
                     self.preview[i] = {"text": msg["text"], "conf": 1.0}
-                    self._ui(messages.DICTATION_PREVIEW, words=list(self.preview))
+                    self._preview_changed(clean_up=False)
 
     def on_ui_target(self, msg: dict) -> None:
         with self._lock:
@@ -324,7 +341,7 @@ class ModeManager:
         elif name == "stop_dictation":
             if self.preview:
                 self._ask(f'Insert "{self._preview_text()}" before stopping?',
-                          on_yes=lambda: (self._insert_preview(), self._set_mode(Mode.POINTER)),
+                          on_yes=lambda: self._insert_preview(then=lambda: self._set_mode(Mode.POINTER)),
                           on_no=lambda: (self._discard_preview(), self._set_mode(Mode.POINTER)))
             else:
                 self._set_mode(Mode.POINTER)
@@ -364,6 +381,19 @@ class ModeManager:
                       on_yes=lambda: self.bus.publish(topics.DELETE_VOICE_DATA, {}))
         elif name == "target":
             self._look_and_say(cmd.label)
+        elif name == "use_original":
+            if self.preview and self._use_clean:
+                self._use_clean = False
+                self._show_preview()
+        elif name == "clean_up":
+            if not self.preview:
+                return
+            if self._clean is None:
+                self._status("info", "Still cleaning up..." if self._rw_running
+                             else "There's no cleaned-up version of this text")
+            elif not self._use_clean:
+                self._use_clean = True
+                self._show_preview()
 
     # ------------------------------------------------------------ look-and-say
     def _click_target(self, label: str, x: int, y: int) -> None:
@@ -412,23 +442,93 @@ class ModeManager:
 
     def _add_to_preview(self, words: list[dict]) -> None:
         self.preview = self.preview + list(words)  # keep talking: new words join the bubble
-        self._ui(messages.DICTATION_PREVIEW, words=list(self.preview))
+        self._preview_changed()
 
     def _preview_text(self) -> str:
-        return " ".join(w["text"] for w in self.preview)
+        """What "yes" would type: the clean text if it's showing, else the user's own words."""
+        return " ".join(w["text"] for w in self._shown_words())
 
-    def _insert_preview(self) -> str:
+    def _insert_preview(self, then: Callable[[], None] | None = None) -> str:
+        """Type the preview, then run `then` ("send it": press Enter; "stop dictation": leave the mode).
+        If the clean-up of this text is still running, don't block (this may be the camera thread):
+        the insert waits until the result arrives or rewrite_wait_s passes (tick), whichever is first."""
+        if self.preview and self._rw_running and self._use_clean:
+            self._pending = (self.clock() + self.rewrite_wait_s, then)
+            return self._preview_text()
+        return self._type_now(then)
+
+    def _type_now(self, then: Callable[[], None] | None = None) -> str:
+        self._pending = None
         text = self._preview_text()
         if text:
             self._os(topics.OS_TYPE, text=text + " ")
             self.preview = []
-            self._ui(messages.DICTATION_PREVIEW, words=[])  # empty words = hide the bubble
+            self._preview_changed(clean_up=False)          # empty words = hide the bubble
+        if then:
+            then()
         return text
 
     def _discard_preview(self) -> None:
         if self.preview:
             self.preview = []
-            self._ui(messages.DICTATION_PREVIEW, words=[])
+            self._preview_changed(clean_up=False)
+
+    # ------------------------------------------------------------- clean-up
+    def _cleaning(self) -> bool:
+        return self.rewrite_wait_s is not None
+
+    def _shown_words(self) -> list[dict]:
+        if self._cleaning() and self._use_clean and self._clean is not None:
+            return self._clean
+        return self.preview
+
+    def _preview_changed(self, clean_up: bool = True) -> None:
+        """self.preview just changed: the old clean text and any waiting insert no longer apply.
+        Ask for a clean-up of the new text (unless the user fixed a word by hand) and show it raw."""
+        self._pending = None
+        self._clean = None
+        self._rw_id += 1                                   # results for older text are ignored
+        self._rw_running = False
+        if not self.preview:
+            self._use_clean = True                         # "use original" lasts for one preview
+        elif self._cleaning() and clean_up:
+            self._rw_running = True
+            self.bus.publish(topics.REWRITE_REQUEST,
+                             {"id": self._rw_id, "text": " ".join(w["text"] for w in self.preview)})
+        self._show_preview()
+
+    def _show_preview(self) -> None:
+        if not self._cleaning():
+            self._ui(messages.DICTATION_PREVIEW, words=list(self.preview))   # exactly as before
+        elif self._clean is not None and self._use_clean:
+            self._ui(messages.DICTATION_PREVIEW, words=list(self._clean),
+                     original=" ".join(w["text"] for w in self.preview), cleaned=True)
+        else:
+            self._ui(messages.DICTATION_PREVIEW, words=list(self.preview), cleaned=False)
+
+    def on_rewrite_result(self, result: dict) -> None:
+        with self._lock:
+            if result.get("id") != self._rw_id or not self.preview:
+                return                                     # for text that has changed since
+            self._rw_running = False
+            if result.get("used") and str(result.get("clean", "")).strip():
+                self._clean = self._clean_words(result["clean"])
+                if self._use_clean:
+                    self._show_preview()
+            if self._pending:
+                self._type_now(self._pending[1])
+
+    def _clean_words(self, clean: str) -> list[dict]:
+        """Words for the clean text. A word the user also said keeps Whisper's lowest confidence for it,
+        so the UI still marks words Whisper wasn't sure of; words the clean-up wrote get 1.0."""
+        def key(t: str) -> str:
+            return re.sub(r"[^\w']", "", t.lower())
+
+        conf: dict[str, float] = {}
+        for w in self.preview:
+            k = key(w["text"])
+            conf[k] = min(conf.get(k, 1.0), float(w.get("conf", 1.0)))
+        return [{"text": t, "conf": conf.get(key(t), 1.0)} for t in clean.split()]
 
     # ----------------------------------------------------------------- confirm
     def _ask_send(self) -> None:
@@ -436,8 +536,7 @@ class ModeManager:
         prompt = f'Insert "{text}" and send?' if text else "Send?"
 
         def yes() -> None:
-            self._insert_preview()
-            self._os(topics.OS_KEY, key="enter")
+            self._insert_preview(then=lambda: self._os(topics.OS_KEY, key="enter"))
 
         self._ask(prompt, on_yes=yes)
 

@@ -76,6 +76,10 @@ FIXED_COMMANDS: dict[str, str] = {
     "nope": "no",
     "calibrate": "calibrate",
     "delete my voice data": "delete_voice_data",
+    # Dictation clean-up: switch the preview between the cleaned text and the user's own words
+    "use original": "use_original",
+    "use the original": "use_original",
+    "clean it up": "clean_up",
 }
 
 # Verbs that start a look-and-say target request.
@@ -88,6 +92,8 @@ TYPE_VERBS = ("type", "dictate")      # "type see you at noon": one-shot dictati
 FIXED_CUTOFF = 80
 VERB_CUTOFF = 75
 EXACT_ONLY_BELOW = 6       # phrases shorter than this (chars) must match exactly
+# ...and these always: fuzzy matching made "I used the original" and "cleaning up" commands
+EXACT_ONLY = {"use original", "use the original", "clean it up"}
 MAX_COMMAND_WORDS = 5      # longer utterances are never fixed commands
 MAX_LABEL_WORDS = 5        # "click <up to 5 words>"
 
@@ -114,7 +120,7 @@ def normalize(text: str) -> str:
 
 
 _SHORT = {p for p in FIXED_COMMANDS if len(p) < EXACT_ONLY_BELOW}
-_LONG = [p for p in FIXED_COMMANDS if len(p) >= EXACT_ONLY_BELOW]
+_LONG = [p for p in FIXED_COMMANDS if len(p) >= EXACT_ONLY_BELOW and p not in EXACT_ONLY]
 
 
 def _fixed(clean: str) -> Command | None:

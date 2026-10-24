@@ -16,7 +16,9 @@ puts audio on a queue, so audio_in's thread is never blocked.
 
 from __future__ import annotations
 
+import importlib
 import queue
+import sys
 import threading
 import time
 from pathlib import Path
@@ -40,6 +42,21 @@ def resolve_model(name: str) -> str:
     return name
 
 
+def load_torch_first(device: str, platform: str | None = None, import_module=importlib.import_module) -> bool:
+    """Windows + CUDA: import torch before faster-whisper. UI-Venus (torch) and Whisper (CTranslate2)
+    each load the CUDA libraries (cuBLAS); when CTranslate2 loaded its copy first, torch's load on the
+    UI-Venus thread could fail (the cuBLAS load race on Khang's PC). With torch imported first, its DLLs
+    are in place and CTranslate2 uses them. No torch (a CPU-only install) or not CUDA on Windows: skip.
+    Returns whether torch was imported here."""
+    if (platform or sys.platform) != "win32" or not str(device).startswith("cuda"):
+        return False
+    try:
+        import_module("torch")
+    except ImportError:
+        return False
+    return True
+
+
 class Dictation:
     """Wraps faster-whisper. Pass `model` in tests to skip loading Whisper."""
 
@@ -50,11 +67,12 @@ class Dictation:
 
     def load(self) -> None:
         if self._model is None:
-            from faster_whisper import WhisperModel  # heavy: import only when used (rule 6)
-
             s = self.settings
             if s is None:
                 from engine.config import settings as s
+            load_torch_first(s.whisper_device)
+            from faster_whisper import WhisperModel  # heavy: import only when used (rule 6)
+
             name = resolve_model(s.whisper_model)
             kwargs = dict(device=s.whisper_device, compute_type=s.whisper_compute_type)
             try:

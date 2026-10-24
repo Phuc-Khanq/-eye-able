@@ -141,3 +141,13 @@ demo_006,stop dictation,demo,stop_dictation,dictation
 demo_007,pause,demo,pause,pointer
 demo_008,scroll down,demo,scroll_down,paused
 demo_009,resume,demo,resume,paused
+demo_010,calibrate,demo,calibrate,pointer
+demo_011,click search bar,demo,target:Search Bar,pointer
+demo_012,funny cat videos,demo,dictation,dictation
+demo_013,open first result,demo,target:First Result,pointer
+short_001,click,short,yes,pointer
+short_002,scroll,short,scroll_mode,pointer
+short_003,stop,short,none,scroll
+short_004,open,short,none,pointer
+short_005,done,short,none,scroll
+short_006,click send,short,target:Send,pointer

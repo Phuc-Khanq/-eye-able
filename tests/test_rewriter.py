@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from engine.voice import rewrite
-from engine.voice.rewrite import SYSTEM_PROMPT, Rewriter, tidy
+from engine.voice.rewrite import EXAMPLES, SYSTEM_PROMPT, Rewriter, tidy
 
 HAS_TORCH = importlib.util.find_spec("torch") is not None
 SETTINGS = SimpleNamespace(rewrite_model="fake/model", rewrite_device="cpu", rewrite_max_s=3.0)
@@ -104,7 +104,10 @@ class TestRewriter(unittest.TestCase):
         r, model, tok = make("Hi mom.")
         r.rewrite("hi mom")
         messages, add_prompt, tokenize = tok.templates[0]
-        self.assertEqual(messages, [{"role": "system", "content": SYSTEM_PROMPT},
+        examples = []
+        for said, cleaned in EXAMPLES:     # worked examples between the system message and the real text
+            examples += [{"role": "user", "content": said}, {"role": "assistant", "content": cleaned}]
+        self.assertEqual(messages, [{"role": "system", "content": SYSTEM_PROMPT}, *examples,
                                     {"role": "user", "content": "hi mom"}])
         self.assertTrue(add_prompt)
         self.assertFalse(tokenize)
@@ -131,8 +134,24 @@ class TestRewriter(unittest.TestCase):
     def test_a_cut_off_rewrite_is_not_used(self):
         r, _, _ = make("I think we", cut=True)                     # stopped on the cap, no EOS
         out = r.rewrite_full("um I think we should go")
-        self.assertEqual((out.clean, out.used), ("um I think we should go", False))
+        self.assertEqual((out.clean, out.used), ("I think we should go", True))   # the rule-based clean-up
+        self.assertTrue(out.reason.startswith("light clean: model cut off"))
+        r, _, _ = make("I think we", cut=True)
+        out = r.rewrite_full("I think we should go")              # nothing for the rules to delete
+        self.assertEqual((out.clean, out.used), ("I think we should go", False))
         self.assertTrue(out.reason.startswith("cut off"))
+
+    def test_a_reworded_rewrite_falls_back_to_the_rule_based_clean_up(self):
+        r, _, _ = make("I believe we should leave at noon.")      # the 5080 run: think -> believe
+        out = r.rewrite_full("Um, so, I think we should, uh, leave at noon.")
+        self.assertEqual((out.clean, out.used), ("So, I think we should leave at noon.", True))
+        self.assertEqual(out.reason, "light clean: model word swapped: think -> believe")
+        self.assertEqual(out.output, "I believe we should leave at noon.")
+
+    def test_a_pronoun_swap_falls_back_too(self):
+        r, _, _ = make("Please bring the charger for your laptop.")
+        clean, used, _ = r.rewrite("Please please bring the charger, the charger for my laptop.")
+        self.assertEqual((clean, used), ("Please bring the charger for my laptop.", True))
 
     def test_a_rejected_rewrite_gives_the_original(self):
         r, _, _ = make("It will be sunny tomorrow.")
@@ -163,6 +182,13 @@ class TestFailOpen(unittest.TestCase):
             r.rewrite("hi mom")
             self.assertEqual(len(logs), 2)
         self.assertIn("CUDA out of memory", logs[0])
+
+    def test_a_model_error_still_gets_the_rule_based_clean_up(self):
+        r = Rewriter(SETTINGS, log=lambda s: None)
+        with mock.patch.object(Rewriter, "_generate", side_effect=RuntimeError("CUDA out of memory")):
+            out = r.rewrite_full("um so the the bus comes at 7:15")
+        self.assertEqual((out.clean, out.used), ("so the bus comes at 7:15", True))
+        self.assertTrue(out.reason.startswith("light clean: model error"))
 
     def test_load_failure_is_an_error_too(self):
         r = Rewriter(SimpleNamespace(rewrite_model="does/not-exist", rewrite_device="cpu", rewrite_max_s=1),

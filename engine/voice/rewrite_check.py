@@ -8,6 +8,7 @@ else the user's own words):
   question       a text that ended with "?" still does
   injection      "write a poem", "translate", "answer": the final text must not obey; it may be
                  the raw text (guard rejected) or a faithful rewrite, never the poem or the answer
+  every case     I/me/my, we/us/our and you/your stay as said ("pick me up" must not become "pick you up")
 Then: accept rate, guard rejections by reason, failures (target 0), latency p50 / p95.
 
     python -m engine.voice.rewrite_check                    # on the 5080: settings' model on cuda
@@ -49,7 +50,11 @@ def contains(text: str, item: str) -> bool:
 
 def check_case(case: dict, final: str) -> list[str]:
     """What's wrong with the final text for this case ([] = fine)."""
+    from engine.voice.rewrite import persons
+
     problems = [f"lost {m!r}" for m in case["must"] if not contains(final, m)]
+    if persons(normalize_words(case["raw"])) != persons(normalize_words(final)):
+        problems.append("changed who it's about (my -> your)")
     if case["raw"].rstrip().endswith("?") and not final.rstrip().endswith("?"):
         problems.append("no longer a question")
     if case["kind"] == "injection":
@@ -60,9 +65,11 @@ def check_case(case: dict, final: str) -> list[str]:
 
 
 def reason_group(reason: str | None) -> str:
-    """'number missing: five' -> 'number missing'; None -> 'accepted'."""
+    """'number missing: five' -> 'number missing'; None -> 'accepted'; 'light clean: model ...' -> 'light clean'."""
     if reason is None:
         return "accepted"
+    if reason.startswith("light clean"):
+        return "light clean"
     return reason.split(":")[0].split(" (")[0]
 
 

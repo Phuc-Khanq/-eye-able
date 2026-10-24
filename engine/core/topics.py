@@ -9,7 +9,7 @@ Route: Khoi and Khoa
 
 # Eyes route -> mode manager
 GAZE = "eyes.gaze"                  # GazePoint, every frame
-GESTURE = "eyes.gesture"            # Gesture (nod, shake, tilt_left, tilt_right, brow_raise)
+GESTURE = "eyes.gesture"            # Gesture (nod, shake, tilt_left, tilt_right, brow_raise, mouth_open)
 DWELL_DONE = "eyes.dwell_done"      # GazePoint where a dwell finished (the cursor rested dwell_ms)
 CALIBRATE = "eyes.calibrate"        # {"action": "start" | "cancel"}
 MOUTH = "eyes.mouth"                # MouthSample, every frame with a face (engine/eyes/mouth.py reads it)
@@ -31,7 +31,7 @@ REWRITE_RESULT = "dictation.rewrite_result"    # {"id": int, "clean": str, "used
                                                # the original text when used is False
 
 # Look-and-say (mode manager <-> screen_target)
-TARGET_REQUEST = "target.request"   # TargetRequest
+TARGET_REQUEST = "target.request"   # TargetRequest (snap=True: no name, the clickable thing at the point)
 TARGET_RESULT = "target.result"     # TargetResult
 
 # Mode manager -> os_input. Only the mode manager publishes these.

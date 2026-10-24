@@ -210,10 +210,12 @@ class TestEyesService(unittest.TestCase):
         r.raise_brows(frames=4)             # about 0.13 s: under the 250 ms hold
         self.assertEqual(r.os.clicks, [])
 
-    def test_raise_with_nothing_waiting_does_nothing(self):
+    def test_raise_with_nothing_waiting_snap_clicks(self):
         r = self.r
         r.raise_brows()
-        self.assertEqual(r.os.clicks, [])
+        req = r.finder.asked[-1]
+        self.assertTrue(req.snap)
+        self.assertEqual(r.os.clicks, [(req.gaze_x + 30, req.gaze_y + 10)])   # where "UI-Venus" snapped it
         self.assertEqual(r.os.typed, [])
 
     def test_nod_does_not_say_yes_by_default(self):

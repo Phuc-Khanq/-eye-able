@@ -60,9 +60,12 @@ class TestOkayAndSureAreNotYes(Base):
         self.assertEqual(self.questions()[-1][1], "open")
 
     def test_the_other_yes_words_still_work(self):
-        for text in ["Yes.", "yeah", "Click.", "Click it.", "Do it.", "Go ahead."]:
+        for text in ["Yes.", "yeah", "Do it.", "Go ahead."]:
             with self.subTest(text=text):
                 self.assertEqual(parse(text).name, "yes")
+        for text in ["Click.", "Click it."]:                  # yes while "Click Send?" is open (below)
+            with self.subTest(text=text):
+                self.assertEqual(parse(text).name, "click_here")
         self.say("click send")
         self.found()
         self.say("click it")

@@ -10,6 +10,9 @@ Options:  --no-zoom   skip the small zoom box, ask about the full 1280x720 box o
                       calibration/ui_venus_results.csv (numbers and labels only, never screenshots)
           --offset 150  ask from a point 150 px away from the mouse in a random direction, to measure how
                         well UI-Venus copes with an imprecise pointer (the head or gaze cursor)
+          --snap        ask with no name, the way a brow raise does ("the button, link, icon, tab or text box
+                        closest to the center"): type what you mean only to mark the answer. Use --offset 40
+                        to rest the mouse ON the target and ask from a near miss. The hint column says "snap"
 
 How it works
   1. Type a target (or pass a list). You get a few seconds: switch to the window you want and rest
@@ -79,6 +82,7 @@ def main() -> None:
     parser.add_argument("--hint", choices=["none", "center", "mark"], default="center",
                         help="tell the model which look-alike: center = 'closest to the center', mark = red ring at the pointer")
     parser.add_argument("--csv", default=None, help="results file (default calibration/ui_venus_results.csv)")
+    parser.add_argument("--snap", action="store_true", help="no name: the nearest clickable thing, as a brow raise asks")
     args = parser.parse_args()
     import csv
     import math
@@ -136,7 +140,8 @@ def main() -> None:
             ask_at = (int(min(max(mouse[0] + args.offset * math.cos(a), sl), sl + sw - 1)),
                       int(min(max(mouse[1] + args.offset * math.sin(a), st), st + sh - 1)))
             print(f"  asking from {ask_at}, {args.offset:.0f} px from the mouse")
-        result = finder.find(TargetRequest(gaze_x=ask_at[0], gaze_y=ask_at[1], label=label), screen=screen, origin=(sl, st))
+        result = finder.find(TargetRequest(gaze_x=ask_at[0], gaze_y=ask_at[1], label=label, snap=args.snap),
+                             screen=screen, origin=(sl, st))
         times.append(result.ms)
         print(f"  {label}: " + (f"({result.x}, {result.y})" if result.found else "NOT FOUND")
               + f" in {result.ms:.0f} ms, mouse at {mouse}")
@@ -157,7 +162,8 @@ def main() -> None:
         answered = next((st_.name for st_ in finder.trace if st_.answer.point is not None and st_.answer.point[0] >= 0), "")
         writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), args.app, label, bool(finder.zoom), int(args.offset),
                          result.found, verdict or "skip", round(result.ms), answered,
-                         round(float(np.hypot(result.x - mouse[0], result.y - mouse[1]))) if result.found else "", args.hint])
+                         round(float(np.hypot(result.x - mouse[0], result.y - mouse[1]))) if result.found else "",
+                         "snap" if args.snap else args.hint])
         out.flush()
 
     if times:

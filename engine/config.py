@@ -24,12 +24,19 @@ class Settings:
     face_model_path: str = "models/face_landmarker.task"
     blink_threshold: float = 0.5
 
-    # Pointing
-    dwell_ms: int = 1000           # rest the cursor this long = left click
+    # Pointing and clicking
+    # Left click: an eyebrow raise (or "click") snaps onto the nearest button, link or box: at once when the
+    # cursor is already on one (the hand cursor or UI Automation), else UI-Venus looks near the cursor.
+    brow_click: str = "left"       # "left": a raise with nothing waiting is the snap left click; "right": the old right click
+    snap_trust_cursor: bool = True  # already on a link or button: click there without asking UI-Venus
+    snap_max_px: int = 150         # UI-Venus may move a snap click at most this far
+    mouth_click: bool = True       # open the mouth and close it again (0.3 to 1.5 s) = right click
+    dwell_ms: int = 1000           # with --dwell: rest the cursor this long = left click (off by default)
     dwell_clickable_only: bool = True   # Windows: dwell only on links, buttons, tabs... (engine/eyes/clickable.py);
                                         # false for canvas apps and games, which show neither
     dwell_uia: bool = True         # also ask Windows UI Automation (native buttons, text boxes; pip install uiautomation)
-    dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py), no Electron UI needed
+    dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py): the snap click's
+                                   # spinner and flash, and the dwell fill; no Electron UI needed
     sensitivity: float = 1.0
 
     # UI-Venus

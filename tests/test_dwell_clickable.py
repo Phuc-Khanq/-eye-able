@@ -258,6 +258,7 @@ class TestMeter(unittest.TestCase):
         self.assertEqual(m.state()[0], "ready")
         m.on_ui(messages.make(messages.TARGET_SEARCHING, label="send"))
         self.assertEqual(m.state()[0], "hidden")
+        m.on_ui(messages.make(messages.TARGET_NONE, label="send"))
         m.on_ui(messages.make(messages.DWELL, progress=0.0, ready=True))
         clock.t += 5.0                                      # resting on a link: no new message, still shown
         self.assertEqual(m.state()[0], "ready")

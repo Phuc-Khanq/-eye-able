@@ -8,7 +8,8 @@ plus the asyncio loop for the WebSocket server. Run with: python -m engine.main
     python -m engine.main --stdin          # also take typed lines as if heard (testing without the mic;
                                            # they go straight to voice.transcript, so the mouth gate never sees them)
     python -m engine.main --confirm nod    # say yes with a nod instead of an eyebrow raise (or "both")
-    python -m engine.main --no-dwell       # resting the cursor doesn't click (dwell = left click is on by default)
+    python -m engine.main --dwell          # resting the cursor 1 s also left-clicks (off by default: the left
+                                           # click is an eyebrow raise or "click", snapped by UI-Venus)
     python -m engine.main --no-rewrite     # type dictation as heard, without the clean-up model
 """
 from __future__ import annotations
@@ -31,7 +32,7 @@ class Engine:
 
     def __init__(self, bus, settings=settings, dictation=None, sd=None, mic_settings=None,
                  vad=None, warm_up: bool = True, eyes: bool = False, pointer: str = "head",
-                 dwell: bool = True, confirm: str = "brow", rewrite: bool = False, rewriter=None) -> None:
+                 dwell: bool = False, confirm: str = "brow", rewrite: bool = False, rewriter=None) -> None:
         self.bus = bus
         self.warm_up = warm_up
         # Start order matters only for subscriptions; nothing is published until start().
@@ -57,7 +58,7 @@ class Engine:
             from engine.eyes.service import EyesService
             from engine.eyes.target_service import TargetService
             self.eyes = EyesService(bus, settings, pointer=pointer, dwell=dwell, confirm=confirm)
-            self.targets = TargetService(bus, settings)
+            self.targets = TargetService(bus, settings, probe=self.eyes.probe)   # snap: on a link already?
             self.os_output = OsOutput(bus, driver=self.eyes.driver, scroller=self.eyes.scroller)
             # Was the user's mouth moving? For the voice route's "only the user's voice" gate.
             self.mouth = MouthTracker(bus)
@@ -143,11 +144,13 @@ def log_to_console(bus) -> None:
         elif t == messages.MODE:
             print(f"[mode] {m['mode']}")
         elif t == messages.TARGET_SEARCHING:
-            print(f"[ui-venus] looking for '{m['label']}'...")
+            print("[snap] clicking at the cursor..." if m.get("snap") else f"[ui-venus] looking for '{m['label']}'...")
         elif t == messages.TARGET_FOUND:
-            print(f"[ui-venus] found '{m['label']}' at ({m['x']}, {m['y']})")
+            print(f"[snap] click at ({m['x']}, {m['y']})" if m.get("snap")
+                  else f"[ui-venus] found '{m['label']}' at ({m['x']}, {m['y']})")
         elif t == messages.TARGET_NONE:
-            print(f"[ui-venus] couldn't find '{m['label']}'")
+            print("[snap] nothing to snap to: clicking where the cursor is" if m.get("snap")
+                  else f"[ui-venus] couldn't find '{m['label']}'")
         elif t == messages.CONFIRM:
             hint = (f"   (raise your eyebrows, or say \"yes\" / \"click it\", within {CONFIRM_TIMEOUT_S:.0f} s; "
                     "\"no\" or a head shake cancels)" if m["state"] == "open" else "")
@@ -186,7 +189,7 @@ def read_stdin(bus, stop: threading.Event, delay_s: float = 3.0) -> None:
                                             "ms": 0.0})
 
 
-async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head", dwell: bool = True,
+async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head", dwell: bool = False,
               stdin: bool = False, confirm: str = "brow", rewrite: bool = False) -> None:
     bus = EventBus()
     relay = WebSocketRelay(bus)
@@ -228,8 +231,9 @@ def main() -> None:
     p.add_argument("--pointer", choices=["head", "head-abs", "hybrid", "gaze"], default="head",
                    help="head = head as a mouse with acceleration (default); head-abs = fixed head angle per "
                         "screen spot; hybrid and gaze need a gaze calibration (tests.gaze_dot)")
-    p.add_argument("--dwell", action=argparse.BooleanOptionalAction, default=True,
-                   help="resting the cursor dwell_ms (settings, 1 s) left-clicks; on by default, --no-dwell turns it off")
+    p.add_argument("--dwell", action=argparse.BooleanOptionalAction, default=False,
+                   help="resting the cursor dwell_ms (settings, 1 s) also left-clicks; off by default (the left click "
+                        "is an eyebrow raise or \"click\", snapped onto the nearest button by UI-Venus)")
     p.add_argument("--stdin", action="store_true", help="typed lines count as heard speech (testing)")
     p.add_argument("--confirm", choices=["brow", "nod", "both"], default="brow",
                    help="what says yes besides your voice: eyebrow raise (default), nod, or either")

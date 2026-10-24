@@ -152,14 +152,14 @@ class TestEyesServiceClicks(unittest.TestCase):
         x, y = self.gaze()
         self.assertLess(abs(x - start[0]), 30)   # carries on from there, no jump to where the head went
 
-    def test_no_dwell_during_a_raise_or_after_a_right_click(self):
+    def test_no_dwell_during_a_raise_or_after_its_click(self):
         r = self.r
         self.move_and_rest(frames=5)
         r.frames(40, yaw=4.0, brow=0.45)         # a long raise on a resting cursor: 1.3 s
-        x, y = self.gaze()                       # the mode manager right-clicked here (the raise, nothing waiting)
-        r.frames(60, yaw=4.0)                    # the context menu is open right under the cursor
+        req = r.finder.asked[-1]                 # the raise, nothing waiting: the snap click here
+        r.frames(60, yaw=4.0)                    # whatever it opened is right under the cursor
         r.out.flush()
-        self.assertEqual(r.os.clicks, [(int(x), int(y), "right")])
+        self.assertEqual(r.os.clicks, [(req.gaze_x + 30, req.gaze_y + 10)])   # one click, no dwell after it
 
     def test_right_click_reaches_os_input_with_the_button(self):
         self.r.bus.publish(topics.OS_CLICK, {"x": 300, "y": 200, "button": "right"})

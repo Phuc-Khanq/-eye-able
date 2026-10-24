@@ -353,11 +353,14 @@ class TestEyebrowRaise(Base):
         self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 410, 220))
         self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 410, "y": 220})])
 
-    def test_with_nothing_waiting_right_clicks_at_the_cursor(self):
-        # Task 6 (team decision): with nothing waiting, a raise is the right click (dwell is the left)
+    def test_with_nothing_waiting_snap_clicks_at_the_cursor(self):
+        # With nothing waiting, a raise is the left click, snapped by UI-Venus (tests/test_snap_click.py)
         self.look(500, 300)
         self.gesture("brow_raise")
-        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 500, "y": 300, "button": "right"})])
+        req = self.bus.of(topics.TARGET_REQUEST)[-1]
+        self.assertEqual((req.gaze_x, req.gaze_y, req.snap), (500, 300, True))
+        self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 512, 296))
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 512, "y": 296})])
         self.assertEqual(self.bus.ui(messages.STATUS), [])
 
     def test_ignored_while_paused(self):

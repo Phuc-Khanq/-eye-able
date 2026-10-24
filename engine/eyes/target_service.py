@@ -10,6 +10,11 @@ The model loads in the background when the engine starts (about 9 s on the demo 
 no download). A request that comes while it loads waits in line behind the load; the mode manager gives
 up after 6 s and says it couldn't find the target, so the first request may need repeating.
 With use_ui_venus off (config.local.json), every request is answered "not found" right away.
+
+Snap requests (TargetRequest.snap: a brow raise or "click here", no name): when the cursor is already on
+something clickable (engine/eyes/clickable.py: the hand cursor or UI Automation), the answer is that
+spot at once, no model call (snap_trust_cursor). Otherwise UI-Venus finds the nearest clickable thing
+around the pointer. "Not found" makes the mode manager click at the pointer anyway.
 """
 from __future__ import annotations
 
@@ -19,8 +24,11 @@ from engine.core.types import TargetRequest, TargetResult
 
 
 class TargetService:
-    def __init__(self, bus, settings=default_settings, finder=None) -> None:
+    def __init__(self, bus, settings=default_settings, finder=None, probe=None, log=print) -> None:
         self.bus = bus
+        self.probe = probe                # clickable.ClickableProbe, or None (off Windows, tests)
+        self.trust_cursor = bool(getattr(settings, "snap_trust_cursor", True))
+        self._log = log
         self.enabled = bool(getattr(settings, "use_ui_venus", True))
         self.finder = finder
         self.ready = False
@@ -48,6 +56,8 @@ class TargetService:
         self._status("info", f"UI-Venus ready ({secs:.0f} s)")
 
     def on_request(self, req: TargetRequest) -> None:
+        if getattr(req, "snap", False) and self._on_clickable(req):
+            return
         if not self.enabled or self.failed or self.finder is None:
             self.bus.publish(topics.TARGET_RESULT, TargetResult(label=req.label, found=False))
             return
@@ -55,12 +65,39 @@ class TargetService:
             self._status("info", "UI-Venus is still loading; this one may take a few seconds")
         self.finder.submit(req).add_done_callback(lambda fut: self._answer(req, fut))
 
+    def _on_clickable(self, req: TargetRequest) -> bool:
+        """Snap with the cursor already on a link or button: click right there (inside its rectangle)."""
+        if self.probe is None or not self.trust_cursor:
+            return False
+        try:
+            over = self.probe.over_at(req.gaze_x, req.gaze_y)
+        except Exception:
+            return False
+        if over is None or not over.clickable:
+            return False
+        x, y = req.gaze_x, req.gaze_y
+        if over.rect is not None:
+            left, top, right, bottom = over.rect
+            x, y = min(max(x, left + 2), right - 2), min(max(y, top + 2), bottom - 2)
+        self._log(f"[snap] on a {'link/button (hand cursor)' if over.rect is None else 'control'} already: "
+                  f"clicking at ({x}, {y})")
+        self.bus.publish(topics.TARGET_RESULT, TargetResult(label=req.label, found=True, x=int(x), y=int(y)))
+        return True
+
     def _answer(self, req: TargetRequest, fut) -> None:
         try:
             result = fut.result()
         except Exception as exc:   # a bad screenshot or a model error must not stop the engine
             self._status("error", f"UI-Venus failed: {type(exc).__name__}: {exc}")
             result = TargetResult(label=req.label, found=False)
+        if getattr(req, "snap", False):
+            if result.found:
+                moved = ((result.x - req.gaze_x) ** 2 + (result.y - req.gaze_y) ** 2) ** 0.5
+                self._log(f"[snap] UI-Venus moved the click {moved:.0f} px to ({result.x}, {result.y}) "
+                          f"in {result.ms:.0f} ms")
+            else:
+                self._log(f"[snap] UI-Venus found nothing clickable near ({req.gaze_x}, {req.gaze_y}) "
+                          f"in {result.ms:.0f} ms")
         self.bus.publish(topics.TARGET_RESULT, result)
 
     def stop(self) -> None:

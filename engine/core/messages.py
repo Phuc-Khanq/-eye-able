@@ -14,7 +14,9 @@ TARGET_NONE = "target_none"              # label
 CALIB_TARGET = "calib_target"            # index, x, y, total
 CALIB_RESULT = "calib_result"            # error_px, ok
 LISTENING = "listening"                  # level 0-1, speaking true/false
-DICTATION_PREVIEW = "dictation_preview"  # words: [{"text": str, "conf": float}]; [] hides the bubble
+DICTATION_PREVIEW = "dictation_preview"  # words: [{"text": str, "conf": float}]; [] hides the bubble.
+                                         # With the clean-up on, also cleaned: true|false, and when true
+                                         # original: the user's own words (words then holds the cleaned text)
 STATUS = "status"                        # level: "info" | "warn" | "error", text
 CONFIRM = "confirm"                      # id, prompt, state: "open" | "confirmed" | "cancelled" | "expired", expires_in_s
 

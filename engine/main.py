@@ -5,7 +5,8 @@ plus the asyncio loop for the WebSocket server. Run with: python -m engine.main
     python -m engine.main --wav clip.wav   # a recording instead of the mic, played in real time
     python -m engine.main --pointer hybrid # gaze jumps, head fine-tunes (needs a gaze calibration)
     python -m engine.main --no-eyes        # voice only: no camera, and nothing clicks or types
-    python -m engine.main --stdin          # also take typed lines as if heard (testing without the mic)
+    python -m engine.main --stdin          # also take typed lines as if heard (testing without the mic;
+                                           # they go straight to voice.transcript, so the mouth gate never sees them)
     python -m engine.main --confirm nod    # say yes with a nod instead of an eyebrow raise (or "both")
 """
 from __future__ import annotations

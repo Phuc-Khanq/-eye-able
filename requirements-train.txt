@@ -1,0 +1,5 @@
+# Only for training/ (fine-tuning Whisper). The engine and demo don't need these.
+# Install through scripts\train_whisper.ps1: it uses requirements.lock.txt as a constraint
+# and pins the installed CUDA PyTorch, so nothing the demo uses changes.
+datasets==5.1.0
+peft==0.21.2

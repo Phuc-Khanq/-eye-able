@@ -37,6 +37,7 @@ COLLECT_S = 1.0     # collect this long once settled
 MAX_S = 3.5         # give up on a dot after this long (blinks, no face)
 MIN_SAMPLES = 12    # usable frames needed per dot
 VALIDATION_DOTS = 5
+MAX_ONE_DOT_DRIFT_PX = 300  # a one-dot re-center claiming more than this is ignored
 QUICK_DOTS = [(0.5, 0.5), (0.25, 0.25), (0.75, 0.25), (0.75, 0.75), (0.25, 0.75)]  # quick re-center
 SWEEP_S = 6.0       # optional head-sweep step: look at the middle dot, turn and nod a little
 SWEEP_SETTLE_S = 1.0
@@ -182,10 +183,20 @@ class GazeDotApp:
 
     def _finish_recenter(self, now: float) -> None:
         dots = [(t, np.array(r)) for t, r in zip(self.rc_targets, self.rc_rows) if len(r) >= MIN_SAMPLES // 2]
+        before = self.model.bias
         self.drift = self.model.recenter(dots)
         print(f"Re-center on {len(dots)} dot(s): gaze had drifted ({self.drift[0]:+.0f}, {self.drift[1]:+.0f}) px")
+        if len(dots) == 1 and math.hypot(*self.drift) > MAX_ONE_DOT_DRIFT_PX:
+            # One dot right after calibration can't honestly have moved this far: a blink or a glance away.
+            self.model.bias = before
+            self.drift = (0.0, 0.0)
+            print(f"  ignored: more than {MAX_ONE_DOT_DRIFT_PX} px from one dot usually means you weren't on the dot")
+            return self._after_recenter(now)
         for t, r in dots:
             self.session.add(t, r, "recenter")
+        self._after_recenter(now)
+
+    def _after_recenter(self, now: float) -> None:
         if self.after_rc == "live":
             self.smoother.reset()
             self.state = "live"

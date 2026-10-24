@@ -38,14 +38,18 @@ class Engine:
         #    the cursor, plus head_gestures; UI-Venus answers target requests; os_output carries out
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
         #    the cursor or the keyboard; run() turns it on.
-        self.eyes = self.targets = self.os_output = None
+        self.eyes = self.targets = self.os_output = self.mouth = None
         if eyes:
+            from engine.eyes.mouth import MouthTracker
             from engine.eyes.os_output import OsOutput
             from engine.eyes.service import EyesService
             from engine.eyes.target_service import TargetService
             self.eyes = EyesService(bus, settings, pointer=pointer, dwell=dwell, confirm=confirm)
             self.targets = TargetService(bus, settings)
             self.os_output = OsOutput(bus, driver=self.eyes.driver)
+            # Was the user's mouth moving? For the voice route's "only the user's voice" gate:
+            # DictationWorker should take mouth=self.mouth (None without eyes = no gate).
+            self.mouth = MouthTracker(bus)
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
         self.dictation = DictationWorker(bus, dictation or Dictation(settings))
         self.audio_in = AudioIn(bus, settings, sd=sd, mic_settings=mic_settings, vad=vad)

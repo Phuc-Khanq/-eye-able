@@ -159,6 +159,11 @@ class TestEyesService(unittest.TestCase):
         self.assertAlmostEqual(g.x, (W - 1) / 2, delta=3)   # sitting turned 3 deg reads as the center
         self.assertAlmostEqual(g.y, (H - 1) / 2, delta=3)
 
+    def test_publishes_the_mouth_every_frame(self):
+        n = len(self.r.bus.of(topics.MOUTH))
+        self.r.frames(10)
+        self.assertEqual(len(self.r.bus.of(topics.MOUTH)), n + 10)
+
     def test_head_points(self):
         self.r.frames(60, yaw=5.0, pitch=-3.0)   # right and up
         g = self.r.bus.of(topics.GAZE)[-1]

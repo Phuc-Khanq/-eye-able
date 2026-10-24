@@ -61,3 +61,9 @@ class TargetResult:
     x: int = -1     # screen pixels (physical); -1 when not found
     y: int = -1
     ms: float = 0.0  # time UI-Venus took
+
+
+@dataclass
+class MouthSample:
+    t_ms: int     # camera frame time: time.monotonic() in ms, the clock audio_in stamps utterances with
+    open: float   # MediaPipe jawOpen, 0 (closed) to about 1

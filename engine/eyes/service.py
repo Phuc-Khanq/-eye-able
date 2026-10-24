@@ -3,6 +3,7 @@ plus head gestures, the one-look calibration and the confirm nod.
 
 Route: Khang and Hung (Khang leads)
 Publishes: topics.GAZE (GazePoint, every frame), topics.GESTURE (Gesture), topics.DWELL_DONE (dwell on only),
+           topics.MOUTH (MouthSample, every frame with a face),
            to the UI: gaze (x, y, confidence), dwell, calib_target, calib_result, status
 Subscribes: topics.CALIBRATE and the UI's calibrate, the UI's settings; and, read only, the mode manager's
            messages to the UI (mode, target_found, target_none, confirm, dictation_preview), to know when
@@ -33,7 +34,7 @@ import time
 
 from engine.config import settings as default_settings
 from engine.core import messages, topics
-from engine.core.types import GazePoint, Gesture
+from engine.core.types import GazePoint, Gesture, MouthSample
 from engine.eyes.cursor_driver import CursorDriver
 from engine.eyes.head_gestures import GestureDetector
 from engine.eyes.brow_gesture import BrowRaiseDetector
@@ -230,6 +231,8 @@ class EyesService:
             self._no_face_said = False
         self._last_face = now
         feats, pose = self.features.compute(face), self.head.compute(face)
+        # for the voice route: words count only while the user's own mouth moves (engine/eyes/mouth.py)
+        self.bus.publish(topics.MOUTH, MouthSample(t_ms=face.t_ms, open=float((face.blendshapes or {}).get("jawOpen", 0.0))))
 
         if self._calib_wanted:
             self._calib_wanted = False

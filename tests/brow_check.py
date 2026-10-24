@@ -24,9 +24,10 @@ def track(*raises, rest=REST, n=N) -> np.ndarray:
     return out
 
 
-def run(score, seed=0, noise=0.01, blink=(), drop=(), split=False) -> list[int]:
+def run(score, seed=0, noise=0.01, blink=(), drop=(), split=False, frame_ms=FRAME_MS) -> list[int]:
     """Feed scores as blendshapes; returns the frame numbers where brow_raise fired.
-    blink: frames with eyes closed. drop: frames with no face. split: inner brow only (outer at rest)."""
+    blink: frames with eyes closed. drop: frames with no face. split: inner brow only (outer at rest).
+    frame_ms: time between frames (a webcam in dim light can slow to 125 ms, 8 fps)."""
     rng = np.random.default_rng(seed)
     det = BrowRaiseDetector()
     fired = []
@@ -37,7 +38,7 @@ def run(score, seed=0, noise=0.01, blink=(), drop=(), split=False) -> list[int]:
         outer = REST if split else s
         shapes = {"browInnerUp": s, "browOuterUpLeft": outer, "browOuterUpRight": outer,
                   "eyeBlinkLeft": 0.9 if i in blink else 0.05, "eyeBlinkRight": 0.9 if i in blink else 0.05}
-        if det.update(i * FRAME_MS, shapes) is not None:
+        if det.update(i * frame_ms, shapes) is not None:
             fired.append(i)
     return fired
 
@@ -73,7 +74,11 @@ SCENARIOS = [
     ("blinks during a raise don't break it", lambda: len(run(track((30, 25, 0.4)), blink={33, 34, 40})), 1),
     ("a blink alone fires nothing", lambda: run(np.full(N, REST), blink=set(range(30, 36))), []),
     ("face lost mid-raise: no click from two halves",
-     lambda: run(track((30, 12, 0.4)), drop=set(range(35, 45))), []),
+     lambda: run(track((30, 12, 0.4)), drop=set(range(35, 50))), []),
+    ("slow camera (8 fps): a 0.75 s raise fires once", lambda: len(run(track((20, 6, 0.5)), frame_ms=125)), 1),
+    ("slow camera (8 fps): two raises fire twice",
+     lambda: len(run(track((20, 6, 0.5), (45, 6, 0.5)), frame_ms=125)), 2),
+    ("slow camera (8 fps): talking fires nothing", lambda: run(talking(), frame_ms=125), []),
     ("hold flickering at the edge fires once",
      lambda: len(run(track((20, 60, 0.4)) - 0.18 * (np.arange(N) % 9 == 0) * (np.arange(N) > 30))), 1),
 ]

@@ -32,7 +32,8 @@ TARGET_REQUEST = "target.request"   # TargetRequest
 TARGET_RESULT = "target.result"     # TargetResult
 
 # Mode manager -> os_input. Only the mode manager publishes these.
-OS_CLICK = "os.click"               # {"x": int, "y": int}
+OS_CLICK = "os.click"               # {"x": int, "y": int, "button": "left" | "right"}; button is optional
+                                    # (left). Dwell clicks left; an eyebrow raise clicks right
 OS_TYPE = "os.type"                 # {"text": str}
 OS_KEY = "os.key"                   # {"key": "enter" | "backspace"}
 OS_SCROLL = "os.scroll"             # {"direction": "up" | "down"}

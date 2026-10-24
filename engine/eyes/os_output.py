@@ -2,7 +2,7 @@
 
 Route: Khang and Hung (Hung leads os_input; this is the bus side of it)
 Publishes: nothing
-Subscribes: topics.OS_CLICK {"x", "y"}, OS_TYPE {"text"}, OS_KEY {"key": "enter" | "shift+enter" | ...},
+Subscribes: topics.OS_CLICK {"x", "y", "button": "left" | "right" (optional, left)}, OS_TYPE {"text"}, OS_KEY {"key": "enter" | "shift+enter" | ...},
             OS_SCROLL {"direction": "up" | "down"}, OS_UNDO {}
 APIs: os_input (pynput). Only the mode manager publishes these topics, so nothing else can click or type.
 
@@ -15,6 +15,7 @@ instead of one 5-notch jump.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 from engine.core import messages, topics
 
@@ -35,7 +36,8 @@ class OsOutput:
 
     def on_click(self, p: dict) -> None:
         x, y = int(p["x"]), int(p["y"])
-        self._safely("click", lambda: self.driver.click(x, y, self.os.click) if self.driver else self.os.click(x, y))
+        click = partial(self.os.click, button="right") if p.get("button") == "right" else self.os.click
+        self._safely("click", lambda: self.driver.click(x, y, click) if self.driver else click(x, y))
 
     def on_type(self, p: dict) -> None:
         self._safely("type", lambda: self.os.type_text(p.get("text", "")))

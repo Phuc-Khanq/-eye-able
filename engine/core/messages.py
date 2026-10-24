@@ -8,9 +8,11 @@ Every message is a JSON object: {"type": <name>, ...fields}.
 MODE = "mode"                            # mode: "pointer" | "dictation" | "menu" | "paused" | "scroll". On every change,
                                          # and once when a UI connects
 GAZE = "gaze"                            # x, y (screen px, 0.1 px), confidence 0-1. Every camera frame with a face
-GESTURE = "gesture"                      # gesture: "nod" | "tilt_left" | "tilt_right" | "brow_raise" | "blink" (a long
-                                         # blink). Only in menu mode (the UI moves / picks in the menu); a shake there
-                                         # closes it (a mode message). "shake" and "mouth_open" aren't sent yet.
+GESTURE = "gesture"                      # gesture: "nod" | "shake" | "tilt_left" | "tilt_right" | "brow_raise" | "blink"
+                                         # (a long blink) | "mouth_open". Every gesture the engine acts on, in any mode,
+                                         # just before it acts (flash "raise seen"): a click, a yes / no, a scroll, the
+                                         # menu (tilts move, nod / raise pick, a shake closes it). Ignored ones (paused,
+                                         # a raise while talking, a mouth gesture during speech) aren't sent.
                                          # Not "type": that key is the message name
 DWELL = "dwell"                          # progress 0-1 (2 decimals), ready true/false (resting on something clickable and
                                          # dwell armed: show "this clicks" before it fills). Sent when either changes:

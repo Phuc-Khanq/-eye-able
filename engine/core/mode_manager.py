@@ -204,11 +204,12 @@ class ModeManager:
             if gesture.type == "mouth_open" and self.clock() - self._heard_speech < SPEECH_GUARD_S:
                 self._log("[mouth] ignored: the mic heard speech")
                 return
+            # Every gesture acted on goes to the UI too ("raise seen"), in any mode, just before it acts;
+            # ignored ones (paused, a raise while talking, a mouth gesture during speech) send nothing.
             if self.question:
-                if gesture.type in ("nod", "brow_raise", "blink"):
-                    self._answer(True)
-                elif gesture.type == "shake":
-                    self._answer(False)
+                if gesture.type in ("nod", "brow_raise", "blink", "shake"):
+                    self._ui(messages.GESTURE, gesture=gesture.type)
+                    self._answer(gesture.type != "shake")
                 return
             intent = GESTURES[self.mode].get(gesture.type)
             if intent == "menu_gesture":
@@ -218,6 +219,8 @@ class ModeManager:
                 # click in Pointer mode, snapped onto the nearest button (brow_click "right": the right
                 # click), at the cursor: the eyes service freezes the cursor during a raise, so the
                 # last gaze is where it froze. A raise while talking never gets here.
+                if self.preview or self.search or self.mode == Mode.POINTER:
+                    self._ui(messages.GESTURE, gesture=gesture.type)
                 if self.preview:
                     self._insert_preview()
                 elif self.search:
@@ -227,6 +230,7 @@ class ModeManager:
                 elif self.mode == Mode.POINTER:
                     self._right_click() if (self._brow_click == "right" and gesture.type == "brow_raise") else self._snap_click()
             elif intent:
+                self._ui(messages.GESTURE, gesture=gesture.type)
                 self._do(Command(name=intent))
 
     def _raised_while_talking(self, t_ms: float) -> bool:

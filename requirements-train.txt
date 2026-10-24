@@ -1,0 +1,31 @@
+# Training only (engine/voice/finetune). The demo install (requirements.txt) does NOT need this.
+#
+# Install on top of an environment that ALREADY has PyTorch; this file never installs torch:
+#   Kaggle:   pip install -r requirements-train.txt     (keeps Kaggle's own CUDA PyTorch)
+#   Laptop:   .\.venv\Scripts\python.exe -m pip install -r requirements-train.txt
+#
+# Same versions as requirements.lock.txt where the package is also used by the app, so
+# training, export and the app decode with the same code.
+
+# Same as requirements.lock.txt
+faster-whisper==1.2.1
+ctranslate2==4.8.3
+onnxruntime==1.31.0
+av==18.1.0
+transformers==5.20.2
+tokenizers==0.23.3
+huggingface_hub==2.3.0
+safetensors==0.8.0
+accelerate==1.15.0
+soundfile==0.14.0
+
+# New, training only
+peft==0.21.2          # LoRA; needs transformers >= 4.x and torch >= 1.13 (works with 5.20.2 / 2.14)
+jiwer==4.0.0          # word error rate
+
+# Linux only (Kaggle): CTranslate2 4.8 is built for CUDA 12, but Kaggle's PyTorch uses CUDA 13.
+# These give faster-whisper its CUDA 12 cuBLAS and cuDNN 9 (the versions the CUDA 12.8
+# PyTorch build uses); common.preload_cuda12_libs() loads them. Windows uses the CUDA 12.8
+# libraries that come with the demo laptop's PyTorch, so it skips these.
+nvidia-cublas-cu12==12.8.4.1; sys_platform == "linux"
+nvidia-cudnn-cu12==9.10.2.21; sys_platform == "linux"

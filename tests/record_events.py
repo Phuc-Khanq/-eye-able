@@ -34,6 +34,7 @@ async def record(url: str, out: Path, max_messages: int | None = None,
                  seconds: float | None = None) -> int:
     """Write messages from the engine at `url` to `out`. Returns how many were kept."""
     from websockets.asyncio.client import connect
+    from websockets.exceptions import ConnectionClosed
 
     out.parent.mkdir(parents=True, exist_ok=True)
     kept, t0 = 0, time.monotonic()
@@ -43,7 +44,7 @@ async def record(url: str, out: Path, max_messages: int | None = None,
                 timeout = None if seconds is None else max(0.0, seconds - (time.monotonic() - t0))
                 try:
                     text = await asyncio.wait_for(ws.recv(), timeout)
-                except asyncio.TimeoutError:
+                except (asyncio.TimeoutError, ConnectionClosed):   # time's up, or the engine stopped
                     break
                 try:
                     msg = json.loads(text)

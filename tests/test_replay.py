@@ -79,6 +79,25 @@ class TestRecordWhatTheEngineSends(unittest.TestCase):
             self.assertEqual(asyncio.run(run(out)), 2)
             self.assertEqual([m for _, m in load(out)], [sent[0], sent[2]])
 
+    def test_engine_closing_the_connection_ends_the_recording_cleanly(self):
+        # e.g. fake_engine --once finishing: record() keeps what it got instead of a traceback
+        async def run(out):
+            bus = EventBus()
+            relay = WebSocketRelay(bus)
+            await relay.start("127.0.0.1", 0)
+            task = asyncio.create_task(record(f"ws://127.0.0.1:{relay.port}", out, seconds=10))
+            while not relay.clients:
+                await asyncio.sleep(0.01)
+            bus.publish(topics.TO_UI, messages.make(messages.MODE, mode="pointer"))
+            await asyncio.sleep(0.1)
+            await relay.close()
+            return await asyncio.wait_for(task, 3)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "rec.jsonl"
+            self.assertEqual(asyncio.run(run(out)), 1)
+            self.assertEqual([m for _, m in load(out)], [messages.make(messages.MODE, mode="pointer")])
+
 
 if __name__ == "__main__":
     unittest.main()

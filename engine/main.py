@@ -124,6 +124,50 @@ class Engine:
         self.bus.publish(topics.TO_UI, messages.make(messages.STATUS, level=level, text=text))
 
 
+def cuda_device_count() -> int:
+    """NVIDIA GPUs this laptop has (0 if none or no driver). Needs no torch."""
+    try:
+        import ctranslate2  # comes with faster-whisper; importing it needs no GPU
+
+        return ctranslate2.get_cuda_device_count()
+    except Exception:
+        return 0
+
+
+def use_cpu_without_gpu(s, cuda_devices: int | None = None) -> bool:
+    """Whisper set to CUDA on a laptop with no NVIDIA GPU can't load, so voice would not work.
+    Use the CPU (int8) for this run instead and say so. Returns True if it switched.
+    The defaults in config.py stay as they are (CONTRIBUTING rule 3)."""
+    if s.whisper_device != "cuda":
+        return False
+    if cuda_devices is None:
+        cuda_devices = cuda_device_count()
+    if cuda_devices > 0:
+        return False
+    s.whisper_device, s.whisper_compute_type = "cpu", "int8"
+    print("No NVIDIA GPU found: Whisper runs on the CPU (int8) this time. To make that "
+          'permanent, put {"whisper_device": "cpu", "whisper_compute_type": "int8"} '
+          "in config.local.json.")
+    return True
+
+
+def keep_rewrite_without_gpu(s, rewrite: bool, cuda_devices: int | None = None) -> bool:
+    """The dictation clean-up model set to CUDA can't load without an NVIDIA GPU: it would
+    download about 3 GB and then fail quietly. On the CPU it takes seconds per sentence, longer
+    than rewrite_max_s, so it would only slow Whisper down. So with no GPU it's off for this run
+    (the user's own words are shown, as when the clean-up is off). rewrite_device "cpu" in
+    config.local.json still forces it on. Returns whether the clean-up stays on."""
+    if not rewrite or not str(getattr(s, "rewrite_device", "cuda")).startswith("cuda"):
+        return rewrite
+    if cuda_devices is None:
+        cuda_devices = cuda_device_count()
+    if cuda_devices > 0:
+        return True
+    print("No NVIDIA GPU found: the dictation clean-up is off this time (it needs a GPU to keep up). "
+          'To run it on the CPU anyway (slow), put {"rewrite_device": "cpu"} in config.local.json.')
+    return False
+
+
 def read_wav(path: str):
     """(rate, float32 audio) from a WAV file. Only reads; nothing is written."""
     import numpy as np
@@ -215,6 +259,8 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
     relay = WebSocketRelay(bus)
     await relay.start(settings.ws_host, settings.ws_port)
     log_to_console(bus)
+    if getattr(settings, "stt_backend", "whisper") == "whisper":
+        use_cpu_without_gpu(settings)
     stop = threading.Event()
     if wav:
         from engine.voice.audio_in import load_vad
@@ -271,9 +317,10 @@ def main() -> None:
         except (AttributeError, ValueError):
             pass
     settings.blink_click = args.blink
+    rewrite = keep_rewrite_without_gpu(settings, args.rewrite)
     try:
         asyncio.run(run(args.wav, eyes=not args.no_eyes, pointer=args.pointer, dwell=args.dwell,
-                        stdin=args.stdin, confirm=args.confirm, rewrite=args.rewrite))
+                        stdin=args.stdin, confirm=args.confirm, rewrite=rewrite))
     except KeyboardInterrupt:
         print("Engine stopped.")
     except OSError as exc:

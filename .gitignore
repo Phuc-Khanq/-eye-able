@@ -9,7 +9,9 @@ models/*
 recordings/
 !tests/recordings/
 tests/recordings/*
-!tests/recordings/*.jsonl
+# Only the made-up demo is shared. Real sessions (record_events saves them here) can
+# contain the words someone dictated, so they stay on the laptop.
+!tests/recordings/demo_flow.jsonl
 calibration/
 
 # Training data, checkpoints and downloaded Kaggle results (TORGO is never published)

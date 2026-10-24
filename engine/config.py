@@ -43,6 +43,7 @@ class Settings:
     whisper_compute_type: str = "float16"  # use "int8" on CPU
     # Only the user's voice: keep a word only if the camera saw the mouth moving as it was said
     mouth_gate: bool = True
+    mouth_gate_mode: str = "utterance"  # "utterance": keep or drop the whole utterance; "word": each word on its own
     mouth_min_moving: float = 0.3      # share of face frames with a moving mouth; lower it for weak movement
     mouth_pad_ms: float = 150.0        # widen each word's time window by this much on both sides
     mouth_status_every_s: float = 10.0  # "Ignored speech while your mouth wasn't moving", at most this often

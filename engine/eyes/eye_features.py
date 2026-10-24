@@ -3,7 +3,7 @@
 Route: Khang and Hung (Khang leads)
 Publishes: EyeFeatures
 Subscribes: FaceFrame
-APIs: NumPy; blendshapes eyeBlinkLeft / eyeBlinkRight for blink skipping
+APIs: NumPy; blendshapes eyeBlinkLeft / eyeBlinkRight for blink skipping, eyeLook* for blend_h / blend_v
 
 Per eye, with corner A (image left) and corner B (image right):
   h   = how far along A->B the iris center sits, divided by eye width (0 at A, 1 at B)
@@ -109,7 +109,8 @@ class EyeFeatureExtractor:
         if self.blinking or self.right is None or self.left is None:
             if self.last is None:
                 return EyeFeatures(t_ms=face.t_ms, h=float("nan"), v=float("nan"), lid=float("nan"), usable=False)
-            return EyeFeatures(t_ms=face.t_ms, h=self.last.h, v=self.last.v, lid=self.last.lid, usable=False)
+            return EyeFeatures(t_ms=face.t_ms, h=self.last.h, v=self.last.v, lid=self.last.lid, usable=False,
+                               blend_h=self.last.blend_h, blend_v=self.last.blend_v)
 
         # Average the two eyes, trusting the wider one more (the far eye looks narrower when you turn).
         wr, wl = self.right.width_px, self.left.width_px
@@ -120,6 +121,8 @@ class EyeFeatureExtractor:
             v=(self.right.v * wr + self.left.v * wl) / total,
             lid=(self.right.lid * wr + self.left.lid * wl) / total,
             usable=True,
+            blend_h=self.blend_h,
+            blend_v=self.blend_v,
         )
         self.last = feats
         return feats

@@ -8,6 +8,11 @@ models/*
 !models/README.md
 recordings/
 calibration/
+
+# Training data, checkpoints and downloaded Kaggle results (TORGO is never published)
+data/
+checkpoints/
+downloads/
 *.wav
 *.mp4
 

@@ -1,4 +1,4 @@
-"""Stock vs fine-tuned Whisper on 20 short commands: the same synthetic clips, decoded the way the app does.
+"""Stock vs fine-tuned Whisper on 9 short commands: the same synthetic clips, decoded the way the app does.
 
     python -m engine.voice.command_bench                                   # stock large-v3-turbo
     python -m engine.voice.command_bench --model models/whisper-elder-ct2  # the fine-tuned one
@@ -12,7 +12,7 @@ not elderly speakers: it compares the two models, it doesn't say how well an old
 Two scores per clip:
   text     right if the words match after normalizing (case, punctuation, numbers)
   command  right if the app would do the right thing: commands.parse gives the phrase's command
-           ("stop" / "done" count when they'd leave scroll mode; "open" alone is no command)
+           ("stop" counts when it would leave scroll mode)
 Prints right / wrong / empty per phrase and in total; what a wrong clip became is printed, never saved.
 Saves the numbers only (phrase ids and counts, no audio or transcripts) to checkpoints/command_bench_<model>.json.
 """
@@ -29,14 +29,11 @@ from pathlib import Path
 from engine.voice import commands
 from engine.voice.voice_check import SYNTH, command_name, normalize_words
 
-# (phrase id in tests/speech_phrases.csv, text): Khang's seven, then the demo's and the other short commands
+# (phrase id in tests/speech_phrases.csv, text): Khang's 9 short commands
 PHRASES = [
-    ("command_080", "yes"), ("command_092", "no"), ("short_001", "click"), ("short_002", "scroll"),
-    ("short_003", "stop"), ("command_056", "send it"), ("short_004", "open"),
-    ("short_005", "done"), ("command_044", "cancel"), ("command_035", "menu"), ("command_019", "pause"),
-    ("command_026", "resume"), ("command_050", "scroll up"), ("command_053", "scroll down"),
-    ("command_001", "start dictation"), ("command_010", "stop dictation"), ("command_068", "undo"),
-    ("command_074", "new line"), ("short_006", "click send"), ("target_001", "click compose"),
+    ("command_080", "yes"), ("command_092", "no"), ("short_001", "click"), ("short_007", "right click"),
+    ("short_008", "go back"), ("short_009", "escape"), ("short_002", "scroll"), ("short_003", "stop"),
+    ("command_056", "send it"),
 ]
 SCROLL_EXIT = "scroll_exit"
 REPO = Path(__file__).resolve().parents[2]
@@ -114,7 +111,7 @@ def main(argv: list[str] | None = None) -> int:
     from engine.config import settings
     from engine.voice.dictation import Dictation
 
-    p = argparse.ArgumentParser(description="Stock vs fine-tuned Whisper on 20 short commands.")
+    p = argparse.ArgumentParser(description="Stock vs fine-tuned Whisper on 9 short commands.")
     p.add_argument("--model", default="large-v3-turbo", help="a Whisper name or a CTranslate2 folder")
     p.add_argument("--device", default=None, help="cuda or cpu (default: the config's)")
     p.add_argument("--compute-type", default=None, help="float16 on the GPU, int8 on the CPU")

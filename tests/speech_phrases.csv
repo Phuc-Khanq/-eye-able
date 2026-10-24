@@ -151,3 +151,6 @@ short_003,stop,short,none,scroll
 short_004,open,short,none,pointer
 short_005,done,short,none,scroll
 short_006,click send,short,target:Send,pointer
+short_007,right click,short,right_click,pointer
+short_008,go back,short,go_back,pointer
+short_009,escape,short,escape,pointer

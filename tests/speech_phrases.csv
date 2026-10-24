@@ -1,0 +1,143 @@
+id,text,category,expected,mode
+command_001,start dictation,command,start_dictation,pointer
+command_002,"um, start dictation please",command,start_dictation,pointer
+command_003,"okay, start dictation",command,start_dictation,pointer
+command_004,dictation,command,start_dictation,pointer
+command_005,"um, dictation please",command,start_dictation,pointer
+command_006,"okay, dictation",command,start_dictation,pointer
+command_007,start typing,command,start_dictation,pointer
+command_008,"um, start typing please",command,start_dictation,pointer
+command_009,"okay, start typing",command,start_dictation,pointer
+command_010,stop dictation,command,stop_dictation,pointer
+command_011,"um, stop dictation please",command,stop_dictation,pointer
+command_012,"okay, stop dictation",command,stop_dictation,pointer
+command_013,stop typing,command,stop_dictation,pointer
+command_014,"um, stop typing please",command,stop_dictation,pointer
+command_015,"okay, stop typing",command,stop_dictation,pointer
+command_016,done typing,command,stop_dictation,pointer
+command_017,"um, done typing please",command,stop_dictation,pointer
+command_018,"okay, done typing",command,stop_dictation,pointer
+command_019,pause,command,pause,pointer
+command_020,"um, pause please",command,pause,pointer
+command_021,"okay, pause",command,pause,pointer
+command_022,paws,command,pause,pointer
+command_023,stop listening,command,pause,pointer
+command_024,"um, stop listening please",command,pause,pointer
+command_025,"okay, stop listening",command,pause,pointer
+command_026,resume,command,resume,pointer
+command_027,"um, resume please",command,resume,pointer
+command_028,"okay, resume",command,resume,pointer
+command_029,wake up,command,resume,pointer
+command_030,"um, wake up please",command,resume,pointer
+command_031,"okay, wake up",command,resume,pointer
+command_032,start listening,command,resume,pointer
+command_033,"um, start listening please",command,resume,pointer
+command_034,"okay, start listening",command,resume,pointer
+command_035,menu,command,menu,pointer
+command_036,"um, menu please",command,menu,pointer
+command_037,"okay, menu",command,menu,pointer
+command_038,open menu,command,menu,pointer
+command_039,"um, open menu please",command,menu,pointer
+command_040,"okay, open menu",command,menu,pointer
+command_041,show menu,command,menu,pointer
+command_042,"um, show menu please",command,menu,pointer
+command_043,"okay, show menu",command,menu,pointer
+command_044,cancel,command,cancel,pointer
+command_045,"um, cancel please",command,cancel,pointer
+command_046,"okay, cancel",command,cancel,pointer
+command_047,never mind,command,cancel,pointer
+command_048,"um, never mind please",command,cancel,pointer
+command_049,"okay, never mind",command,cancel,pointer
+command_050,scroll up,command,scroll_up,pointer
+command_051,"um, scroll up please",command,scroll_up,pointer
+command_052,"okay, scroll up",command,scroll_up,pointer
+command_053,scroll down,command,scroll_down,pointer
+command_054,"um, scroll down please",command,scroll_down,pointer
+command_055,"okay, scroll down",command,scroll_down,pointer
+command_056,send it,command,send_it,pointer
+command_057,"um, send it please",command,send_it,pointer
+command_058,"okay, send it",command,send_it,pointer
+command_059,send,command,send_it,pointer
+command_060,"um, send please",command,send_it,pointer
+command_061,"okay, send",command,send_it,pointer
+command_062,send message,command,send_it,pointer
+command_063,"um, send message please",command,send_it,pointer
+command_064,"okay, send message",command,send_it,pointer
+command_065,scratch that,command,undo,pointer
+command_066,"um, scratch that please",command,undo,pointer
+command_067,"okay, scratch that",command,undo,pointer
+command_068,undo,command,undo,pointer
+command_069,"um, undo please",command,undo,pointer
+command_070,"okay, undo",command,undo,pointer
+command_071,undo that,command,undo,pointer
+command_072,"um, undo that please",command,undo,pointer
+command_073,"okay, undo that",command,undo,pointer
+command_074,new line,command,new_line,pointer
+command_075,"um, new line please",command,new_line,pointer
+command_076,"okay, new line",command,new_line,pointer
+command_077,next line,command,new_line,pointer
+command_078,"um, next line please",command,new_line,pointer
+command_079,"okay, next line",command,new_line,pointer
+command_080,yes,command,yes,pointer
+command_081,"um, yes please",command,yes,pointer
+command_082,"okay, yes",command,yes,pointer
+command_083,yeah,command,yes,pointer
+command_084,"um, yeah please",command,yes,pointer
+command_085,"okay, yeah",command,yes,pointer
+command_086,yep,command,yes,pointer
+command_087,"um, yep please",command,yes,pointer
+command_088,"okay, yep",command,yes,pointer
+command_089,confirm,command,yes,pointer
+command_090,"um, confirm please",command,yes,pointer
+command_091,"okay, confirm",command,yes,pointer
+command_092,no,command,no,pointer
+command_093,"um, no please",command,no,pointer
+command_094,"okay, no",command,no,pointer
+command_095,nope,command,no,pointer
+command_096,"um, nope please",command,no,pointer
+command_097,"okay, nope",command,no,pointer
+command_098,calibrate,command,calibrate,pointer
+command_099,"um, calibrate please",command,calibrate,pointer
+command_100,"okay, calibrate",command,calibrate,pointer
+command_101,delete my voice data,command,delete_voice_data,pointer
+command_102,"um, delete my voice data please",command,delete_voice_data,pointer
+command_103,"okay, delete my voice data",command,delete_voice_data,pointer
+target_001,click compose,target,target:Compose,pointer
+target_002,open Gmail,target,target:Gmail,pointer
+target_003,select the send button,target,target:Send Button,pointer
+target_004,click on Khoa,target,target:Khoa,pointer
+target_005,open the first result,target,target:First Result,pointer
+dictation_001,"Hi mom, home at seven tonight.",dictation,dictation,dictation
+dictation_002,Meet Nhi at 3:30?,dictation,dictation,dictation
+dictation_003,My address is 21 Oak Street.,dictation,dictation,dictation
+dictation_004,Can you pick up milk and bread on the way home?,dictation,dictation,dictation
+dictation_005,The doctor's appointment is on Tuesday at 10 a.m.,dictation,dictation,dictation
+dictation_006,"Khoa, please call me back when you can.",dictation,dictation,dictation
+dictation_007,I'll be there in about 15 minutes.,dictation,dictation,dictation
+dictation_008,"Thank you for the flowers, they are beautiful.",dictation,dictation,dictation
+dictation_009,Please send the photos from Saturday.,dictation,dictation,dictation
+dictation_010,My phone number ends in 4 7 2 9.,dictation,dictation,dictation
+dictation_011,Is the pharmacy open on Sunday?,dictation,dictation,dictation
+dictation_012,Grandpa turns 80 next month.,dictation,dictation,dictation
+dictation_013,Remind me to take my pills at 8 o'clock.,dictation,dictation,dictation
+dictation_014,The bus leaves at quarter past nine.,dictation,dictation,dictation
+dictation_015,"Love you, see you soon.",dictation,dictation,dictation
+near_miss_001,I sent it yesterday,near_miss,none,pointer
+near_miss_002,scrolling through photos,near_miss,none,pointer
+near_miss_003,yes I'll be there at noon,near_miss,none,pointer
+near_miss_004,the menu looks really good tonight,near_miss,none,pointer
+near_miss_005,no worries at all,near_miss,none,pointer
+near_miss_006,we paused the movie halfway,near_miss,none,pointer
+near_miss_007,stop by the store after work,near_miss,none,pointer
+near_miss_008,I'm done with my homework,near_miss,none,pointer
+near_miss_009,listening to music in the kitchen,near_miss,none,pointer
+near_miss_010,the meeting was undone by the rain,near_miss,none,pointer
+demo_001,click compose,demo,target:Compose,pointer
+demo_002,start dictation,demo,start_dictation,pointer
+demo_003,"Hi mom, home at eleven tonight.",demo,dictation,dictation
+demo_004,"Hi mom, home at seven tonight.",demo,dictation,dictation
+demo_005,send it,demo,send_it,dictation
+demo_006,stop dictation,demo,stop_dictation,dictation
+demo_007,pause,demo,pause,pointer
+demo_008,scroll down,demo,scroll_down,paused
+demo_009,resume,demo,resume,paused

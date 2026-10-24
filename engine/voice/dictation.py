@@ -18,13 +18,25 @@ from __future__ import annotations
 import queue
 import threading
 import time
+from pathlib import Path
 
 from engine.core import topics
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 BEAM_SIZE = 1             # greedy: fastest; short utterances barely gain from beam search
 NO_SPEECH_SKIP = 0.6      # drop a segment Whisper thinks is silence
 HALLUCINATION_CONF = 0.35  # a 1-3 word result this unsure is usually noise ("Thank you.")
 MAX_QUEUED = 3            # if Whisper falls behind, drop the oldest utterance
+
+
+def resolve_model(name: str) -> str:
+    """A folder under the repo root (e.g. "models/whisper-elder-ct2") becomes its full path;
+    anything else ("large-v3-turbo", "small") is a model name faster-whisper downloads."""
+    path = Path(name)
+    if not path.is_absolute() and (REPO_ROOT / path).is_dir():
+        return str(REPO_ROOT / path)
+    return name
 
 
 class Dictation:
@@ -42,7 +54,7 @@ class Dictation:
             s = self.settings
             if s is None:
                 from engine.config import settings as s
-            self._model = WhisperModel(s.whisper_model, device=s.whisper_device,
+            self._model = WhisperModel(resolve_model(s.whisper_model), device=s.whisper_device,
                                        compute_type=s.whisper_compute_type)
 
     def warm_up(self) -> None:

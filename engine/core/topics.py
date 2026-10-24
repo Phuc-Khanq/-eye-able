@@ -9,7 +9,7 @@ Route: Khoi and Khoa
 
 # Eyes route -> mode manager
 GAZE = "eyes.gaze"                  # GazePoint, every frame
-GESTURE = "eyes.gesture"            # Gesture (nod, shake, tilt_left, tilt_right)
+GESTURE = "eyes.gesture"            # Gesture (nod, shake, tilt_left, tilt_right, brow_raise)
 DWELL_DONE = "eyes.dwell_done"      # GazePoint where a dwell finished (the cursor rested dwell_ms)
 CALIBRATE = "eyes.calibrate"        # {"action": "start" | "cancel"}
 

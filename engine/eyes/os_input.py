@@ -120,3 +120,22 @@ def press(key: str) -> None:
     from pynput.keyboard import Key
 
     _get_keyboard().tap(getattr(Key, key))
+
+
+def combo(keys: str) -> None:
+    """A key or a shortcut: "enter", "shift+enter", "ctrl+z". Modifiers are held while the last key taps.
+    On macOS, "ctrl" is Control; use "cmd+z" for Command-Z."""
+    from pynput.keyboard import Key
+
+    parts = [p.strip().lower() for p in keys.split("+") if p.strip()]
+    if not parts:
+        return
+    named = [getattr(Key, p) if hasattr(Key, p) else p for p in parts]  # "z" stays a character
+    kb = _get_keyboard()
+    for mod in named[:-1]:
+        kb.press(mod)
+    try:
+        kb.tap(named[-1])
+    finally:
+        for mod in reversed(named[:-1]):
+            kb.release(mod)

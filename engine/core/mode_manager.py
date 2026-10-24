@@ -11,9 +11,11 @@ APIs: plain Python (enum, threading)
 Only this module asks os_input to click or type, so stray signals can't act alone.
 
 What each input means (one table per mode: GESTURES below):
-  Pointer    dwell = click at the cursor, tilt left/right = scroll up/down,
-             "click/open/select <name>" = look-and-say
-  Dictation  speech -> preview bubble; nod (or "yes") inserts, shake (or "no") discards
+  Pointer    dwell = click at the cursor, tilt left/right = scroll up/down, eyebrow raise = yes,
+             "click/open/select <name>" = look-and-say, "type <words>" = one-shot dictation
+             (the words go to the preview; "yes" types them)
+  Dictation  speech -> preview bubble; eyebrow raise, nod or "yes" inserts, shake or "no" discards;
+             "click <name>" still clicks (only "click": "open the door..." stays text)
   Menu       tilts and nods go to the UI's radial menu; shake closes it;
              the UI sends menu_select with the item
   Paused     everything is ignored except "resume" and the UI's set_mode
@@ -45,9 +47,10 @@ from engine.core.types import GazePoint, Gesture, TargetRequest, TargetResult
 from engine.voice import commands
 from engine.voice.commands import Command
 
-CONFIRM_TIMEOUT_S = 8.0
+CONFIRM_TIMEOUT_S = 12.0  # Whisper only answers after the pause, so a spoken "yes" lands 2-4 s late
 TARGET_TIMEOUT_S = 6.0   # UI-Venus should answer well inside this
 TICK_S = 0.25
+REPEAT_CLICK_S = 3.0      # "click Send" again this soon after Send was clicked is a repeat, not a new click
 
 
 class Mode(Enum):
@@ -59,9 +62,9 @@ class Mode(Enum):
 
 # Gesture -> intent, per mode. Change the controls here, in one place.
 GESTURES: dict[Mode, dict[str, str]] = {
-    Mode.POINTER:   {"tilt_left": "scroll_up", "tilt_right": "scroll_down"},
-    Mode.DICTATION: {"nod": "yes", "shake": "no"},
-    Mode.MENU:      {"tilt_left": "menu_gesture", "tilt_right": "menu_gesture",
+    Mode.POINTER:   {"tilt_left": "scroll_up", "tilt_right": "scroll_down", "brow_raise": "gesture_yes"},
+    Mode.DICTATION: {"nod": "yes", "shake": "no", "brow_raise": "gesture_yes"},
+    Mode.MENU:      {"tilt_left": "menu_gesture", "tilt_right": "menu_gesture", "brow_raise": "menu_gesture",
                      "nod": "menu_gesture", "shake": "close_menu"},
     Mode.PAUSED:    {},
 }
@@ -78,12 +81,14 @@ class _Question:
     on_yes: Callable[[], None]
     on_no: Callable[[], None]
     kind: str = "general"  # "target" questions can also be answered by the UI's target message
+    label: str = ""        # target questions: what would be clicked
 
 
 @dataclass
 class _Search:
     label: str
     expires_at: float
+    preconfirmed: bool = False  # "click Send, yes": the yes came before UI-Venus answered
 
 
 class ModeManager:
@@ -97,6 +102,7 @@ class ModeManager:
         self.search: _Search | None = None
         self.last_gaze: GazePoint | None = None
         self._ids = itertools.count(1)
+        self._last_click: tuple[str, float] | None = None   # (label, time) of the last look-and-say click
         self._lock = threading.RLock()
         self._stop = threading.Event()
 
@@ -137,7 +143,7 @@ class ModeManager:
         with self._lock:
             self.tick()
             if self.question:
-                if gesture.type == "nod":
+                if gesture.type in ("nod", "brow_raise"):
                     self._answer(True)
                 elif gesture.type == "shake":
                     self._answer(False)
@@ -145,36 +151,88 @@ class ModeManager:
             intent = GESTURES[self.mode].get(gesture.type)
             if intent == "menu_gesture":
                 self._ui(messages.GESTURE, gesture=gesture.type)
+            elif intent == "gesture_yes":
+                # An eyebrow raise only answers something that is waiting. With nothing waiting it does
+                # nothing, because a raise can also happen while talking (about 0.8 a minute in Hung's test).
+                if self.preview:
+                    self._insert_preview()
+                elif self.search:
+                    self.search.preconfirmed = True
+                    self._status("info", f"Will click {self.search.label} as soon as it's found")
             elif intent:
                 self._do(Command(name=intent))
 
     def on_transcript(self, transcript: dict) -> None:
+        """One utterance can hold several things ("Click search box. Yeah."), so it is cut into
+        clauses (commands.split_clauses) and each clause is read on its own:
+          Pointer    every clause that is a command runs, in order; other clauses are ignored
+          Dictation  a whole-utterance command runs as before; otherwise "click <name>" clauses and
+                     clauses after a trigger word ("Venus, stop dictation") are commands, and
+                     the rest goes to the preview
+          Menu       fixed commands only;  Paused  only "resume"
+        The same command twice in a row in one utterance runs once."""
         with self._lock:
             self.tick()
-            cmd = commands.parse(transcript["text"], allow_targets=self.mode == Mode.POINTER)
+            words = transcript.get("words") or [{"text": w, "conf": 1.0} for w in transcript["text"].split()]
+            clauses = commands.split_clauses(words)
             if self.mode == Mode.PAUSED:
-                if cmd and cmd.name in PAUSED_COMMANDS:
-                    self._do(cmd)
+                for c in clauses:
+                    cmd = commands.parse(c.text, allow_targets=False)
+                    if cmd and cmd.name in PAUSED_COMMANDS:
+                        self._do(cmd)
+                        return
                 return
-            if cmd:
-                self._do(cmd)
-            elif self.mode == Mode.DICTATION:
-                self._add_to_preview(transcript["words"])
-            else:
+            if self.mode == Mode.DICTATION:
+                whole = commands.parse(transcript["text"], allow_targets=True,
+                                       target_verbs=commands.DICTATION_TARGET_VERBS)
+                if whole and whole.name != "type_text" and len(clauses) <= 1:
+                    self._do(whole)
+                    return
+            done, last, i = False, None, 0
+            while i < len(clauses):
+                c = clauses[i]
+                cmd = self._clause_command(c)
+                if cmd is None:
+                    if self.mode == Mode.DICTATION:
+                        self._add_to_preview(c.words)
+                    i += 1
+                    continue
+                done = True
+                if cmd.name == "type_text":
+                    rest = [w for later in clauses[i + 1:] for w in later.words]
+                    self._type_text({"words": c.words + rest})
+                    return
+                if (cmd.name, cmd.label) != last:
+                    self._do(cmd)
+                last = (cmd.name, cmd.label)
+                i += 1
+            if not done and self.mode != Mode.DICTATION:
                 self._status("info", f'Heard "{transcript["text"]}" (not a command)')
+
+    def _clause_command(self, c) -> Command | None:
+        if c.triggered or self.mode == Mode.POINTER:
+            return commands.parse(c.text, allow_targets=self.mode in (Mode.POINTER, Mode.DICTATION))
+        if self.mode == Mode.DICTATION:   # untriggered: only "click <name>"
+            cmd = commands.parse(c.text, allow_targets=True, target_verbs=commands.DICTATION_TARGET_VERBS)
+            return cmd if cmd and cmd.name == "target" else None
+        cmd = commands.parse(c.text, allow_targets=False)   # Menu
+        return None if cmd and cmd.name == "type_text" else cmd
 
     def on_target_result(self, result: TargetResult) -> None:
         with self._lock:
             if not self.search or result.label != self.search.label:
                 return  # late answer to a search we already gave up on
-            self.search = None
+            preconfirmed, self.search = self.search.preconfirmed, None
             if not result.found:
                 self._ui(messages.TARGET_NONE, label=result.label)
                 return
             x, y, label = result.x, result.y, result.label
             self._ui(messages.TARGET_FOUND, x=x, y=y, label=label)
-            self._ask(f"Click {label}?", on_yes=lambda: self._os(topics.OS_CLICK, x=x, y=y),
-                      kind="target")
+            click = lambda: self._click_target(label, x, y)
+            if preconfirmed:   # already said yes while UI-Venus was looking
+                click()
+                return
+            self._ask(f"Click {label}?", on_yes=click, kind="target", label=label)
 
     def tick(self) -> None:
         """Expire an old question or search. The timer thread calls this; so does every input."""
@@ -243,6 +301,15 @@ class ModeManager:
                 self._answer(name == "yes")
             elif self.preview:
                 self._insert_preview() if name == "yes" else self._discard_preview()
+            elif self.search:
+                if name == "yes":
+                    self.search.preconfirmed = True
+                    self._status("info", f"Will click {self.search.label} as soon as it's found")
+                else:
+                    self._cancel_search()
+            else:
+                self._status("info", f'Nothing is waiting for a "{name}" (a question expires after '
+                                      f'{CONFIRM_TIMEOUT_S:.0f} s)')
         elif name == "cancel":
             if self.question:
                 self._answer(False)
@@ -299,7 +366,21 @@ class ModeManager:
             self._look_and_say(cmd.label)
 
     # ------------------------------------------------------------ look-and-say
+    def _click_target(self, label: str, x: int, y: int) -> None:
+        self._last_click = (label, self.clock())
+        self._os(topics.OS_CLICK, x=x, y=y)
+
     def _look_and_say(self, label: str) -> None:
+        # Saying the same "click <name>" again is impatience, not a new request:
+        q, now = self.question, self.clock()
+        if q and q.kind == "target" and q.label == label:
+            self._answer(True)                       # repeated while "Click X?" is open: that's a yes
+            return
+        if self.search and self.search.label == label:
+            self.search.preconfirmed = True          # repeated while searching: click when found
+            return
+        if self._last_click and self._last_click[0] == label and now - self._last_click[1] < REPEAT_CLICK_S:
+            return                                   # just clicked it: don't click again
         if self.last_gaze is None:
             self._status("warn", f"Look near {label} first, then say it again")
             return
@@ -317,6 +398,18 @@ class ModeManager:
             self._ui(messages.TARGET_NONE, label=s.label)
 
     # ----------------------------------------------------------------- preview
+    def _type_text(self, transcript: dict) -> None:
+        """'type <words>' / 'dictate <words>': only the words after the verb go to the preview,
+        with their confidence; then "yes" (or a nod) types them, as in Dictation mode."""
+        words = list(transcript.get("words") or [])
+        for i, w in enumerate(words):
+            if commands.normalize(w["text"]) in commands.TYPE_VERBS:
+                words = words[i + 1:]
+                break
+        if not words:
+            return
+        self._add_to_preview(words)
+
     def _add_to_preview(self, words: list[dict]) -> None:
         self.preview = self.preview + list(words)  # keep talking: new words join the bubble
         self._ui(messages.DICTATION_PREVIEW, words=list(self.preview))
@@ -349,11 +442,11 @@ class ModeManager:
         self._ask(prompt, on_yes=yes)
 
     def _ask(self, prompt: str, on_yes: Callable[[], None],
-             on_no: Callable[[], None] = lambda: None, kind: str = "general") -> None:
+             on_no: Callable[[], None] = lambda: None, kind: str = "general", label: str = "") -> None:
         if self.question:   # a newer question replaces the old one, which counts as "no"
             self._answer(False)
         q = _Question(f"q{next(self._ids)}", prompt, self.clock() + CONFIRM_TIMEOUT_S,
-                      on_yes, on_no, kind)
+                      on_yes, on_no, kind, label)
         self.question = q
         self._ui(messages.CONFIRM, id=q.id, prompt=prompt, state="open",
                  expires_in_s=CONFIRM_TIMEOUT_S)

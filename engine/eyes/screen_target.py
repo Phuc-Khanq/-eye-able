@@ -10,7 +10,12 @@ Two steps, so where you look matters (the model itself never knows where your ga
   1. zoom: a small box (640x360) around the gaze, enlarged 2x so small icons are clearer.
   2. wide: if the target isn't in the zoom box, the full 1280x720 box.
 The model picks any matching element in the image it sees, so a smaller box near the gaze means fewer
-look-alikes (one channel avatar instead of twenty).
+look-alikes (one channel avatar instead of twenty). Experimental hints (hint=) also say which one is meant:
+  "center"  adds "the one closest to the center of the screenshot" (the crop is centered on the pointer).
+            The default: on YouTube it got 5 of 6 right, against 4 of 7 with no hint and 3 of 5 with "mark"
+            (target_bench, Oct 24 2:20-3:10 AM; small samples, rerun on more apps)
+  "mark"    draws a red ring at the pointer and adds "the one at or nearest the red circle"
+  "none"    UI-Venus's own prompt, unchanged
 
 Prompt and output format come from UI-Venus's own grounding evaluation
 (models/grounding/eval_screenspot_pro.py on the UI-Venus-1.5 branch):
@@ -97,13 +102,14 @@ class ScreenTarget:
 
     def __init__(self, model_id: str | None = None, device: str | None = None,
                  crop: tuple[int, int] | None = None, zoom: tuple[int, int] | None = (640, 360),
-                 max_new_tokens: int = 32) -> None:
+                 max_new_tokens: int = 32, hint: str = "center") -> None:
         self.model_id = model_id or settings.ui_venus_model
         self.device = device or settings.ui_venus_device
         self.crop_w, self.crop_h = crop or (settings.crop_width, settings.crop_height)
         self.zoom = zoom                      # None = one step with the full box only
         self.trace: list[Stage] = []          # what each step saw and said, for the console and the bench
         self.max_new_tokens = max_new_tokens
+        self.hint = hint                      # "center" (default), "mark" or "none"; see the module notes
         self.model = None
         self.processor = None
         self.model_class = ""
@@ -174,13 +180,37 @@ class ScreenTarget:
             image = screen.crop((left, top, left + w, top + h))
             if name == "zoom":  # enlarge so the model gets more detail on small icons
                 image = image.resize((w * 2, h * 2), resample=3)  # 3 = bicubic
-            ans = self.ask(image, request.label)
+            ans = self.ask(*self._hinted(image, request.label, gx - left, gy - top, 2.0 if name == "zoom" else 1.0))
             total_ms += ans.ms
             self.trace.append(Stage(name=name, box=(left + ox, top + oy, w, h), answer=ans))
             if ans.point is not None and ans.point[0] >= 0:
                 return TargetResult(label=request.label, found=True, x=int(round(left + ox + ans.point[0] * w)),
                                     y=int(round(top + oy + ans.point[1] * h)), ms=total_ms)
         return TargetResult(label=request.label, found=False, ms=total_ms)
+
+    def _hinted(self, image, label: str, px: float, py: float, scale: float):
+        """Tells the model which of several look-alikes is meant: the one where the user is pointing.
+        px, py: the pointer inside the crop (before enlarging); scale: how much the crop was enlarged."""
+        if self.hint == "center":
+            return image, f"{label}, the one closest to the center of the screenshot"
+        if self.hint == "mark":
+            from PIL import ImageDraw
+            image = image.copy()
+            x, y, r = px * scale, py * scale, 22 * scale
+            ImageDraw.Draw(image).ellipse((x - r, y - r, x + r, y + r), outline=(255, 0, 0), width=int(2 * scale))
+            return image, f"{label}, the one at or nearest the red circle"
+        return image, label
+
+    def preload(self) -> Future:
+        """Load the model and warm it up on the worker thread; returns a Future with the seconds taken.
+        Requests submitted meanwhile wait behind it, so the model is never loaded twice."""
+        def work() -> float:
+            from PIL import Image
+            t0 = time.perf_counter()
+            self.load()
+            self.ask(Image.new("RGB", (640, 360), (255, 255, 255)), "the button")  # the first call is slow
+            return time.perf_counter() - t0
+        return self._pool.submit(work)
 
     def submit(self, request: TargetRequest) -> Future:
         """Runs find() on the UI-Venus worker thread, so the camera and audio threads never wait."""

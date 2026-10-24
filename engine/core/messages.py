@@ -6,7 +6,7 @@ Every message is a JSON object: {"type": <name>, ...fields}.
 # Engine -> UI
 MODE = "mode"                            # mode: "pointer" | "dictation" | "menu" | "paused"
 GAZE = "gaze"                            # x, y (screen px), confidence 0-1
-GESTURE = "gesture"                      # gesture: "nod" | "shake" | "tilt_left" | "tilt_right" (not "type": that key is the message name)
+GESTURE = "gesture"                      # gesture: "nod" | "shake" | "tilt_left" | "tilt_right" | "brow_raise" (not "type": that key is the message name)
 DWELL = "dwell"                          # progress 0-1
 TARGET_SEARCHING = "target_searching"    # label
 TARGET_FOUND = "target_found"            # x, y (screen px), label

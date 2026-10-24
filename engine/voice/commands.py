@@ -11,8 +11,18 @@ Forgiving means:
 Safe means:
   * the WHOLE utterance must be the command: "I'll send it tomorrow" is not "send it"
   * short phrases ("yes", "no", "menu") must match exactly, so "go" never becomes "no"
-  * target commands only count when the mode manager allows them (Pointer mode),
-    so dictating "Open the door when you get home" stays text
+  * target commands only count when the mode manager allows them: all three verbs in
+    Pointer mode, only "click" in Dictation mode, so "click Send" always clicks while
+    dictating "Open the door when you get home" stays text
+One-shot typing: "type <words>" or "dictate <words>" in Pointer or Dictation mode puts just
+those words in the preview (Command "type_text"); the mode manager then asks to type them.
+
+Mixed speech: Whisper hands over everything said before a pause as one utterance, e.g.
+"Click search box. Yeah." or "Yes. Yes. Click window." split_clauses() cuts it at sentence
+punctuation, before every "click", and at a trigger word, and the mode manager reads each
+clause on its own. Repeats collapse ("yes yes" = "yes").
+Trigger words ("Venus, scroll down", "computer stop dictation"): whatever follows one is always
+read as a command, in any mode, even in the middle of dictated text.
 """
 
 from __future__ import annotations
@@ -55,6 +65,13 @@ FIXED_COMMANDS: dict[str, str] = {
     "yeah": "yes",
     "yep": "yes",
     "confirm": "yes",
+    "sure": "yes",
+    "do it": "yes",
+    "go ahead": "yes",
+    # Answering "Click Send?": without these, "click it" started a new search for a button named "It"
+    "click": "yes",
+    "click it": "yes",
+    "click that": "yes",
     "no": "no",
     "nope": "no",
     "calibrate": "calibrate",
@@ -63,6 +80,9 @@ FIXED_COMMANDS: dict[str, str] = {
 
 # Verbs that start a look-and-say target request.
 TARGET_VERBS = ("click", "open", "select")
+DICTATION_TARGET_VERBS = ("click",)   # while dictating, only "click <name>" is a command
+TRIGGER_WORDS = ("venus", "computer")  # "Venus, click send": what follows is always a command
+TYPE_VERBS = ("type", "dictate")      # "type see you at noon": one-shot dictation
 
 # Minimum fuzzy scores (0-100). Kept high so chatter doesn't trigger commands.
 FIXED_CUTOFF = 80
@@ -109,11 +129,11 @@ def _fixed(clean: str) -> Command | None:
     return Command(name=FIXED_COMMANDS[phrase], score=score)
 
 
-def _target(clean: str) -> Command | None:
+def _target(clean: str, verbs=TARGET_VERBS) -> Command | None:
     first, _, rest = clean.partition(" ")
     if not rest:
         return None
-    verb = process.extractOne(first, TARGET_VERBS, scorer=fuzz.ratio, score_cutoff=VERB_CUTOFF)
+    verb = process.extractOne(first, verbs, scorer=fuzz.ratio, score_cutoff=VERB_CUTOFF)
     if verb is None:
         return None
     words = rest.split()
@@ -124,16 +144,75 @@ def _target(clean: str) -> Command | None:
     return Command(name="target", label=" ".join(words).title(), score=verb[1])
 
 
-def parse(text: str, allow_targets: bool = True) -> Command | None:
+@dataclass
+class Clause:
+    text: str
+    words: list[dict]          # Whisper words ({"text", "conf"}) in this clause
+    triggered: bool = False    # came right after a trigger word: always read as a command
+
+
+_END = re.compile(r"[.!?,;:]+[\"')\]]*$")
+
+
+def split_clauses(words: list[dict]) -> list[Clause]:
+    """Cut one utterance into clauses: after sentence punctuation, before every "click" that isn't
+    the first word, and at a trigger word (dropped; the clause after it is triggered)."""
+    clauses: list[Clause] = []
+    cur: list[dict] = []
+    triggered = pending = False
+
+    def close() -> None:
+        nonlocal cur, triggered
+        if cur:
+            clauses.append(Clause(" ".join(w["text"].strip() for w in cur), cur, triggered))
+        cur, triggered = [], False
+
+    for w in words:
+        raw = str(w.get("text", "")).strip()
+        bare = re.sub(r"[^\w']", "", raw.lower())
+        if not bare:
+            continue
+        if bare in TRIGGER_WORDS:
+            close()
+            pending = True
+            continue
+        if bare == "click" and cur:
+            close()
+        if not cur and pending:
+            triggered, pending = True, False
+        cur.append(w)
+        if _END.search(raw):
+            close()
+    close()
+    return clauses
+
+
+def _collapse(clean: str) -> str:
+    """'yes yes yes' -> 'yes': people repeat themselves when nothing seems to happen."""
+    out: list[str] = []
+    for w in clean.split():
+        if not out or out[-1] != w:
+            out.append(w)
+    return " ".join(out)
+
+
+def _type(clean: str) -> Command | None:
+    first, _, rest = clean.partition(" ")
+    return Command(name="type_text", label=rest) if first in TYPE_VERBS and rest else None
+
+
+def parse(text: str, allow_targets: bool = True, target_verbs=TARGET_VERBS) -> Command | None:
     """Return the best Command for a transcript, or None if nothing matches.
 
     allow_targets=False (Dictation mode) only matches fixed commands.
     Fixed commands win over targets, so "open menu" opens the menu.
     """
-    clean = normalize(text)
+    clean = _collapse(normalize(text))
     if not clean:
-        return None
-    return _fixed(clean) or (_target(clean) if allow_targets else None)
+        # "Okay." alone: the filler words are removed above, but on its own it answers a question
+        bare = re.sub(r"[^\w\s]", " ", text.lower()).split()
+        return Command(name="yes") if bare and set(bare) <= {"ok", "okay"} else None
+    return _fixed(clean) or (_target(clean, target_verbs) if allow_targets else None) or _type(clean)
 
 
 if __name__ == "__main__":

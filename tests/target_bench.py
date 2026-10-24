@@ -76,6 +76,8 @@ def main() -> None:
     parser.add_argument("--wait", type=float, default=3.0, help="seconds to switch windows before each capture")
     parser.add_argument("--app", default="", help="tag for the results file, e.g. youtube")
     parser.add_argument("--offset", type=float, default=0.0, help="ask this many px away from the mouse (random direction)")
+    parser.add_argument("--hint", choices=["none", "center", "mark"], default="center",
+                        help="tell the model which look-alike: center = 'closest to the center', mark = red ring at the pointer")
     parser.add_argument("--csv", default=None, help="results file (default calibration/ui_venus_results.csv)")
     args = parser.parse_args()
     import csv
@@ -84,14 +86,16 @@ def main() -> None:
     from pathlib import Path
     csv_path = Path(args.csv) if args.csv else Path(__file__).resolve().parents[1] / "calibration" / "ui_venus_results.csv"
     csv_path.parent.mkdir(parents=True, exist_ok=True)
+    if csv_path.exists() and "hint" not in csv_path.read_text(encoding="utf-8").splitlines()[0]:
+        csv_path.rename(csv_path.with_name(csv_path.stem + "_v1.csv"))  # older file without the hint column
     new_file = not csv_path.exists()
     out = open(csv_path, "a", newline="", encoding="utf-8")
     writer = csv.writer(out)
     if new_file:
-        writer.writerow(["time", "app", "target", "zoom", "offset_px", "found", "verdict", "ms", "answered_by", "px_from_mouse"])
+        writer.writerow(["time", "app", "target", "zoom", "offset_px", "found", "verdict", "ms", "answered_by", "px_from_mouse", "hint"])
 
     os_input.make_dpi_aware()
-    finder = ScreenTarget(zoom=None if args.no_zoom else (640, 360))
+    finder = ScreenTarget(zoom=None if args.no_zoom else (640, 360), hint=args.hint)
     print(f"Loading {finder.model_id} on {finder.device} (the first load reads about 5 GB from disk)...")
     secs = finder.load()
     print(f"Loaded in {secs:.1f} s with {finder.model_class}.")
@@ -153,7 +157,7 @@ def main() -> None:
         answered = next((st_.name for st_ in finder.trace if st_.answer.point is not None and st_.answer.point[0] >= 0), "")
         writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S"), args.app, label, bool(finder.zoom), int(args.offset),
                          result.found, verdict or "skip", round(result.ms), answered,
-                         round(float(np.hypot(result.x - mouse[0], result.y - mouse[1]))) if result.found else ""])
+                         round(float(np.hypot(result.x - mouse[0], result.y - mouse[1]))) if result.found else "", args.hint])
         out.flush()
 
     if times:

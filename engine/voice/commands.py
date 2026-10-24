@@ -133,6 +133,8 @@ FIXED_COMMANDS: dict[str, str] = {
     "find": "key_find",
     "new tab": "key_new_tab",
     "open new tab": "key_new_tab",
+    "new window": "key_new_window",
+    "open new window": "key_new_window",
     "close tab": "key_close_tab",
     "reopen tab": "key_reopen_tab",
     "next tab": "key_next_tab",
@@ -176,7 +178,8 @@ KEY_SHORTCUTS: dict[str, str] = {
     "key_select_all": "ctrl+a",
     "key_save": "ctrl+s",
     "key_find": "ctrl+f",
-    "key_new_tab": "ctrl+t",
+    "key_new_tab": "ctrl+t",           # a new tab in Chrome, Edge, Firefox and Windows 11's File Explorer
+    "key_new_window": "ctrl+n",        # a new WINDOW in browsers (Ctrl+N is not "new tab" there)
     "key_close_tab": "ctrl+w",
     "key_reopen_tab": "ctrl+shift+t",
     "key_next_tab": "ctrl+tab",
@@ -204,7 +207,7 @@ COMMAND_LABELS: dict[str, str] = {
     "volume_up": "Volume up", "volume_down": "Volume down", "mute": "Mute",
     "brightness_up": "Brightness up", "brightness_down": "Brightness down",
     "key_copy": "Copy", "key_paste": "Paste", "key_cut": "Cut", "key_select_all": "Select all", "key_save": "Save",
-    "key_find": "Find", "key_new_tab": "New tab", "key_close_tab": "Close tab", "key_reopen_tab": "Reopen tab",
+    "key_find": "Find", "key_new_tab": "New tab", "key_new_window": "New window", "key_close_tab": "Close tab", "key_reopen_tab": "Reopen tab",
     "key_next_tab": "Next tab", "key_previous_tab": "Previous tab", "key_refresh": "Refresh",
     "key_forward": "Forward", "key_switch_window": "Switch window", "key_minimize": "Minimize",
     "key_maximize": "Maximize", "key_show_desktop": "Show desktop", "key_zoom_in": "Zoom in",
@@ -216,6 +219,69 @@ COMMAND_LABELS: dict[str, str] = {
 
 # System commands -> the os.system action (os_output: volume by media keys, brightness through Windows)
 SYSTEM_COMMANDS = {"volume_up", "volume_down", "mute", "brightness_up", "brightness_down"}
+
+# The command list (python -m engine.voice.command_list prints it). EVERY command name above must have a row here:
+# tests/test_command_list.py fails otherwise, so adding a command means writing down what it does.
+# name -> (category, what it does). The list shows every phrase from FIXED_COMMANDS next to it.
+COMMAND_INFO: dict[str, tuple[str, str]] = {
+    "start_dictation": ("Dictation", "Starts dictation: what you say next shows on the card and is typed after you say yes"),
+    "stop_dictation": ("Dictation", "Ends dictation (asks first if words are waiting). While dictating, \"close\", \"off\" and \"turn off\" also work"),
+    "send_it": ("Dictation", "Types the preview and presses Enter, after asking \"send?\""),
+    "undo": ("Dictation", "Drops the preview, or presses Ctrl+Z when none is showing"),
+    "new_line": ("Dictation", "Starts a new line in the preview"),
+    "use_original": ("Dictation", "Types your own words instead of the cleaned-up text"),
+    "clean_up": ("Dictation", "Types the cleaned-up text again"),
+    "yes": ("Answers", "Says yes to a waiting question, preview or search"),
+    "no": ("Answers", "Says no to a waiting question, preview or search"),
+    "cancel": ("Answers", "Cancels a question or search, closes the menu, or drops the preview"),
+    "click_here": ("Click and mouse", "Left click at the cursor, snapped onto the nearest button or link (answers a question when one waits)"),
+    "right_click": ("Click and mouse", "Right click at the cursor"),
+    "dwell_on": ("Click and mouse", "Turns on dwell clicking (rest the cursor to click)"),
+    "dwell_off": ("Click and mouse", "Turns off dwell clicking"),
+    "scroll_up": ("Scroll", "Scrolls up a little and stays in the current mode"),
+    "scroll_down": ("Scroll", "Scrolls down a little and stays in the current mode"),
+    "scroll_mode": ("Scroll", "Scroll mode: tilt your head chin up or down to scroll; say \"stop\" or \"done\" to leave"),
+    "pause": ("Modes", "Pauses the engine: it ignores everything except \"resume\""),
+    "resume": ("Modes", "Wakes the engine up again"),
+    "menu": ("Modes", "Opens the menu (no menu screen yet; say \"cancel\" to close it)"),
+    "calibrate": ("Setup", "Redoes the center calibration after you move your chair"),
+    "delete_voice_data": ("Setup", "Deletes the saved voice data (asks first)"),
+    "volume_up": ("Volume and screen", "Volume up 10%"),
+    "volume_down": ("Volume and screen", "Volume down 10%"),
+    "mute": ("Volume and screen", "Mutes or unmutes"),
+    "brightness_up": ("Volume and screen", "Screen brightness up 10% (laptop screen only)"),
+    "brightness_down": ("Volume and screen", "Screen brightness down 10% (laptop screen only, never below 10%)"),
+    "key_copy": ("Editing", "Ctrl+C"),
+    "key_paste": ("Editing", "Ctrl+V"),
+    "key_cut": ("Editing", "Ctrl+X"),
+    "key_select_all": ("Editing", "Ctrl+A"),
+    "key_save": ("Editing", "Ctrl+S"),
+    "key_find": ("Editing", "Ctrl+F"),
+    "key_new_tab": ("Browser and tabs", "Ctrl+T: a new tab in Chrome, Edge, Firefox and Windows 11's File Explorer"),
+    "key_new_window": ("Browser and tabs", "Ctrl+N: a new window"),
+    "key_close_tab": ("Browser and tabs", "Ctrl+W: closes the current tab"),
+    "key_reopen_tab": ("Browser and tabs", "Ctrl+Shift+T: reopens the tab you just closed"),
+    "key_next_tab": ("Browser and tabs", "Ctrl+Tab"),
+    "key_previous_tab": ("Browser and tabs", "Ctrl+Shift+Tab"),
+    "key_refresh": ("Browser and tabs", "F5"),
+    "go_back": ("Browser and tabs", "Alt+Left: back"),
+    "key_forward": ("Browser and tabs", "Alt+Right: forward"),
+    "key_zoom_in": ("Browser and tabs", "Ctrl+="),
+    "key_zoom_out": ("Browser and tabs", "Ctrl+-"),
+    "key_switch_window": ("Windows", "Alt+Tab"),
+    "key_minimize": ("Windows", "Windows key + Down"),
+    "key_maximize": ("Windows", "Windows key + Up"),
+    "key_show_desktop": ("Windows", "Windows key + D"),
+    "close_window": ("Windows", "Alt+F4, after asking \"Close this window?\""),
+    "escape": ("Keys and moving around", "Esc"),
+    "key_page_up": ("Keys and moving around", "Page Up"),
+    "key_page_down": ("Keys and moving around", "Page Down"),
+    "key_top": ("Keys and moving around", "Ctrl+Home: top of the page or document"),
+    "key_bottom": ("Keys and moving around", "Ctrl+End: bottom of the page or document"),
+    "key_enter": ("Keys and moving around", "Enter"),
+    "key_tab": ("Keys and moving around", "Tab"),
+    "key_backspace": ("Keys and moving around", "Backspace"),
+}
 
 # Said alone while dictating, these end Dictation mode (the mode manager checks; anywhere else they are words
 # or nothing). Longer ways to say it ("dictate off", "stop dictation") are fixed commands and work everywhere.
@@ -242,7 +308,7 @@ EXACT_ONLY_BELOW = 6       # phrases shorter than this (chars) must match exactl
 EXACT_ONLY = {"use original", "use the original", "clean it up", "stop clicking", "start clicking",
               "scroll", "scroll mode", "start scrolling",
               # one word or close pairs: never fuzzy ("new tab" and "next tab", "louder" from "lower")
-              "new tab", "next tab", "last tab", "louder", "quieter", "softer", "brighter", "dimmer", "darker",
+              "new tab", "new window", "next tab", "last tab", "louder", "quieter", "softer", "brighter", "dimmer", "darker",
               "refresh", "reload", "minimize", "maximize", "backspace", "go forward", "dictate on", "dictate off",
               "dictation on", "dictation off"}
 SCROLL_WORDS = ("scroll", "scrolling")

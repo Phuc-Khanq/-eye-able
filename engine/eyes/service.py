@@ -22,10 +22,11 @@ What the cursor does:
 The first face the camera sees starts a calibration, so the head's neutral pose is wherever you face
 the screen center. Say "calibrate" (or the UI's calibrate) to redo it after moving your chair.
 
-Clicks: an eyebrow raise = left click when nothing is waiting (the mode manager asks UI-Venus to snap it
-onto the button, link or box nearest the cursor); open the mouth and close it again (MouthOpenDetector,
-Gesture "mouth_open") = right click; a long blink (BlinkDetector, Gesture "blink", blink_click / --blink) = the
-same click as a raise, without moving the head; dwell (rest the cursor dwell_ms; off by default, --dwell) = left
+Clicks: a long blink (BlinkDetector, Gesture "blink", blink_click / --blink) = left click when nothing is
+waiting (the mode manager asks UI-Venus to snap it onto the button, link or box nearest the cursor), without
+moving the head; an eyebrow raise only says yes to a waiting question (and leaves Scroll mode), unless
+settings.brow_click is "left" / "right"; open the mouth and close it again (MouthOpenDetector,
+Gesture "mouth_open") = right click; dwell (rest the cursor dwell_ms; off by default, --dwell) = left
 click through DWELL_DONE.
 From the moment a raise starts (BrowRaiseDetector.raised), or once the eyes have been shut (BlinkDetector.held)
 or the mouth open (MouthOpenDetector.held) a moment, the cursor freezes where it was, so the face moving can't nudge the click off the
@@ -385,8 +386,8 @@ class EyesService:
 
     def _face_held(self) -> tuple[bool, int]:
         """(a click gesture is in progress, how far back it started in ms): the brows, or the mouth."""
-        if self.brows.raised:
-            return True, FREEZE_LOOKBACK_MS
+        if self.brows.raised and str(getattr(self.settings, "brow_click", "off")) != "off":
+            return True, FREEZE_LOOKBACK_MS     # a raise only holds the cursor when it is a click (aimed)
         if self.blink is not None and self.blink.held:
             return True, self.blink.closed_ms + FREEZE_LOOKBACK_MS
         if self.jaw is not None and self.jaw.held:

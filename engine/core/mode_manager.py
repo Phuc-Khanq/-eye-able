@@ -11,8 +11,10 @@ APIs: plain Python (enum, threading)
 Only this module asks os_input to click or type, so stray signals can't act alone.
 
 What each input means (one table per mode: GESTURES below):
-  Pointer    eyebrow raise = yes when a question, preview or search is waiting, otherwise the LEFT
-             click, snapped (below); "click" / "click here" / "click this|that|it" = the same snap click
+  Pointer    a long blink = the LEFT click, snapped (below), and yes when a question, preview or search is
+             waiting; an eyebrow raise = yes when something waits, otherwise nothing (brow_click "left" /
+             "right" in settings brings back the raise-click); "click" / "click here" / "click this|that|it" =
+             the same snap click
              (yes when something waits); open the mouth and close it = RIGHT click at the cursor, as is
              "right click"; dwell (off by default) = left click at the cursor;
              tilt left/right = scroll up/down; "click/open/select <name>" = look-and-say,
@@ -23,7 +25,7 @@ What each input means (one table per mode: GESTURES below):
              "open <name>" stays look-and-say
              An eyebrow raise made while the mouth is moving is ignored (talking, not a click), and so
              is a mouth gesture while the mic hears speech.
-             brow_click "right" (settings) brings back the old raise = right click.
+             brow_click "right" (settings) makes the raise a right click.
   Dictation  speech -> preview bubble; eyebrow raise, nod or "yes" inserts, shake or "no" discards;
              "click <name>" still clicks (only "click": "open the door..." stays text). Ends with
              "dictate off" / "stop dictation" (anywhere), or "close", "off", "turn off", "exit", "stop",
@@ -109,8 +111,8 @@ class Mode(Enum):
 
 # Gesture -> intent, per mode. Change the controls here, in one place.
 GESTURES: dict[Mode, dict[str, str]] = {
-    # brow_raise and blink (a long blink, when switched on) = "gesture_yes": yes if something waits, else the
-    # snap left click (Pointer only)
+    # blink (a long blink) = "gesture_yes": yes if something waits, else the snap left click (Pointer only).
+    # brow_raise = the same, but with nothing waiting it does nothing unless settings.brow_click says otherwise
     Mode.POINTER:   {"tilt_left": "scroll_up", "tilt_right": "scroll_down", "brow_raise": "gesture_yes",
                      "blink": "gesture_yes", "mouth_open": "right_click"},
     Mode.DICTATION: {"nod": "yes", "shake": "no", "brow_raise": "gesture_yes", "blink": "gesture_yes"},
@@ -166,7 +168,7 @@ class ModeManager:
         self._settings = settings           # launch.match reads launch_apps / launch_aliases from it
         self._scroll_idle_s = float(getattr(settings, "scroll_idle_s", 10.0))
         self._scroll_seen = 0.0             # clock time scroll mode started or the head last scrolled
-        self._brow_click = str(getattr(settings, "brow_click", "left"))   # "left" (snap) or "right"
+        self._brow_click = str(getattr(settings, "brow_click", "off"))   # "off" (default), "left" (snap) or "right"
         self._heard_speech = float("-inf")  # clock time the mic last said it heard speech
         self.mode = Mode.POINTER
         self._return_mode = Mode.POINTER   # where Menu and Paused go back to
@@ -241,11 +243,14 @@ class ModeManager:
             if intent == "menu_gesture":
                 self._ui(messages.GESTURE, gesture=gesture.type)
             elif intent == "gesture_yes":
-                # An eyebrow raise answers whatever is waiting. With nothing waiting it is the LEFT
-                # click in Pointer mode, snapped onto the nearest button (brow_click "right": the right
-                # click), at the cursor: the eyes service freezes the cursor during a raise, so the
-                # last gaze is where it froze. A raise while talking never gets here.
-                if self.preview or self.search or self.mode == Mode.POINTER:
+                # An eyebrow raise answers whatever is waiting (a preview, a look-and-say search). With nothing
+                # waiting it does nothing, unless brow_click is "left" / "right" (off by default since Oct 24
+                # evening: only a long blink clicks). A long blink with nothing waiting is the LEFT click in
+                # Pointer mode, snapped onto the nearest button, at the cursor: the eyes service freezes the
+                # cursor while the eyes are shut, so the last gaze is where it froze. A raise while talking
+                # never gets here.
+                brow_off = gesture.type == "brow_raise" and self._brow_click == "off"
+                if self.preview or self.search or (self.mode == Mode.POINTER and not brow_off):
                     self._ui(messages.GESTURE, gesture=gesture.type)
                 if self.preview:
                     self._insert_preview()
@@ -253,7 +258,7 @@ class ModeManager:
                     if not self.search.preconfirmed:
                         self.search.preconfirmed = True
                         self._status("info", f"Will click {self.search.label} as soon as it's found")
-                elif self.mode == Mode.POINTER:
+                elif self.mode == Mode.POINTER and not brow_off:
                     self._right_click() if (self._brow_click == "right" and gesture.type == "brow_raise") else self._snap_click()
             elif intent:
                 self._ui(messages.GESTURE, gesture=gesture.type)

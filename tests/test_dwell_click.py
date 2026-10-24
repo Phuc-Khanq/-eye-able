@@ -140,6 +140,7 @@ class TestEyesServiceClicks(unittest.TestCase):
 
     def test_raise_freezes_the_cursor_where_it_started(self):
         r = self.r
+        r.brow_click_on()
         self.move_and_rest(frames=5)             # stopped on a spot, well before a dwell
         start = self.gaze()
         r.frames(12, yaw=6.0, brow=0.45)         # brows up, and the head drifts right with them
@@ -154,6 +155,7 @@ class TestEyesServiceClicks(unittest.TestCase):
 
     def test_no_dwell_during_a_raise_or_after_its_click(self):
         r = self.r
+        r.brow_click_on()
         self.move_and_rest(frames=5)
         r.frames(40, yaw=4.0, brow=0.45)         # a long raise on a resting cursor: 1.3 s
         req = r.finder.asked[-1]                 # the raise, nothing waiting: the snap click here

@@ -41,6 +41,7 @@ class Base(unittest.TestCase):
 
 class TestActedOnIsShown(Base):
     def test_a_raise_snap_clicks_and_is_shown(self):
+        self.mm._brow_click = "left"                 # the old raise-click, switched back on
         self.gesture("brow_raise")
         self.assertEqual(self.shown(), ["brow_raise"])
         self.assertEqual(self.bus.of(topics.TARGET_REQUEST)[-1].snap, True)

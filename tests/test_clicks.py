@@ -30,6 +30,9 @@ class Base(unittest.TestCase):
     def raise_brows(self, t_ms=100_000):
         self.bus.publish(topics.GESTURE, Gesture(t_ms=t_ms, type="brow_raise"))
 
+    def blink(self, t_ms=100_000):
+        self.bus.publish(topics.GESTURE, Gesture(t_ms=t_ms, type="blink"))
+
     def clicks(self):
         return self.bus.of(topics.OS_CLICK)
 
@@ -41,21 +44,21 @@ class TestRaiseLeftClicks(Base):
         return req
 
     def test_a_raise_with_nothing_waiting_snap_clicks(self):
-        self.raise_brows()
+        self.blink()
         req = self.answer(True, 512, 296)
         self.assertEqual((req.gaze_x, req.gaze_y, req.snap), (500, 300, True))
         self.assertEqual(self.clicks(), [{"x": 512, "y": 296}])
 
     def test_it_asks_from_where_the_cursor_froze(self):
         self.bus.publish(topics.GAZE, GazePoint(0, 612.7, 410.2, 0.9))   # the frozen spot during the raise
-        self.raise_brows()
+        self.blink()
         req = self.answer(False)
         self.assertEqual((req.gaze_x, req.gaze_y), (612, 410))
         self.assertEqual(self.clicks(), [{"x": 612, "y": 410}])          # nothing to snap to: clicks there
 
     def test_no_cursor_yet_says_so_and_does_not_click(self):
         self.setUp(gaze=None)
-        self.raise_brows()
+        self.blink()
         self.assertEqual(self.clicks(), [])
         self.assertIn("Can't click", self.bus.ui(messages.STATUS)[-1]["text"])
 

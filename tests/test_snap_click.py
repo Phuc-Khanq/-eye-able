@@ -201,7 +201,7 @@ class TestModeManagerSnap(Base):
 
     def test_nothing_found_clicks_where_it_pointed(self):
         self.look(500, 300)
-        self.gesture("brow_raise")
+        self.gesture("blink")
         req = self.requests()[-1]
         self.look(700, 300)                                  # the head moved on meanwhile
         self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, False))
@@ -209,7 +209,7 @@ class TestModeManagerSnap(Base):
 
     def test_no_answer_in_time_does_not_click(self):
         self.look()
-        self.gesture("brow_raise")
+        self.gesture("blink")
         req = self.requests()[-1]
         self.clock.t += SNAP_TIMEOUT_S + 0.1
         self.mm.tick()
@@ -219,8 +219,8 @@ class TestModeManagerSnap(Base):
 
     def test_a_second_raise_while_snapping_clicks_once(self):
         self.look()
-        self.gesture("brow_raise")
-        self.gesture("brow_raise")
+        self.gesture("blink")
+        self.gesture("blink")
         req = self.requests()[-1]
         self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 520, 310))
         self.assertEqual(len(self.requests()), 1)

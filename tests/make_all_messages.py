@@ -49,6 +49,7 @@ def session() -> list[tuple[float, dict]]:
     from tests.test_eyes_service import Rig, TargetResult
 
     r = Rig()
+    r.brow_click_on()                    # a raise stands in for the long blink here: both snap click the same way
     r.os = r.out.os = ButtonOs()         # records the button: left and right clicks
     r.eyes.probe = FakeProbe()           # a link or button under every resting point: dwell shows ready
     r.mm.rewrite_wait_s = 1.5            # the dictation clean-up on, as in the app

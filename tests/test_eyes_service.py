@@ -138,6 +138,11 @@ class Rig:
         self.frames(5)
         self.out.flush()
 
+    def brow_click_on(self, side="left"):
+        """Bring back the old eyebrow-raise click (settings.brow_click "left" / "right"; "off" by default)."""
+        self.mm._brow_click = side
+        self.eyes.settings = SimpleNamespace(**{**vars(self.eyes.settings), "brow_click": side})
+
     def raise_brows(self, frames=12):
         self.frames(15)                     # resting brows
         self.frames(frames, brow=0.45)      # raised about 0.4 s (12 frames)
@@ -212,6 +217,7 @@ class TestEyesService(unittest.TestCase):
 
     def test_raise_with_nothing_waiting_snap_clicks(self):
         r = self.r
+        r.brow_click_on()
         r.raise_brows()
         req = r.finder.asked[-1]
         self.assertTrue(req.snap)

@@ -44,6 +44,7 @@ class Demo:
         from tests.test_eyes_service import Rig
 
         self.r = r = Rig()
+        r.brow_click_on()                      # a raise stands in for the long blink: both snap click the same way
         r.os = r.out.os = ButtonOs()
         r.mm.rewrite_wait_s = 1.5              # the clean-up on, as in the app
         self.voice, self.variant = voice, variant

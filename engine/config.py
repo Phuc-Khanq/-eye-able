@@ -25,13 +25,15 @@ class Settings:
     blink_threshold: float = 0.5
 
     # Pointing and clicking
-    # Left click: an eyebrow raise (or "click") snaps onto the nearest button, link or box: at once when the
+    # Left click: a long blink (or "click") snaps onto the nearest button, link or box: at once when the
     # cursor is already on one (the hand cursor or UI Automation), else UI-Venus looks near the cursor.
-    brow_click: str = "left"       # "left": a raise with nothing waiting is the snap left click; "right": the old right click
+    # An eyebrow raise is NOT a click any more (Oct 24 evening): it answers a waiting question, preview or search
+    # ("yes") and leaves Scroll mode. Put "left" here to bring the raise-click back.
+    brow_click: str = "off"        # "off": a raise with nothing waiting does nothing; "left": snap left click; "right": right click
     snap_trust_cursor: bool = True  # already on a link or button: click there without asking UI-Venus
     snap_max_px: int = 150         # UI-Venus may move a snap click at most this far
-    blink_click: bool = True       # a long, deliberate blink (0.4 to 1.2 s, both eyes) = the same click as an eyebrow
-                                   # raise (on since Khang's live test, Oct 24; --no-blink turns it off)
+    blink_click: bool = True       # a long, deliberate blink (both eyes) is the left click (on since Khang's live
+                                   # test, Oct 24; --no-blink turns it off)
     blink_rise: float = 0.20       # the blink click: how far over your open level the eyes must close; and how
     blink_closed_abs: float = 0.55  # shut they must get (tests.blink_record + tests.blink_replay suggest yours)
     blink_min_ms: int = 400        # the blink click: shut at least this long (a normal blink is shorter; raise it to

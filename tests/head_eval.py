@@ -98,9 +98,20 @@ def score(session: dict, make_detector=GestureDetector) -> dict:
                 row["miss"] += 1
         rows[seg["label"]] = row
     stray = [g for i, g in enumerate(gestures) if i not in used]
+    unwanted = []   # what fired when it shouldn't have, and where, to see what went wrong
+    for seg in session["segments"]:
+        if seg["expected"] is None:
+            unwanted += [(seg["label"], (t - seg["start_ms"]) / 1000, ty) for t, ty in gestures
+                         if seg["start_ms"] <= t < seg["end_ms"]]
+        for k, (start, end) in enumerate(seg["slots"]):
+            inside = [(t, ty) for t, ty in gestures if start <= t < end]
+            first_right = next((i for i, (_, ty) in enumerate(inside) if ty == seg["expected"]), None)
+            for i, (t, ty) in enumerate(inside):
+                if i != first_right:
+                    unwanted.append((f"{seg['label']} #{k + 1}", (t - start) / 1000, ty))
     minutes_quiet = sum(r["end_ms"] - r["start_ms"] for r in session["segments"] if r["label"] in QUIET_LABELS) / 60000
     false_total = sum(r["false"] + r["extra"] for r in rows.values()) + len(stray)
-    return {"rows": rows, "stray": stray, "false_total": false_total, "quiet_minutes": minutes_quiet,
+    return {"rows": rows, "stray": stray, "unwanted": unwanted, "false_total": false_total, "quiet_minutes": minutes_quiet,
             "false_per_min": false_total / minutes_quiet if minutes_quiet else float("nan")}
 
 
@@ -118,6 +129,10 @@ def print_report(result: dict, title: str = "") -> None:
     hits = sum(r["hit"] for r in result["rows"].values())
     print(f"hits {hits}/{asked}   false triggers {result['false_total']} "
           f"({result['false_per_min']:.1f} per quiet minute)   outside any prompt: {len(result['stray'])}")
+    if result["unwanted"]:
+        print("Fired when it shouldn't have (part, seconds into it, gesture):")
+        for where, sec, ty in result["unwanted"]:
+            print(f"  {where:<14} {sec:5.1f} s  {ty}")
 
 
 def sweep(session: dict) -> None:

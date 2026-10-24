@@ -190,6 +190,26 @@ class TestNoGpu(unittest.TestCase):
         from engine.config import Settings
 
         self.assertEqual((Settings.whisper_device, Settings.whisper_compute_type), ("cuda", "float16"))
+        self.assertEqual((Settings.rewrite_dictation, Settings.rewrite_device), (True, "cuda"))
+
+    def test_no_gpu_turns_the_cleanup_off(self):
+        import contextlib
+        import io
+
+        from engine.main import keep_rewrite_without_gpu
+
+        s = SimpleNamespace(rewrite_device="cuda")
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertFalse(keep_rewrite_without_gpu(s, True, cuda_devices=0))
+        self.assertIn('"rewrite_device": "cpu"', out.getvalue())
+        self.assertEqual(s.rewrite_device, "cuda")            # the setting itself isn't changed
+
+    def test_cleanup_stays_as_chosen_otherwise(self):
+        from engine.main import keep_rewrite_without_gpu
+
+        self.assertTrue(keep_rewrite_without_gpu(SimpleNamespace(rewrite_device="cuda"), True, cuda_devices=1))
+        self.assertTrue(keep_rewrite_without_gpu(SimpleNamespace(rewrite_device="cpu"), True, cuda_devices=0))
+        self.assertFalse(keep_rewrite_without_gpu(SimpleNamespace(rewrite_device="cuda"), False, cuda_devices=1))
 
 
 if __name__ == "__main__":

@@ -16,6 +16,9 @@ MOUTH = "eyes.mouth"                # MouthSample, every frame with a face (engi
 
 # Voice route
 UTTERANCE = "voice.utterance"       # numpy float32 array, 16 kHz mono (audio_in -> dictation)
+SPEECH_SPAN = "voice.speech_span"   # {"start_ms": float, "end_ms": float} (audio_in -> dictation), published
+                                    # right before each UTTERANCE on the same thread: time.monotonic() ms of
+                                    # the utterance audio's first sample (pre-roll included) and of its end
 TRANSCRIPT = "voice.transcript"     # {"text": str, "words": [{"text", "conf"}], "ms": float}
 DELETE_VOICE_DATA = "voice.delete_data"  # {} (mode manager -> voice_data, after a confirm)
 

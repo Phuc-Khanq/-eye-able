@@ -82,7 +82,8 @@ class TestDictationWorker(unittest.TestCase):
         left = []
         while not worker._queue.empty():
             left.append(worker._queue.get_nowait())
-        self.assertEqual(left, [f"clip {i}" for i in range(2, dictation.MAX_QUEUED + 2)])
+        # queued with its speech span (none here: no SPEECH_SPAN was published)
+        self.assertEqual(left, [(f"clip {i}", None) for i in range(2, dictation.MAX_QUEUED + 2)])
 
     def test_load_failure_is_reported(self):
         class Broken:

@@ -2,7 +2,8 @@
 
 Route: Khoi and Khoa (Khoi leads)
 Publishes: topics.TRANSCRIPT {"text", "words": [{"text", "conf"}], "ms"}
-Subscribes: topics.UTTERANCE (float32 audio from audio_in)
+Subscribes: topics.UTTERANCE (float32 audio from audio_in) and topics.SPEECH_SPAN (when it was
+            spoken, for the mouth gate: only the user's voice counts; see DictationWorker)
 APIs: faster-whisper WhisperModel("large-v3-turbo", device="cuda", compute_type="float16"),
       transcribe(word_timestamps=True, hotwords=...)
 
@@ -113,14 +114,44 @@ def public_words(words: list[dict]) -> list[dict]:
 
 
 class DictationWorker:
-    """Listens for utterances on the bus and transcribes them on its own thread."""
+    """Listens for utterances on the bus and transcribes them on its own thread.
 
-    def __init__(self, bus, dictation: Dictation) -> None:
+    Only the user's voice counts (the mouth gate). With teammates talking near the mic, Whisper
+    hears them too. audio_in publishes topics.SPEECH_SPAN (when the clip was spoken) right before
+    each UTTERANCE; with `mouth` (engine.eyes.mouth.MouthTracker) a word is kept only if the
+    camera saw the user's mouth moving while it was said:
+        f = mouth.moving_fraction(span start + word start - pad, span start + word end + pad)
+        keep the word if f is None or f >= mouth_min_moving
+    MouthTracker's contract (confirmed with Khang): it returns None when the face was seen in
+    under half of the window's expected frames ("can't tell", so we keep the word); otherwise
+    the share of moving frames among the frames where the face was seen. It is thread-safe
+    (it locks and copies its history), so calling it from this Whisper thread while the
+    camera thread adds frames is fine. If it raises, the word is kept (fail open: a broken
+    camera must not mute the user). No mouth, mouth_gate off, or an utterance with no span:
+    every word is kept, as before.
+    """
+
+    def __init__(self, bus, dictation: Dictation, mouth=None, settings=None,
+                 clock=time.monotonic, log=print) -> None:
+        if settings is None:
+            from engine.config import settings
         self.bus = bus
         self.dictation = dictation
+        self.mouth = mouth
+        self.gate = bool(getattr(settings, "mouth_gate", True))
+        self.min_moving = float(getattr(settings, "mouth_min_moving", 0.3))
+        self.pad_ms = float(getattr(settings, "mouth_pad_ms", 150.0))
+        self.status_every_s = float(getattr(settings, "mouth_status_every_s", 10.0))
+        self._clock = clock
+        self._log = log                       # console lines for tuning; never audio
+        self._span: dict | None = None        # the SPEECH_SPAN for the next UTTERANCE
+        self._span_lock = threading.Lock()
+        self._last_ignored = float("-inf")    # clock time of the last "Ignored speech" status
+        self._last_warning = float("-inf")    # ... and of the last "tracker failed" warning
         self._queue: queue.Queue = queue.Queue(maxsize=MAX_QUEUED)
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        bus.subscribe(topics.SPEECH_SPAN, self.on_speech_span)
         bus.subscribe(topics.UTTERANCE, self.on_utterance)
 
     def start(self, warm_up: bool = True) -> None:
@@ -131,16 +162,23 @@ class DictationWorker:
     def stop(self) -> None:
         self._stop.set()
 
+    def on_speech_span(self, span: dict) -> None:
+        """Called on audio_in's thread right before the UTTERANCE it belongs to."""
+        with self._span_lock:
+            self._span = span
+
     def on_utterance(self, audio) -> None:
-        """Called on audio_in's thread: queue and return immediately."""
+        """Called on audio_in's thread: queue the audio with its span and return immediately."""
+        with self._span_lock:
+            item, self._span = (audio, self._span), None
         try:
-            self._queue.put_nowait(audio)
+            self._queue.put_nowait(item)
         except queue.Full:
             try:
-                self._queue.get_nowait()       # drop the oldest
+                self._queue.get_nowait()       # drop the oldest (its span goes with it)
             except queue.Empty:
                 pass
-            self._queue.put_nowait(audio)
+            self._queue.put_nowait(item)
 
     def _run(self, warm_up: bool) -> None:
         if warm_up:
@@ -151,12 +189,12 @@ class DictationWorker:
                 return
         while not self._stop.is_set():
             try:
-                audio = self._queue.get(timeout=0.2)
+                audio, span = self._queue.get(timeout=0.2)
             except queue.Empty:
                 continue
-            self.process(audio)
+            self.process(audio, span)
 
-    def process(self, audio) -> None:
+    def process(self, audio, span: dict | None = None) -> None:
         """Transcribe one utterance and publish it. Tests call this directly."""
         t0 = time.perf_counter()
         try:
@@ -164,13 +202,56 @@ class DictationWorker:
         except Exception as exc:               # one bad clip must not kill the demo
             self._error(f"Transcription failed: {exc}")
             return
+        ms = round((time.perf_counter() - t0) * 1000, 1)
+        if words and span is not None and self.mouth is not None and self.gate:
+            words = self._mouth_gate(words, span)
+            if not words:
+                self._ignored()
+                return
         if not words:
             return
         self.bus.publish(topics.TRANSCRIPT, {
             "text": words_to_text(words),
             "words": public_words(words),
-            "ms": round((time.perf_counter() - t0) * 1000, 1),
+            "ms": ms,
         })
+
+    # ----------------------------------------------------------- mouth gate
+    def _mouth_gate(self, words: list[dict], span: dict) -> list[dict]:
+        """The words said while the user's mouth moved (see the class docstring)."""
+        start = float(span["start_ms"])
+        kept, dropped = [], []
+        for w in words:
+            try:
+                f = self.mouth.moving_fraction(start + w["start"] * 1000 - self.pad_ms,
+                                               start + w["end"] * 1000 + self.pad_ms)
+            except Exception as exc:
+                f = None
+                now = self._clock()
+                if now - self._last_warning >= 60:
+                    self._last_warning = now
+                    self._log(f"[mouth] the mouth tracker failed ({exc}); keeping the words")
+            (kept if f is None or f >= self.min_moving else dropped).append((w, f))
+
+        def show(pairs):
+            return " ".join(f"{w['text']}({'-' if f is None else f'{f:.2f}'})" for w, f in pairs)
+
+        line = f"[mouth] kept {len(kept)}/{len(words)}: {show(kept)}"
+        self._log(line + (f"  dropped: {show(dropped)}" if dropped else ""))
+        kept_words = [w for w, _ in kept]
+        if (dropped and kept_words and len(kept_words) <= 3
+                and max(w["conf"] for w in kept_words) < HALLUCINATION_CONF):
+            return []                           # what's left is a few unsure words: noise
+        return kept_words
+
+    def _ignored(self) -> None:
+        now = self._clock()
+        if now - self._last_ignored >= self.status_every_s:
+            self._last_ignored = now
+            from engine.core import messages
+
+            self.bus.publish(topics.TO_UI, messages.make(
+                messages.STATUS, level="info", text="Ignored speech while your mouth wasn't moving"))
 
     def _error(self, text: str) -> None:
         from engine.core import messages

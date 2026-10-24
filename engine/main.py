@@ -47,11 +47,12 @@ class Engine:
             self.eyes = EyesService(bus, settings, pointer=pointer, dwell=dwell, confirm=confirm)
             self.targets = TargetService(bus, settings)
             self.os_output = OsOutput(bus, driver=self.eyes.driver)
-            # Was the user's mouth moving? For the voice route's "only the user's voice" gate:
-            # DictationWorker should take mouth=self.mouth (None without eyes = no gate).
+            # Was the user's mouth moving? For the voice route's "only the user's voice" gate.
             self.mouth = MouthTracker(bus)
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
-        self.dictation = DictationWorker(bus, dictation or Dictation(settings))
+        #    (without eyes, mouth is None: no gate, every word counts)
+        self.dictation = DictationWorker(bus, dictation or Dictation(settings), mouth=self.mouth,
+                                         settings=settings)
         self.audio_in = AudioIn(bus, settings, sd=sd, mic_settings=mic_settings, vad=vad)
         self.voice_data = VoiceData(bus)             # "delete my voice data"
 

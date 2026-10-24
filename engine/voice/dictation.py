@@ -54,8 +54,13 @@ class Dictation:
             s = self.settings
             if s is None:
                 from engine.config import settings as s
-            self._model = WhisperModel(resolve_model(s.whisper_model), device=s.whisper_device,
-                                       compute_type=s.whisper_compute_type)
+            name = resolve_model(s.whisper_model)
+            kwargs = dict(device=s.whisper_device, compute_type=s.whisper_compute_type)
+            try:
+                # already downloaded: load offline (skips a ~2 s online check, nothing leaves the laptop)
+                self._model = WhisperModel(name, local_files_only=True, **kwargs)
+            except Exception:
+                self._model = WhisperModel(name, **kwargs)   # first run: download it once
 
     def warm_up(self) -> None:
         """First CUDA call is slow; run one second of silence at startup."""

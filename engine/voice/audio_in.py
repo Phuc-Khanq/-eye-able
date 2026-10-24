@@ -80,28 +80,99 @@ def level_0_1(block) -> float:
     return round(min(1.0, max(0.0, 1.0 + 20.0 * np.log10(rms) / 60.0)), 3)
 
 
-class _ProbSpy:
-    """Wraps the Silero model to remember the last speech probability (for --debug)."""
+def _silero_onnx_path():
+    """The ONNX model file inside the silero-vad package, found WITHOUT importing the package
+    (its __init__ imports torch, which alone takes about 4 s to load)."""
+    import importlib.util
+    from pathlib import Path
 
-    def __init__(self, model) -> None:
-        self._model = model
-        self.last = 0.0
+    spec = importlib.util.find_spec("silero_vad")
+    if spec is None or not spec.submodule_search_locations:
+        raise RuntimeError("silero-vad is not installed (pip install -r requirements.txt)")
+    path = Path(list(spec.submodule_search_locations)[0]) / "data" / "silero_vad.onnx"
+    if not path.exists():
+        raise RuntimeError(f"Silero VAD model not found at {path}")
+    return path
 
-    def __call__(self, x, sr):
-        p = self._model(x, sr)
-        self.last = float(p.item()) if hasattr(p, "item") else float(p)
-        return p
 
-    def __getattr__(self, name):
-        return getattr(self._model, name)
+class SileroOnnx:
+    """Silero VAD speech probability for one 512-sample block, with numpy + onnxruntime only.
+    Same model file and same input handling as silero_vad's OnnxWrapper (64-sample context)."""
+
+    CONTEXT = 64
+
+    def __init__(self) -> None:
+        import numpy as np
+        import onnxruntime  # comes with faster-whisper
+
+        opts = onnxruntime.SessionOptions()
+        opts.inter_op_num_threads = 1
+        opts.intra_op_num_threads = 1
+        self.session = onnxruntime.InferenceSession(str(_silero_onnx_path()), sess_options=opts,
+                                                    providers=["CPUExecutionProvider"])
+        self._sr = np.array(RATE, dtype=np.int64)
+        self.last = 0.0                  # last speech probability (live_check --debug)
+        self.reset_states()
+
+    def reset_states(self) -> None:
+        import numpy as np
+
+        self._state = np.zeros((2, 1, 128), dtype=np.float32)
+        self._context = np.zeros((1, self.CONTEXT), dtype=np.float32)
+
+    def __call__(self, block, sr: int = RATE) -> float:
+        import numpy as np
+
+        x = np.concatenate([self._context, np.asarray(block, dtype=np.float32).reshape(1, -1)], axis=1)
+        out, self._state = self.session.run(None, {"input": x, "state": self._state, "sr": self._sr})
+        self._context = x[:, -self.CONTEXT:]
+        self.last = float(out.reshape(-1)[0])
+        return self.last
+
+
+class VadIterator:
+    """Speech start / end events, the same rules as silero_vad.VADIterator:
+    start when probability >= threshold; end after min_silence_samples below threshold - 0.15.
+    Returns {"start": sample}, {"end": sample} or None for each 512-sample block."""
+
+    def __init__(self, model, threshold: float = VAD_THRESHOLD, min_silence_duration_ms: int = 100,
+                 speech_pad_ms: int = 30) -> None:
+        self.model = model
+        self.threshold = threshold
+        self.min_silence_samples = RATE * min_silence_duration_ms // 1000
+        self.speech_pad_samples = RATE * speech_pad_ms // 1000
+        self.reset_states()
+
+    def reset_states(self) -> None:
+        self.model.reset_states()
+        self.triggered = False
+        self.temp_end = 0
+        self.current_sample = 0
+
+    def __call__(self, block):
+        n = len(block)
+        self.current_sample += n
+        prob = self.model(block, RATE)
+        if prob >= self.threshold and self.temp_end:
+            self.temp_end = 0
+        if prob >= self.threshold and not self.triggered:
+            self.triggered = True
+            return {"start": max(0, self.current_sample - self.speech_pad_samples - n)}
+        if prob < self.threshold - 0.15 and self.triggered:
+            if not self.temp_end:
+                self.temp_end = self.current_sample
+            if self.current_sample - self.temp_end < self.min_silence_samples:
+                return None
+            end = self.temp_end + self.speech_pad_samples - n
+            self.temp_end = 0
+            self.triggered = False
+            return {"end": end}
+        return None
 
 
 def load_vad(pause_seconds: float):
-    """Silero VAD (ONNX, small and bundled with the package; no download)."""
-    from silero_vad import VADIterator, load_silero_vad  # heavy: import only when used
-
-    model = _ProbSpy(load_silero_vad(onnx=True))
-    return VADIterator(model, threshold=VAD_THRESHOLD, sampling_rate=RATE,
+    """Silero VAD (the ONNX model bundled with silero-vad; no download, no torch)."""
+    return VadIterator(SileroOnnx(), threshold=VAD_THRESHOLD,
                        min_silence_duration_ms=int(pause_seconds * 1000),
                        speech_pad_ms=SPEECH_PAD_MS)
 

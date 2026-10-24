@@ -108,18 +108,28 @@ def main(argv: list[str] | None = None) -> int:
     bus.subscribe(topics.TRANSCRIPT, on_transcript)
     bus.subscribe(topics.TO_UI, on_ui)
 
+    # Whisper loads and warms up in the background while the mic already listens; anything
+    # said meanwhile waits in the worker's queue, so startup feels much quicker.
     model = resolve_model(settings.whisper_model)
-    print(f"Loading Whisper {model} on {settings.whisper_device} ({settings.whisper_compute_type})...",
-          flush=True)
-    t0 = time.perf_counter()
-    try:
-        worker.dictation.load()
-        Dictation.transcribe(worker.dictation, __import__("numpy").zeros(16000, "float32"))  # warm up
-    except Exception as exc:
-        print(f"Whisper could not load: {exc}")
-        return 1
-    print(f"Loaded in {time.perf_counter() - t0:.1f} s", flush=True)
-    worker.start(warm_up=False)
+    print(f"Loading Whisper {model} on {settings.whisper_device} ({settings.whisper_compute_type}) "
+          "in the background...", flush=True)
+    load_failed = threading.Event()
+
+    def load_whisper() -> None:
+        import numpy as np
+
+        t0 = time.perf_counter()
+        try:
+            worker.dictation.load()
+            Dictation.transcribe(worker.dictation, np.zeros(16000, np.float32))  # warm up
+        except Exception as exc:
+            print(f"Whisper could not load: {exc}", flush=True)
+            load_failed.set()
+            return
+        print(f"  (Whisper ready after {time.perf_counter() - t0:.1f} s)", flush=True)
+        worker.start(warm_up=False)
+
+    threading.Thread(target=load_whisper, name="whisper-load", daemon=True).start()
 
     try:
         chosen = mic.open_settings(preferred=args.mic, verbose=True) if args.mic is not None else None
@@ -146,6 +156,9 @@ def main(argv: list[str] | None = None) -> int:
         while t_end is None or time.monotonic() < t_end:
             time.sleep(0.1)
             now = time.monotonic()
+            if load_failed.is_set():
+                code = 1
+                break
             if not args.loop:
                 if heard.is_set():
                     break                       # the sentence ended: stop listening
@@ -180,10 +193,16 @@ def main(argv: list[str] | None = None) -> int:
     audio_in.stop()                             # mic off before Whisper finishes
     if heard.is_set() and not args.loop:
         print("  Mic off. Waiting for Whisper...", flush=True)
+        give_up = time.monotonic() + 120
         try:
-            if not finished.wait(timeout=120):
-                print("  Whisper took longer than 2 minutes. Stopping.", flush=True)
-                code = 1
+            while not finished.wait(timeout=0.2):
+                if load_failed.is_set():
+                    code = 1
+                    break
+                if time.monotonic() > give_up:
+                    print("  Whisper took longer than 2 minutes. Stopping.", flush=True)
+                    code = 1
+                    break
         except KeyboardInterrupt:
             pass
     worker.stop()

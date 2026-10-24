@@ -249,6 +249,38 @@ class TestRealSilero(unittest.TestCase):
         self.assertEqual(bus.of(topics.UTTERANCE), [])
 
 
+class TestTorchFreeSilero(unittest.TestCase):
+    """audio_in runs Silero's ONNX model without torch (4 s faster to start).
+    It must give the same probabilities and events as the silero_vad package."""
+
+    def test_matches_silero_package(self):
+        try:
+            import torch
+            from silero_vad import VADIterator, load_silero_vad
+        except Exception as exc:
+            self.skipTest(f"silero-vad/torch not available: {exc}")
+        rng = np.random.default_rng(1)
+        # a vowel-like signal: harmonics with a slow wobble, between silences
+        t = np.arange(int(1.5 * RATE)) / RATE
+        voice = sum(np.sin(2 * np.pi * f * t * (1 + 0.02 * np.sin(6 * t))) / k
+                    for k, f in enumerate((140, 280, 420, 700, 1100), start=1))
+        x = np.concatenate([silence(0.5), 0.2 * voice, silence(2.0)]).astype(np.float32)
+        x += (0.001 * rng.standard_normal(len(x))).astype(np.float32)
+        blocks = [x[i:i + 512] for i in range(0, len(x) - 511, 512)]
+
+        mine = audio_in.SileroOnnx()
+        ref = load_silero_vad(onnx=True)
+        for b in blocks:
+            self.assertAlmostEqual(mine(b), ref(torch.from_numpy(b), RATE).item(), places=5)
+
+        ours = audio_in.load_vad(1.0)
+        theirs = VADIterator(load_silero_vad(onnx=True), threshold=audio_in.VAD_THRESHOLD,
+                             sampling_rate=RATE, min_silence_duration_ms=1000,
+                             speech_pad_ms=audio_in.SPEECH_PAD_MS)
+        self.assertEqual([ours(b) for b in blocks],
+                         [theirs(torch.from_numpy(b)) for b in blocks])
+
+
 class TestEventBus(unittest.TestCase):
     def test_publish_reaches_every_subscriber(self):
         bus = EventBus()

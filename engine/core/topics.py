@@ -22,6 +22,11 @@ SPEECH_SPAN = "voice.speech_span"   # {"start_ms": float, "end_ms": float} (audi
 TRANSCRIPT = "voice.transcript"     # {"text": str, "words": [{"text", "conf"}], "ms": float}
 DELETE_VOICE_DATA = "voice.delete_data"  # {} (mode manager -> voice_data, after a confirm)
 
+# Dictation clean-up (mode manager <-> engine/voice/rewrite.py RewriteWorker)
+REWRITE_REQUEST = "dictation.rewrite_request"  # {"id": int, "text": str}, each time the preview text changes
+REWRITE_RESULT = "dictation.rewrite_result"    # {"id": int, "clean": str, "used": bool, "ms": float}; clean is
+                                               # the original text when used is False
+
 # Look-and-say (mode manager <-> screen_target)
 TARGET_REQUEST = "target.request"   # TargetRequest
 TARGET_RESULT = "target.result"     # TargetResult

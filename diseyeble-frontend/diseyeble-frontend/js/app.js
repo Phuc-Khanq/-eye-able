@@ -826,18 +826,23 @@
     const p = pointerAt(e); G.target.x = G.pos.x = p.x; G.target.y = G.pos.y = p.y;
     if (!G.seen){ G.seen = true; tip('Point at something and click. With the engine on, your head moves the pointer and a long blink clicks. You can also just say "open Chrome".'); }
   });
-  // A click is a click: right where the pointer is, at once (a real mouse click, or the engine's blink click)
+  // A click is a click: right where the pointer is, at once. clickAt is shared by a real mouse click and by the
+  // engine's blink click (js/engine.js gets it as page_action "click" and calls clickAt at that spot).
+  function clickAt(clientX, clientY, button='left', how='Click'){
+    const r = screen.getBoundingClientRect(), pos = {x:clientX-r.left, y:clientY-r.top};
+    G.target.x = G.pos.x = pos.x; G.target.y = G.pos.y = pos.y;
+    if (G.paused) return null;
+    if (button === 'right'){ ripple('shake', pos); glabel('RIGHT CLICK'); log('eye', how.replace('Click','Right click')); openCtx(pos.x+6, pos.y+6); return 'menu'; }
+    const t = document.elementFromPoint(clientX, clientY), el = t && screen.contains(t) ? t.closest('[data-act]') : null;
+    ripple('blink', pos); glabel('CLICK');
+    if (el){ log('eye', how + ' "' + label(el) + '"'); run(el.dataset.act, 'eye'); return label(el); }
+    $('#ctx').hidden = true; if (W.startOpen){ W.startOpen = false; renderAll(); }
+    return '';
+  }
   screen.addEventListener('pointerdown', e => {
     if (G.scripted || e.button > 2) return;
     e.preventDefault();
-    const pos = pointerAt(e);
-    G.target.x = G.pos.x = pos.x; G.target.y = G.pos.y = pos.y;
-    if (G.paused) return;
-    if (e.button === 2){ ripple('shake', pos); glabel('RIGHT CLICK'); log('eye','Right click'); openCtx(pos.x+6, pos.y+6); return; }
-    const t = document.elementFromPoint(e.clientX, e.clientY), el = t && screen.contains(t) ? t.closest('[data-act]') : null;
-    ripple('blink', pos); glabel('CLICK');
-    if (el){ log('eye', 'Click "' + label(el) + '"'); run(el.dataset.act, 'eye'); }
-    else { $('#ctx').hidden = true; if (W.startOpen){ W.startOpen = false; renderAll(); } }
+    clickAt(e.clientX, e.clientY, e.button === 2 ? 'right' : 'left', 'Click');
   });
   // the mouse wheel (and the engine's head scrolling, which is a real wheel) scrolls the simulated page
   let wheelAcc = 0;
@@ -1417,7 +1422,7 @@
 
   /* ---------------- hooks for js/engine.js (the real engine over WebSocket) ---------------- */
   window.DZ = { $, esc, log, toast, tip, flashSig, glabel, mascotDo, setCaption, addEvent, FACE, DUR, G, screen, mic,
-    W, run, openWin, nav, renderAll, insertText, typeKey, scrollBy, ctxAction, openCtx, ripple, hitTest, wtoast, ACTIONS, bringTop,
+    W, run, clickAt, openWin, nav, renderAll, insertText, typeKey, scrollBy, ctxAction, openCtx, ripple, hitTest, wtoast, ACTIONS, bringTop,
     get micLive(){ return micLive; }, set micLive(v){ micLive = v; mic.classList.toggle('live', v); } };
 
   /* ---------------- boot ---------------- */

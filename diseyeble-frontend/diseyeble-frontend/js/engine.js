@@ -144,15 +144,25 @@
     ws.onerror = () => { try { ws.close(); } catch (e) {} };
   }
 
-  /* page mode heartbeat: the engine acts inside this page only while this keeps arriving */
+  /* page mode heartbeat: the engine acts inside this page only while this keeps arriving.
+     "inside": the real cursor is over this page, so the engine sends its clicks here instead of through Windows. */
+  let inside = false, offX = null, offY = null, lastX = 0, lastY = 0;
   function beat(force) {
     if (!live) return;
     const want = !$('#demo').hidden && document.visibilityState === 'visible';
-    if (want || force || lastWant !== want) send('page_mode', { on: want });
+    if (want || force || lastWant !== want) send('page_mode', { on: want, inside: want && inside && offX !== null });
     lastWant = want;
   }
   setInterval(beat, HEARTBEAT_MS);
   document.addEventListener('visibilitychange', () => beat(true));
+  // where this page sits on the screen: screen px = (clientX + offX) * devicePixelRatio
+  const track = e => {
+    offX = e.screenX - e.clientX; offY = e.screenY - e.clientY; lastX = e.clientX; lastY = e.clientY;
+    if (!inside) { inside = true; beat(true); }
+  };
+  document.addEventListener('pointermove', track, true);
+  document.addEventListener('pointerdown', track, true);
+  document.documentElement.addEventListener('mouseleave', () => { if (inside) { inside = false; beat(true); } });
 
   /* ---------- webcam picture ---------- */
   function showWebcam(on) {
@@ -326,8 +336,28 @@
     } else if (host === 'mail.google.com') D.run('open:mail', 'voice');
     else toast(host + ' is not part of this demo');
   }
+  // The engine's click (a long blink, "click", "click Send" after yes) while the cursor is over this page: click that spot
+  function actClick(m) {
+    if (offX === null) { log('sys', 'Click from the engine, but the page does not know where it is yet'); return; }
+    const dpr = window.devicePixelRatio || 1;
+    const cx = m.x / dpr - offX, cy = m.y / dpr - offY;
+    const how = m.button === 'right' ? 'Right click' : 'Blink click';
+    if (Math.hypot(cx - lastX, cy - lastY) > 40)   // a hint for debugging: the page's idea of the cursor and the engine's differ
+      log('sys', `Engine click at ${Math.round(cx)}, ${Math.round(cy)}; the cursor was last seen at ${Math.round(lastX)}, ${Math.round(lastY)} (browser zoom not 100%?)`);
+    const sr = screenEl.getBoundingClientRect();
+    if (cx >= sr.left && cx <= sr.right && cy >= sr.top && cy <= sr.bottom) {
+      const what = D.clickAt(cx, cy, m.button === 'right' ? 'right' : 'left', how);
+      if (what === '') log('eye', how + ': nothing to click there');
+      return;
+    }
+    // outside the simulated screen: an ordinary click on this page (Pause, the menu at the top, ...)
+    const el = document.elementFromPoint(cx, cy), target = el && el.closest('button, a, [data-go], [data-page-go]');
+    if (target) { log('eye', how + ' “' + (target.textContent || '').trim().slice(0, 30) + '”'); target.click(); }
+  }
+
   function onAction(m) {
     switch (m.action) {
+      case 'click': actClick(m); break;
       case 'type': actType(m.text); break;
       case 'key': actKey(m.key); break;
       case 'scroll': for (let i = 0; i < 2; i++) D.scrollBy(m.direction === 'up' ? -1 : 1); D.glabel('SCROLL ' + (m.direction === 'up' ? 'UP' : 'DOWN')); break;

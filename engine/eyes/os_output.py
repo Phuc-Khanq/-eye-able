@@ -3,7 +3,8 @@
 Route: Khang and Hung (Hung leads os_input; this is the bus side of it)
 Publishes: status (to the UI) when opening something, or when an action fails
 Page mode (engine/core/page_mode.py): while the website's demo page is open, type, key, scroll, undo and launch go to it
-as a page_action message instead of to Windows. Clicks, volume and brightness stay real.
+as a page_action message instead of to Windows; so does a click while the real cursor is over the page (the page clicks
+that spot itself). Clicks elsewhere, volume and brightness stay real.
 Subscribes: topics.OS_CLICK {"x", "y", "button": "left" | "right" (optional, left)}, OS_TYPE {"text"}, OS_KEY {"key": "enter" | "shift+enter" | ...},
             OS_SCROLL {"direction": "up" | "down"}, OS_UNDO {},
             OS_LAUNCH {"app": a key of settings.launch_apps} or {"url": "https://..."},
@@ -65,6 +66,15 @@ class OsOutput:
 
     def on_click(self, p: dict) -> None:
         x, y = int(p["x"]), int(p["y"])
+        button = "right" if p.get("button") == "right" else "left"
+        if self.page is not None and self.page.has_pointer:
+            # The cursor is over the demo page: the page clicks the spot itself, so the click can't get lost on its
+            # way through Windows and Chrome (Khang's test, Oct 25: blinks were seen but the page didn't react).
+            # The real cursor still goes there, so what you see and what is clicked agree.
+            if self.driver is not None:
+                self.driver.snap(x, y)
+            self._to_page("click", x=x, y=y, button=button)
+            return
         click = partial(self.os.click, button="right") if p.get("button") == "right" else self.os.click
         self._safely("click", lambda: self.driver.click(x, y, click) if self.driver else click(x, y))
 

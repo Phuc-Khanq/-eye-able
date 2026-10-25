@@ -45,7 +45,8 @@ CONFIRM = "confirm"                      # id ("q1"), prompt, state: "open" | "c
 # Page mode (the website's simulated desktop): while the demo page is open and sends PAGE_MODE, typing, keys, scrolling and
 # "open ..." go to the page as PAGE_ACTION instead of to Windows, and the webcam picture is streamed as DEBUG_FRAME.
 # Clicks stay real: the page is under the real cursor.
-PAGE_ACTION = "page_action"              # action: "type" (text) | "key" (key: "enter", "ctrl+c", "alt+left"...) |
+PAGE_ACTION = "page_action"              # action: "click" (x, y: screen px; button "left"|"right"; only while the page
+                                         # said the cursor is over it) | "type" (text) | "key" (key: "enter", "ctrl+c", ...) |
                                          # "scroll" (direction: "up"|"down") | "undo" | "launch" (app: a launch_apps key,
                                          # or url: https://...)
 DEBUG_FRAME = "debug_frame"              # jpeg (base64) of the webcam, mirrored, about preview_width px wide; w, h. Only
@@ -73,7 +74,7 @@ FIELDS: dict[str, tuple[set[str], set[str]]] = {
     STATUS: ({"level", "text"}, set()),
     CONFIRM: ({"id", "prompt", "state", "expires_in_s"}, set()),
     COMMAND: ({"label"}, set()),
-    PAGE_ACTION: ({"action"}, {"text", "key", "direction", "app", "url"}),
+    PAGE_ACTION: ({"action"}, {"text", "key", "direction", "app", "url", "x", "y", "button"}),
     DEBUG_FRAME: ({"jpeg", "w", "h"}, set()),
 }
 
@@ -86,7 +87,8 @@ DICTATION = "dictation"                  # action: "insert" | "discard" | "use_o
 TARGET = "target"                        # action: "click" | "cancel"
 CONSOLE = "console"                      # open: true/false
 CONFIRM_ANSWER = "confirm_answer"        # id, yes: true/false (a button, same as nod / shake)
-PAGE_MODE = "page_mode"                  # on: true. The demo page sends it every 2 s while it is open and showing; the engine
+PAGE_MODE = "page_mode"                  # on: true, inside: true when the cursor is over the page. The demo page sends it every
+                                         # second while it is open and showing (and at once when inside changes); the engine
                                          # treats it as on for 6 s after the last one (so a closed page can never swallow typing)
 
 

@@ -104,11 +104,39 @@ class TestRouting(unittest.TestCase):
                          [("launch", "chrome", None), ("launch", None, "https://youtube.com")])
         self.assertEqual(bus.ui(messages.STATUS)[-1]["level"], "warn")        # http:// is still refused
 
-    def test_clicks_stay_real_in_page_mode(self):
+    def test_clicks_stay_real_when_the_cursor_is_not_over_the_page(self):
         bus, clock, page, out, os_api, launched = rig(True)
         bus.publish(topics.OS_CLICK, {"x": 400, "y": 300})
         out.flush()
         self.assertEqual(os_api.calls, [("click", 400, 300, "left")])
+        self.assertEqual(bus.ui(messages.PAGE_ACTION), [])
+
+    def test_a_click_over_the_page_is_done_by_the_page(self):
+        bus, clock, page, out, os_api, launched = rig(True)
+        snaps = []
+        out.driver = SimpleNamespace(snap=lambda x, y: snaps.append((x, y)))
+        bus.publish(topics.from_ui(messages.PAGE_MODE), {"on": True, "inside": True})
+        bus.publish(topics.OS_CLICK, {"x": 400, "y": 300})
+        bus.publish(topics.OS_CLICK, {"x": 410, "y": 310, "button": "right"})
+        out.flush()
+        self.assertEqual(os_api.calls, [])                 # nothing went through Windows
+        self.assertEqual(snaps, [(400, 300), (410, 310)])  # the real cursor still went there
+        self.assertEqual([(m["action"], m["x"], m["y"], m["button"]) for m in bus.ui(messages.PAGE_ACTION)],
+                         [("click", 400, 300, "left"), ("click", 410, 310, "right")])
+
+    def test_the_cursor_leaving_the_page_makes_clicks_real_again(self):
+        bus, clock, page, out, os_api, launched = rig(True)
+        bus.publish(topics.from_ui(messages.PAGE_MODE), {"on": True, "inside": True})
+        bus.publish(topics.from_ui(messages.PAGE_MODE), {"on": True, "inside": False})
+        bus.publish(topics.OS_CLICK, {"x": 5, "y": 5})
+        out.flush()
+        self.assertEqual(os_api.calls, [("click", 5, 5, "left")])
+
+    def test_inside_does_not_outlive_page_mode(self):
+        bus, clock, page, out, os_api, launched = rig(True)
+        bus.publish(topics.from_ui(messages.PAGE_MODE), {"on": True, "inside": True})
+        clock.t += 7
+        self.assertFalse(page.has_pointer)
 
     def test_without_the_page_everything_is_real(self):
         bus, clock, page, out, os_api, launched = rig(False)

@@ -102,6 +102,7 @@ class Engine:
         self.dictation = DictationWorker(bus, dictation or Dictation(settings), mouth=self.mouth,
                                          settings=settings)
         self.audio_in = AudioIn(bus, settings, sd=sd, mic_settings=mic_settings, vad=vad)
+        self.audio_in.mouth = self.mouth             # a still mouth ends a clip, even in a noisy room (None: VAD only)
         self.voice_data = VoiceData(bus)             # "delete my voice data"
 
     def start(self, listen: bool = True) -> None:
@@ -357,6 +358,9 @@ def main() -> None:
                    default=bool(getattr(settings, "rewrite_dictation", True)),
                    help="clean up dictated text with a small local model before it's typed (Qwen2.5-1.5B on the "
                         "GPU, downloaded once, about 6 GB); on by default (rewrite_dictation), --no-rewrite turns it off")
+    p.add_argument("--no-venus", action="store_true",
+                   help="don't load UI-Venus for this run (look-and-say and snapped clicks are off): saves the GPU "
+                        "memory, for testing the pointer or dictation while something else uses the GPU")
     p.add_argument("--record", action="store_true",
                    help="recording the demo video: the dictation card is visible to OBS (card_hide_from_capture off)")
     p.add_argument("--gpu-log", action="store_true",
@@ -368,6 +372,8 @@ def main() -> None:
         except (AttributeError, ValueError):
             pass
     settings.blink_click = args.blink
+    if args.no_venus:
+        settings.use_ui_venus = False
     apply_record(settings, args.record)
     rewrite = keep_rewrite_without_gpu(settings, args.rewrite)
     try:

@@ -94,6 +94,8 @@ class Settings:
     mouth_gate: bool = True
     mouth_gate_mode: str = "utterance"  # "utterance": keep or drop the whole utterance; "word": each word on its own
     mouth_min_moving: float = 0.3      # share of face frames with a moving mouth; lower it for weak movement
+    mouth_endpoint: bool = True        # also end a clip when your mouth has been still for pause_seconds (a noisy room:
+                                       # the VAD never hears a pause); needs the camera to see your face
     mouth_pad_ms: float = 150.0        # widen each word's time window by this much on both sides
     mouth_status_every_s: float = 10.0  # "Ignored speech while your mouth wasn't moving", at most this often
     # An eyebrow raise while the mouth is moving is talking, not a yes or a right click

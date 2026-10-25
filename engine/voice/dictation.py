@@ -130,6 +130,14 @@ def words_to_text(words: list[dict]) -> str:
     return " ".join(w["text"] for w in words)
 
 
+def _seconds(audio) -> float:
+    """How long a clip is, in seconds (0 for anything that isn't an audio array: tests pass text)."""
+    try:
+        return len(audio) / 16000.0 if not isinstance(audio, str) else 0.0
+    except TypeError:
+        return 0.0
+
+
 def public_words(words: list[dict]) -> list[dict]:
     """Words as the transcript and the UI get them: text and confidence, no timing."""
     return [{"text": w["text"], "conf": w["conf"]} for w in words]
@@ -157,7 +165,7 @@ class DictationWorker:
     """
 
     def __init__(self, bus, dictation: Dictation, mouth=None, settings=None,
-                 clock=time.monotonic, log=print) -> None:
+                 clock=time.monotonic, log=lambda text: print(text, flush=True)) -> None:
         if settings is None:
             from engine.config import settings
         self.bus = bus
@@ -170,6 +178,7 @@ class DictationWorker:
         self.status_every_s = float(getattr(settings, "mouth_status_every_s", 10.0))
         self._clock = clock
         self._log = log                       # console lines for tuning; never audio
+        self._last_mode_note = float("-inf")  # clock time of the last "live preview is off in this mode" line
         self._span: dict | None = None        # the SPEECH_SPAN for the next UTTERANCE
         self._span_lock = threading.Lock()
         self._last_ignored = float("-inf")    # clock time of the last "Ignored speech" status
@@ -205,7 +214,13 @@ class DictationWorker:
 
     def on_partial(self, payload: dict) -> None:
         """Called on audio_in's thread: keep the newest audio-so-far for the live preview (Dictation mode only)."""
-        if not self.live or self._mode != "dictation":
+        if not self.live:
+            return
+        if self._mode != "dictation":
+            now = self._clock()
+            if now - self._last_mode_note >= 15:
+                self._last_mode_note = now
+                self._log(f"[live] not showing: the mode is '{self._mode or 'unknown'}', live text is for Dictation mode")
             return
         with self._partial_lock:
             self._partial = (payload["audio"], {"start_ms": payload["start_ms"], "end_ms": payload["end_ms"]},
@@ -264,16 +279,26 @@ class DictationWorker:
         if item is None:
             return
         audio, span, gen = item
+        t0 = time.perf_counter()
         try:
             words = self.dictation.transcribe(audio)
-        except Exception:
+        except Exception as exc:
+            self._log(f"[live] Whisper failed on a partial ({type(exc).__name__}: {exc})")
             return                             # the live text is a courtesy: the final transcription reports errors
+        ms = (time.perf_counter() - t0) * 1000
         with self._partial_lock:
             stale = gen != self._partial_gen
+        head = f"[live] {_seconds(audio):.1f} s of audio, Whisper {ms:.0f} ms"
         if stale or not self._queue.empty() or self._mode != "dictation":
+            self._log(f"{head}: too late, the finished words got there first (not shown)")
             return
         if words and self.mouth is not None and self.gate and not self._partial_mouth_ok(words, span):
+            self._log(f"{head}: hidden by the mouth gate (your mouth wasn't seen moving): {words_to_text(words)}")
             words = []
+        elif words:
+            self._log(f"{head}: {words_to_text(words)}")
+        else:
+            self._log(f"{head}: no words")
         self._set_live(words_to_text(words) if words else "")
 
     def _partial_mouth_ok(self, words: list[dict], span: dict) -> bool:
@@ -303,6 +328,8 @@ class DictationWorker:
             self._error(f"Transcription failed: {exc}")
             return
         ms = round((time.perf_counter() - t0) * 1000, 1)
+        if self.live:                          # timing for tuning: where a slow dictation spends its time
+            self._log(f"[whisper] {_seconds(audio):.1f} s of audio, {len(words)} words in {ms:.0f} ms")
         if (words and span is not None and self.mouth is not None and self.gate
                 and not self._resume_while_paused(words)):
             words = self._mouth_gate(words, span)

@@ -19,6 +19,7 @@ from tests.test_audio_in import FakeVad, silence, tone
 
 RATE = audio_in.RATE
 LIVE = SimpleNamespace(live_preview=True, live_every_s=1.0, live_min_s=0.8, pause_seconds=1.0)
+LOG = []
 SPAN = {"start_ms": 1000.0, "end_ms": 3000.0}
 
 
@@ -26,7 +27,7 @@ def worker(mouth=None, mode="dictation", settings=None):
     bus = FakeBus()
     s = settings or SimpleNamespace(live_preview=True, mouth_gate=True, mouth_gate_mode="utterance",
                                     mouth_min_moving=0.3, mouth_pad_ms=150.0, mouth_status_every_s=10.0)
-    w = DictationWorker(bus, Dictation(model=FakeWhisperModel()), mouth=mouth, settings=s)
+    w = DictationWorker(bus, Dictation(model=FakeWhisperModel()), mouth=mouth, settings=s, log=LOG.append)
     w._mode = mode
     return w, bus
 
@@ -104,6 +105,29 @@ class TestAudioInPartials(unittest.TestCase):
 
 
 class TestWorkerLive(unittest.TestCase):
+    def setUp(self):
+        LOG.clear()
+
+    def test_the_console_says_what_happened(self):
+        w, bus = worker()
+        w.on_partial(partial("hi mom"))
+        w._live_step()
+        self.assertTrue(any("[live]" in line and "hi mom" in line for line in LOG), LOG)
+        w2, _ = worker(mode="pointer")
+        w2.on_partial(partial("hi mom"))
+        self.assertTrue(any("not showing" in line and "pointer" in line for line in LOG), LOG)
+        w.on_partial(partial("late"))
+        w.on_utterance("late")
+        w.on_partial(partial("hi again"))
+        w._queue.put_nowait(("x", None))
+        w._live_step()
+        self.assertTrue(any("too late" in line for line in LOG), LOG)
+
+    def test_the_whisper_time_of_a_finished_utterance_is_logged(self):
+        w, bus = worker()
+        w.process("hi mom home", None)
+        self.assertTrue(any(line.startswith("[whisper]") for line in LOG), LOG)
+
     def test_a_partial_shows_as_live_text(self):
         w, bus = worker()
         w.on_partial(partial("hi mom home at"))

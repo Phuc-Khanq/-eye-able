@@ -41,6 +41,10 @@ MIN_SPEECH_S = 0.25         # shorter blips (a cough, a click) are dropped
 MAX_UTTERANCE_S = 28.0
 LIVE_VOICE_RMS = 0.015      # a block this loud (after gain) counts as voice for the live preview, so a pause isn't re-transcribed
 LIVE_NEW_VOICE_S = 0.25     # a new partial needs this much new voice since the last one
+MOUTH_STILL = 0.05          # mouth-moving share (over the last pause_seconds) at or under this = the user stopped talking
+MOUTH_EXTRA_S = 0.5         # a clip must be this much longer than pause_seconds before the mouth can end it
+MOUTH_CHECK_EVERY = 6       # ask the mouth tracker every 6 blocks (about 5 times a second)
+MOUTH_TAIL_S = 0.3          # keep this much audio after the mouth stopped
 LEVEL_EVERY = 3             # send a listening level every 3 blocks (about 10 per second)
 RAW_QUEUE_MAX = 200         # about 6 s of mic chunks; if we fall that far behind, drop audio
 TIME_HISTORY_S = 35.0       # sample times kept for SPEECH_SPAN (longer than any utterance plus pre-roll)
@@ -217,6 +221,12 @@ class AudioIn:
         self.live = bool(getattr(settings, "live_preview", False))
         self.live_every_s = max(0.3, float(getattr(settings, "live_every_s", 1.0)))
         self.live_min_s = float(getattr(settings, "live_min_s", 0.8))
+        # End a clip when the user's MOUTH has been still for pause_seconds, not only when the VAD hears silence.
+        # In a room where other people talk, the VAD never hears a pause: clips ran to the 28 s cap, the user
+        # waited that long, and the mouth gate then judged all 28 s at once and dropped "hi Dizzy". Needs `mouth`
+        # (the MouthTracker, set by the engine); no mouth or no face seen: the VAD alone decides, as before.
+        self.mouth = None
+        self.mouth_endpoint = bool(getattr(settings, "mouth_endpoint", False))
         self._reset_stream_state()
         bus.subscribe(topics.from_ui(messages.SETTINGS), self.on_settings)
 
@@ -380,9 +390,10 @@ class AudioIn:
             self._finish(end_sample=int(event["end"]) + self._vad_offset)
         elif self.speaking and len(self._speech) * BLOCK >= MAX_UTTERANCE_S * RATE:
             self._finish(end_sample=None)
-            if hasattr(self._vad, "reset_states"):
-                self._vad.reset_states()
-                self._vad_offset = self._blocks * BLOCK
+            self._restart_vad()
+        elif self.speaking and self._mouth_stopped():
+            self._finish(end_sample=self._blocks * BLOCK - int(max(0.0, self.pause_seconds - MOUTH_TAIL_S) * RATE))
+            self._restart_vad()
 
         if self.live and self.speaking:
             if float(np.sqrt(np.mean(block * block))) >= LIVE_VOICE_RMS:
@@ -392,6 +403,25 @@ class AudioIn:
         if self._blocks % LEVEL_EVERY == 0:
             self.bus.publish(topics.TO_UI, messages.make(
                 messages.LISTENING, level=self.level, speaking=self.speaking))
+
+    def _restart_vad(self) -> None:
+        """After a clip ended without the VAD's say-so, so the VAD can start the next one."""
+        if hasattr(self._vad, "reset_states"):
+            self._vad.reset_states()
+            self._vad_offset = self._blocks * BLOCK
+
+    def _mouth_stopped(self) -> bool:
+        """True when the camera saw the user's mouth still for the last pause_seconds (see mouth_endpoint)."""
+        if self.mouth is None or not self.mouth_endpoint or self._blocks % MOUTH_CHECK_EVERY:
+            return False
+        if len(self._speech) * BLOCK < (self.pause_seconds + MOUTH_EXTRA_S) * RATE:
+            return False
+        try:
+            end_ms = self._sample_time_ms(self._blocks * BLOCK, "end")
+            f = self.mouth.moving_fraction(end_ms - self.pause_seconds * 1000.0, end_ms)
+        except Exception:
+            return False                # a broken tracker must never cut the user off
+        return f is not None and f <= MOUTH_STILL
 
     def _partial(self) -> None:
         """The audio of this utterance so far, for the live preview (the dictation worker transcribes it

@@ -4,6 +4,9 @@
     python -m engine.voice.finetune.run_all --platform kaggle --hours 10 --out /kaggle/working \\
         --resume-from /kaggle/input/<previous-version-output>
     python -m engine.voice.finetune.run_all --tiny --out <some temp folder>      # laptop smoke test
+    python -m engine.voice.finetune.run_all --platform local --hours 3 --out downloads\\personal \\
+        --search engine\\voice\\finetune\\search_personal.json --export-dir models\\whisper-elder-personal-ct2
+                                                      # the demo PC: TORGO + LibriSpeech + your own voice pack
 
 Steps:
   1. get_data --yes (into /kaggle/temp on Kaggle), 2. prepare
@@ -68,6 +71,8 @@ class Pipeline:
             from engine.voice.finetune.export import TINY_EXPORT_DIR
 
             self.export_dir = TINY_EXPORT_DIR if self.tiny else common.DEFAULT_EXPORT_DIR
+        if getattr(args, "export_dir", None):          # e.g. models/whisper-elder-personal-ct2: keep the old model
+            self.export_dir = Path(args.export_dir)
         for inner in (self.data_dir, self.checkpoints):
             if self.out == inner.resolve() or self.out in inner.resolve().parents:
                 raise SystemExit(f"--out {self.out} must not contain {inner} (no data or checkpoints in the output)")
@@ -180,7 +185,7 @@ class Pipeline:
     def configs(self) -> list[dict]:
         if self.tiny:
             return [{"name": "tiny"}]
-        return common.load_search()
+        return common.load_search(getattr(self.args, "search", None))
 
     def train_all(self) -> None:
         from engine.voice.finetune.train import TrainConfig, tiny_config, train
@@ -397,6 +402,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-dir", type=Path, default=None, help="override the data folder")
     parser.add_argument("--work-dir", type=Path, default=None, help="kaggle: scratch folder (default /kaggle/temp)")
     parser.add_argument("--tiny", action="store_true", help="smoke test: whisper tiny, 40 clips, CPU")
+    parser.add_argument("--search", type=Path, default=None,
+                        help="train the configs in this file instead of search.json (search_personal.json)")
+    parser.add_argument("--export-dir", type=Path, default=None,
+                        help="where the converted model goes (default models/whisper-elder-ct2: it would REPLACE "
+                             "the current one)")
     args = parser.parse_args(argv)
     return Pipeline(args).run()
 

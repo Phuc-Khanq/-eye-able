@@ -1,0 +1,7 @@
+{
+  "_note": "One config for the demo PC (run_all --search): the same recipe as r32-lr1e-4-mix25, with the personal voice pack counted 4 times so a ~120 sentence pack matters next to TORGO. Dev still decides; test (the personal 20% and TORGO F04/M01) is scored once.",
+  "configs": [
+    {"name": "r32-lr1e-4-mix25-personal4", "lora_r": 32, "lora_alpha": 64, "lr": 1e-4, "typical_mix": 0.25,
+     "personal_repeat": 4, "max_steps": 1500, "num_workers": 0}
+  ]
+}

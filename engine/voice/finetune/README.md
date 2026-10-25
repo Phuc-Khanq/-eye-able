@@ -210,3 +210,24 @@ Settings tried by `run_all` are in `search.json`. Speakers per split are in `spl
 | `Out of GPU memory: micro-batch is now 2` | Fine: it halves the batch by itself and keeps going. |
 | The run stopped at 12 h | Use step 7 (resume) with `--hours` a bit lower. |
 | `RESULTS.md` says "not met" | That's a real result too. Try other settings in `search.json` and resume. Never tune on the test set. |
+
+---
+
+## Appendix: retrain on the demo PC with your own voice (Oct 24 night)
+
+The Kaggle model (TORGO + LibriSpeech) is `models/whisper-elder-ct2`. To add one person's own voice to it,
+without replacing the working model:
+
+1. Record the pack (about 15 minutes, you type "yes" to consent; the audio stays in `data/voice/personal/`):
+   `python -m engine.voice.finetune.record_pack`
+2. Close the demo (it needs the GPU), then, in the repo's venv:
+   `python -m pip install -r requirements-train.txt`
+   `python -m engine.voice.finetune.run_all --platform local --hours 3 --out downloads\personal --search engine\voice\finetune\search_personal.json --export-dir models\whisper-elder-personal-ct2`
+3. It downloads TORGO and LibriSpeech (about 3 GB), scores the stock model, trains one config (the personal
+   pack counted 4 times), converts it and scores it once on test. Read `downloads\personal\RESULTS.md`: the
+   "Personal voice pack" row is the one that matters here, and LibriSpeech must not get worse.
+4. If it's better, put `{"whisper_model": "models/whisper-elder-personal-ct2"}` in `config.local.json`.
+   If not, nothing changed: the old model is still in `models/whisper-elder-ct2`.
+
+Like TORGO, the personal model is never published. A pack of about 120 sentences is small; expect a gain on
+words and phrases like the ones you recorded, not a new voice model.

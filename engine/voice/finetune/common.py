@@ -100,8 +100,9 @@ def load_split() -> dict:
     return json.loads(SPLIT_FILE.read_text(encoding="utf-8"))
 
 
-def load_search() -> list[dict]:
-    return json.loads(SEARCH_FILE.read_text(encoding="utf-8"))["configs"]
+def load_search(path=None) -> list[dict]:
+    """The configs to train, from search.json or another file with the same shape (run_all --search)."""
+    return json.loads(Path(path or SEARCH_FILE).read_text(encoding="utf-8"))["configs"]
 
 
 # ------------------------------------------------------------------------ text

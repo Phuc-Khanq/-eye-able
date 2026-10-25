@@ -52,6 +52,9 @@ class TrainConfig:
     max_steps: int = 2000
     max_epochs: float = 5.0       # over the dysarthric/personal train clips
     typical_mix: float = 0.25     # share of LibriSpeech in each batch
+    personal_repeat: int = 1      # each personal-pack clip counts this many times among the train clips: a pack of
+                                  # about 120 sentences is tiny next to TORGO, so 4 lets it matter (speed
+                                  # perturbation and noise make every repeat sound a little different)
     eval_every: int = 250
     patience: int = 4             # evals without improvement before stopping
     min_delta: float = 0.2        # WER points that count as an improvement
@@ -214,6 +217,7 @@ class Trainer:
         clips = common.read_manifest(common.manifest_path(self.data_dir, self.cfg.tiny))
         train = [c for c in clips if c.split == "train"]
         main = [c for c in train if c.source in ("torgo", "personal")]
+        main += [c for c in train if c.source == "personal"] * max(0, int(self.cfg.personal_repeat) - 1)
         typical = [c for c in train if c.source == "librispeech"]
         if not main:                       # tiny smoke test: LibriSpeech only
             main, typical = typical, typical

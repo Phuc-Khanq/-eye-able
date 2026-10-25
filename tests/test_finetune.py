@@ -9,6 +9,7 @@ import json
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 import wave
 from pathlib import Path
 
@@ -294,6 +295,36 @@ class TestResultsPage(unittest.TestCase):
                                       data_dir=Path(tmp) / "data", hours=1.0, resume_from=None)
             with self.assertRaises(SystemExit):
                 run_all.Pipeline(args)
+
+
+class TestPersonalRun(unittest.TestCase):
+    def test_search_personal_is_one_valid_config_that_repeats_the_personal_pack(self):
+        from engine.voice.finetune import common
+        from engine.voice.finetune.train import TrainConfig
+
+        configs = common.load_search(common.HERE / "search_personal.json")
+        self.assertEqual(len(configs), 1)
+        cfg = TrainConfig.from_dict(configs[0])
+        self.assertEqual((cfg.personal_repeat, cfg.num_workers), (4, 0))      # 0 workers: Windows
+        self.assertEqual(TrainConfig().personal_repeat, 1)                    # other runs are unchanged
+        self.assertGreater(len(common.load_search()), 1)                      # search.json still the default
+
+    def test_train_clips_repeat_the_personal_ones(self):
+        from types import SimpleNamespace
+
+        from engine.voice.finetune import common
+        from engine.voice.finetune.train import Trainer, TrainConfig
+
+        def clip(source, i):
+            return common.Clip(f"{source}/{i}.wav", f"text {i}", "spk", "dys_unseen", "train", source, 1.0)
+
+        clips = [clip("torgo", i) for i in range(3)] + [clip("personal", i) for i in range(2)] + [clip("librispeech", 0)]
+        with mock.patch.object(common, "read_manifest", return_value=clips):
+            fake = SimpleNamespace(cfg=TrainConfig(personal_repeat=4, tiny=True), data_dir=Path("."))
+            main, typical, _, _ = Trainer._clips(fake)
+        self.assertEqual(sum(c.source == "personal" for c in main), 8)
+        self.assertEqual(sum(c.source == "torgo" for c in main), 3)
+        self.assertEqual(len(typical), 1)
 
 
 if __name__ == "__main__":

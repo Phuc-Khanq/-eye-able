@@ -462,9 +462,13 @@
     }
     setTimeout(() => { if (starting && !live) { starting = false; $('#engTxt').textContent = 'Simulated'; toast('The engine did not come up. Check its window for errors.'); } }, 120000);
   }
-  // capture phase: the page's own camera code never runs, because one app at a time can hold a webcam on Windows
+  // capture phase: the page's own camera code never runs, because one app at a time can hold a webcam on Windows.
+  // On the hosted website (GitHub Pages) there is no launcher: with no engine, the button shows the browser's own
+  // webcam as before, and the page connects by itself whenever Diseyeble is running on this PC.
+  const LOCAL = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   document.addEventListener('click', e => {
     if (!e.target.closest('#allowCam, #demoCamBtn')) return;
+    if (!LOCAL && !live) { toast('Showing your webcam. To control this page with your head, eyes and voice, start Diseyeble on your PC: the page connects by itself.'); return; }
     e.stopImmediatePropagation(); e.preventDefault(); startEngine();
   }, true);
 

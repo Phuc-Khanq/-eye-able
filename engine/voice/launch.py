@@ -12,8 +12,10 @@ APIs: re, urllib.parse (standard library only)
     match("open compose", settings)           -> None   (not on the list: look-and-say keeps it)
 
 Short list, strict matching:
-  * "open / start / launch <app>" only for a name in settings.launch_apps (or settings.launch_aliases).
-    Any other name returns None, so "open compose" stays look-and-say (UI-Venus finds a button).
+  * "open / start / launch <app>" only for a name in settings.launch_apps (or settings.launch_aliases), or a
+    one-word site in settings.launch_sites ("open YouTube" -> youtube.com; Oct 25: it used to go to look-and-say,
+    and UI-Venus clicked the Mail icon under the YouTube one). Any other name returns None, so "open compose"
+    stays look-and-say (UI-Venus finds a button).
   * "go to <site>": one clean host name ("youtube.com", "YouTube dot com"), optionally with a path, or a
     one-word name from settings.launch_sites ("youtube" -> youtube.com). Any other word with no dot is
     not a site: "go to sleep" is None. Only ever https://.
@@ -72,7 +74,13 @@ def _app(rest: list[str], settings) -> dict | None:
     name = " ".join(rest)
     apps = getattr(settings, "launch_apps", {}) or {}
     name = (getattr(settings, "launch_aliases", {}) or {}).get(name, name)
-    return {"app": name} if name in apps else None
+    if name in apps:
+        return {"app": name}
+    if len(rest) == 1:                                           # "open YouTube" = "go to YouTube"
+        site = str((getattr(settings, "launch_sites", {}) or {}).get(name, ""))
+        if site and _HOST.match(site) and "." in site:
+            return {"url": f"https://{site}"}
+    return None
 
 
 def _site(rest: list[str], settings) -> dict | None:

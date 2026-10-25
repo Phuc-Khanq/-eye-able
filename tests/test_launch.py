@@ -334,5 +334,23 @@ class TestModeManagerLaunch(unittest.TestCase):
         self.assertEqual(launcher.started, [("app", "chrome.exe"), ("url", "https://wikipedia.org")])
 
 
+class TestOpenASite(unittest.TestCase):
+    """Oct 25: "open YouTube" opened Mail on the demo page (it went to look-and-say). One-word sites open like
+    "go to"."""
+
+    def test_open_youtube_and_friends(self):
+        cases = {"open YouTube": "https://youtube.com", "Open YouTube.": "https://youtube.com",
+                 "launch youtube": "https://youtube.com", "start YouTube": "https://youtube.com"}
+        for text, url in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(match(text, S), {"url": url})
+
+    def test_apps_still_win_and_unknown_names_stay_look_and_say(self):
+        self.assertEqual(match("open google chrome", S), {"app": "chrome"})
+        self.assertEqual(match("open mail", S), {"app": "mail"})
+        self.assertIsNone(match("open compose", S))
+        self.assertIsNone(match("open youtube music", S))
+
+
 if __name__ == "__main__":
     unittest.main()

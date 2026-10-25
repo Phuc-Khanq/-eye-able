@@ -15,11 +15,11 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
       start() { this.started = true; setTimeout(() => this.onstart && this.onstart(), 0); } abort() { this.started = false; } stop() { this.started = false; } };
     window.__say = (text, final = true) => { const r = [{ 0: { transcript: text }, isFinal: final, length: 1 }]; window.__sr.onresult({ resultIndex: 0, results: r }); };
   });
-  await p.goto('http://localhost:8097/#demo'); await p.waitForSelector('#liteVoiceBtn');
+  await p.goto('http://localhost:8097/#demo'); await p.waitForSelector('#liteVoiceBtn', { state: 'attached' });
   const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
   const say = async (t, final = true) => { await p.evaluate(([t, f]) => window.__say(t, f), [t, final]); await p.waitForTimeout(120); };
   await p.evaluate(() => { window.DZ.engineLive = true; });            // what lite mode's head pointer sets while it runs (the bug: voice refused to start)
-  await p.click('#liteVoiceBtn'); await p.waitForTimeout(400);
+  await p.$eval('#liteVoiceBtn', e => e.click()); await p.waitForTimeout(400);
   ok(await p.evaluate(() => window.__sr && window.__sr.started), 'the recogniser started while the head pointer is on');
   ok(/Listening/.test(await p.textContent('#liteVoiceStat')), 'the voice status says Listening: ' + JSON.stringify(await p.textContent('#liteVoiceStat')));
   ok(await p.evaluate(() => !document.querySelector('.dz-card').hidden), 'the EYEable card is showing on the simulated screen');
@@ -42,13 +42,13 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   await say('click mail'); await p.waitForTimeout(150);
   ok(/Click/.test(await p.textContent('.dz-body')) , 'click <name> asks first on the card: ' + JSON.stringify(await p.textContent('.dz-body')));
   await say('yes'); await p.waitForTimeout(250); ok(await p.evaluate(() => window.DZ.W.mail.open), '"yes" then clicked Mail');
-  await p.click('#liteVoiceBtn'); await p.waitForTimeout(200);
+  await p.$eval('#liteVoiceBtn', e => e.click()); await p.waitForTimeout(200);
   ok(await p.evaluate(() => document.querySelector('.dz-card').hidden), 'turning voice off hides the card');
-  await p.click('#liteVoiceBtn'); await p.waitForTimeout(400);
+  await p.$eval('#liteVoiceBtn', e => e.click()); await p.waitForTimeout(400);
   await p.evaluate(() => { window.__sr.onerror({ error: 'not-allowed' }); });
   await p.waitForTimeout(100);
   ok(/blocked/.test(await p.textContent('#liteVoiceStat')) && /Turn on voice/.test(await p.textContent('#liteVoiceBtn')), 'a blocked microphone says so and turns voice off');
-  await p.click('#liteVoiceBtn'); await p.waitForTimeout(400);
+  await p.$eval('#liteVoiceBtn', e => e.click()); await p.waitForTimeout(400);
   for (let i = 0; i < 7 && await p.evaluate(() => /Turn off/.test(document.getElementById('liteVoiceBtn').textContent)); i++) {
     const prev = await p.evaluateHandle(() => window.__sr);
     await p.evaluate(() => { const r = window.__sr; r.onerror({ error: 'network' }); r.onend(); });
@@ -56,7 +56,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   }
   ok(/network|reached/.test(await p.textContent('#liteVoiceStat')) && /Turn on voice/.test(await p.textContent('#liteVoiceBtn')), 'repeated network failures stop with a clear message: ' + JSON.stringify(await p.textContent('#liteVoiceStat')));
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
-  await p.click('#liteVoiceBtn'); await p.waitForTimeout(400); await say('hi dizzy'); await say('this is a test of the card');
+  await p.$eval('#liteVoiceBtn', e => e.click()); await p.waitForTimeout(400); await say('hi dizzy'); await say('this is a test of the card');
   await p.screenshot({ path: process.env.SHOT || '/tmp/lite-voice.png' });
   await b.close(); srv.close();
 })().catch(e => { console.error(e); process.exit(1); });

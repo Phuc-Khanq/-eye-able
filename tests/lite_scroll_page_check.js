@@ -23,10 +23,10 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
     window.__say = (text, final = true) => window.__sr.onresult({ resultIndex: 0, results: [{ 0: { transcript: text }, isFinal: final, length: 1 }] });
   });
   const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
-  await p.goto('http://localhost:8091/#demo'); await p.waitForSelector('#liteBtn');
+  await p.goto('http://localhost:8091/#demo'); await p.waitForSelector('#liteBtn', { state: 'attached' });
   await p.evaluate(() => { window.__clicks = []; const o = window.DZ.clickAt; window.DZ.clickAt = (...a) => { window.__clicks.push(a.slice(2)); return o(...a); }; });
   ok(await p.evaluate(() => document.querySelector('#liteScrollBtn').disabled), 'the Scroll button waits for lite mode');
-  await p.click('#liteBtn'); await p.waitForFunction(() => document.querySelector('#liteStat').textContent.startsWith('Tracking'), null, { timeout: 15000 });
+  await p.$eval('#liteBtn', e => e.click()); await p.waitForFunction(() => document.querySelector('#liteStat').textContent.startsWith('Tracking'), null, { timeout: 15000 });
   ok(await p.evaluate(() => !document.querySelector('#liteScrollBtn').disabled), 'it is ready once lite mode is on');
   const st = () => p.evaluate(() => ({ s: window.DZ.W.browser.scroll, m: document.querySelector('#mPage').scrollTop, pos: { x: Math.round(window.DZ.G.pos.x), y: Math.round(window.DZ.G.pos.y) }, mode: window.DZLite.isScrolling(), pill: (document.querySelector('.dz-pt') || {}).textContent }));
   const tilt = async deg => { await p.evaluate(d => { window.__face.ny = d / 60 * 0.2; }, deg); };   // 60 degrees per 1.0 of nose offset / eye distance (0.2)
@@ -38,7 +38,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   ok(max > 150, 'the results page is taller than the window (' + max + ' px to scroll)');
 
   // 1. start with the button; chin down scrolls down while the pointer stays
-  await p.click('#liteScrollBtn'); await p.waitForTimeout(700);
+  await p.$eval('#liteScrollBtn', e => e.click()); await p.waitForTimeout(700);
   let a = await st(); ok(a.mode && /Stop scrolling/.test(await p.textContent('#liteScrollBtn')), 'the button starts scroll mode and turns into Stop scrolling');
   ok(/Scroll/.test(await p.textContent('#liteStat')), 'the status line explains scroll mode: ' + JSON.stringify((await p.textContent('#liteStat')).slice(0, 60)));
   await tilt(0); await p.waitForTimeout(300); a = await st(); ok(a.s === 0, 'a head held straight does not scroll');
@@ -58,7 +58,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   const e0 = await st(); await tilt(6); await p.waitForTimeout(600); const e1 = await st(); await tilt(0); ok(Math.abs(e1.s - e0.s) < 2, 'with scroll mode off, tilting the head does not scroll the page');
 
   // 3. voice: "scroll" starts it, "scroll down" still glides, "stop" ends it
-  await p.click('#liteVoiceBtn'); await p.waitForTimeout(300);
+  await p.$eval('#liteVoiceBtn', e => e.click()); await p.waitForTimeout(300);
   const say = async (t, ms = 250) => { await p.evaluate(t => window.__say(t, true), t); await p.waitForTimeout(ms); };
   await p.evaluate(() => { window.__face.ny = 0; }); await p.waitForTimeout(600);
   await say('scroll'); a = await st(); ok(a.mode && a.pill === 'Scroll', 'saying "scroll" starts it and the card says Scroll: ' + JSON.stringify(a.pill));
@@ -71,8 +71,8 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   ok(moved > 0 || (await p.evaluate(() => { const m = document.querySelector('#mPage'); return m.scrollHeight <= m.clientHeight; })), 'scrolling moves the Mail window when it has more to show (' + moved + ' px)');
 
   // 5. turning lite mode off while scrolling ends scroll mode
-  await p.evaluate(() => window.DZ.openWin('browser')); await p.click('#liteScrollBtn'); await p.waitForTimeout(300);
-  await p.click('#liteBtn'); await p.waitForTimeout(300);
+  await p.evaluate(() => window.DZ.openWin('browser')); await p.$eval('#liteScrollBtn', e => e.click()); await p.waitForTimeout(300);
+  await p.$eval('#liteBtn', e => e.click()); await p.waitForTimeout(300);
   a = await st(); ok(!a.mode && await p.evaluate(() => document.querySelector('#liteScrollBtn').disabled), 'stopping lite mode ends scrolling and disables the button');
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await b.close(); srv.close();

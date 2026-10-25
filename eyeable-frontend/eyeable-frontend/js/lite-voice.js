@@ -75,12 +75,13 @@
     for (const pre of P.FILLER_PREFIXES) if (t.startsWith(pre)) t = t.slice(pre.length);
     return t.split(' ').filter(w => w && !FILLERS.has(w));
   }
+  const LITE_APPS = { browser: 'chrome', 'web browser': 'chrome', 'chrome browser': 'chrome', internet: 'chrome', 'the internet': 'chrome', web: 'chrome', 'internet browser': 'chrome' };
   function launch(text) {
     const words = launchWords(text); if (words.length < 2) return null;
     const first = words[0]; let rest = words.slice(1);
     if (['open', 'start', 'launch'].includes(first)) {
       while (rest.length && rest[0] === 'the') rest = rest.slice(1);
-      let name = rest.join(' '); name = P.launch_aliases[name] || name;
+      let name = rest.join(' '); name = LITE_APPS[name] || P.launch_aliases[name] || name;
       if (Object.prototype.hasOwnProperty.call(P.launch_apps, name)) return { app: name };
       if (rest.length === 1) { const site = String(P.launch_sites[name] || ''); if (site && HOST.test(site) && site.includes('.')) return { url: 'https://' + site }; }
       return null;
@@ -92,9 +93,33 @@
       return { url: 'https://' + host + (path ? '/' + path : '') };
     }
     if (first === 'search') {
-      if (rest[0] === 'for') rest = rest.slice(1); if (!rest.length) return null;
-      return { url: P.launch_search_url.replace('{q}', encodeURIComponent(rest.join(' ')).replace(/%20/g, '+')) };
+      const sawFor = rest[0] === 'for'; if (sawFor) rest = rest.slice(1);
+      let site = 'google';                                                 // lite only: "search YouTube for piano music" opens the YouTube results page
+      if (!sawFor && (rest[0] === 'youtube' || rest[0] === 'google') && rest.length > 1) { site = rest[0]; rest = rest.slice(1); if (rest[0] === 'for') rest = rest.slice(1); }
+      if (!rest.length) return null;
+      const q = encodeURIComponent(rest.join(' ')).replace(/%20/g, '+');
+      return { url: site === 'youtube' ? 'https://www.youtube.com/results?search_query=' + q : P.launch_search_url.replace('{q}', q) };
     }
+    return null;
+  }
+
+  /* Lite only: spoken commands for what is INSIDE the simulated windows (home page, play a video, write a mail), so there is more to try by voice.
+     They are plain whole-sentence patterns, used outside dictation only. Returns { name, n?, say } or null. */
+  const NUMBERS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8 };
+  const NUMW = '(one|two|three|four|five|six|seven|eight|first|second|third|fourth|fifth|sixth|seventh|eighth|[1-8])';
+  function simCommand(clean) {
+    let m;
+    if (/^(go (to )?(the )?home( ?page)?|home ?page|take me home)$/.test(clean)) return { name: 'home', say: 'Home' };
+    if (/^close (the )?(browser|chrome|web browser|youtube)$/.test(clean)) return { name: 'close_browser', say: 'Close Chrome' };
+    if (/^close (the )?(mail|email|e mail|inbox)$/.test(clean)) return { name: 'close_mail', say: 'Close Mail' };
+    if ((m = new RegExp(`^(play|watch|open) (the )?(video (number )?${NUMW}|${NUMW} (video|result)|number ${NUMW})$`).exec(clean))) {
+      const w = m.slice(5, 9).concat(m[10]).find(x => x); return { name: 'watch', n: NUMBERS[w] || +w, say: 'Video ' + (NUMBERS[w] || w) };
+    }
+    if (/^(pause|play|resume|stop) (the |this )?video$/.test(clean)) return { name: 'play_toggle', say: /^(pause|stop)/.test(clean) ? 'Pause video' : 'Play video' };
+    if (/^(like|thumbs up)( the| this)?( video)?$/.test(clean) && clean !== 'like') return { name: 'like', say: 'Like' };
+    if (/^(new (email|e mail|message|mail)|compose( (a|an|new))?( (email|mail|message))?|write (a|an|new) (email|mail|message)|send (a|an) (email|mail|message))$/.test(clean)) return { name: 'compose', say: 'New message' };
+    if (/^(go to |open |show )?(the |my )?inbox$/.test(clean)) return { name: 'inbox', say: 'Inbox' };
+    if (/^(go to |open |show )?(the |my )?(sent|sent mail|sent messages|sent folder)$/.test(clean)) return { name: 'sent', say: 'Sent' };
     return null;
   }
 
@@ -157,7 +182,7 @@
     function enterScroll() {
       if (S.mode === 'dictation') return false;
       if (S.mode === 'scroll') return true;
-      if (!hooks.scroll || !hooks.scroll(true)) { status('Head scrolling needs lite mode: press “Try hands-free in your browser (lite)”. Say “scroll up” or “scroll down” for now.'); return false; }
+      if (!hooks.scroll || !hooks.scroll(true)) { status('Head scrolling needs the camera: press “Start hands-free”. Say “scroll up” or “scroll down” for now.'); return false; }
       setMode('scroll'); flash('Scroll'); return true;
     }
     function leaveScroll(label) {
@@ -245,6 +270,7 @@
         if (cl) { run(cl, t); return; }
         S.chunks.push(t.replace(/\s+/g, ' ')); showPreview(); return;      // everything else is words to type
       }
+      const sim = simCommand(clean); if (sim) { hooks.act({ action: 'sim', name: sim.name, n: sim.n }); flash(sim.say); return; }
       if (SCROLL_HEARD.has(clean)) { run({ name: 'scroll_mode' }, t); return; }   // one short word is often misheard ("scrawl", "stroll")
       let cmd = parse(t, false);                                          // pointer mode: fixed commands, then open/go to/search, then look-and-say
       if (cmd && cmd.name !== 'type_text') { run(cmd, t); return; }
@@ -259,7 +285,7 @@
   }
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {            // node (the unit tests)
-    if (typeof module !== 'undefined') module.exports = { createVoice, parse, launch, normalize, answerOf, ratio, tidy };
+    if (typeof module !== 'undefined') module.exports = { createVoice, parse, launch, normalize, answerOf, ratio, tidy, simCommand };
     return;
   }
   const D = window.DZ; if (!D || !D.bridge) return;
@@ -318,16 +344,16 @@
     if (type === 'confirm_answer') voice.answer(!!f.yes);
     else if (type === 'dictation') { if (f.action === 'insert' || f.action === 'use_original') voice.insert(); else if (f.action === 'discard') voice.dropPreview(); }
   });
-  window.DZVoice = { voice, start: () => start(), stop: () => stop(), pending: () => voice.pending(), waiting: () => !!(voice.state.q || voice.state.chunks.length), answer: y => voice.answer(y) };
+  window.DZVoice = { voice, start: () => start(), stop: () => stop(), isOn: () => on || starting, pending: () => voice.pending(), waiting: () => !!(voice.state.q || voice.state.chunks.length), answer: y => voice.answer(y) };
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   let rec = null, on = false, starting = false, local = false, restartT = 0, speaking = false, fails = 0, lastStart = 0, lastErr = '';
   const btn = document.createElement('button');
-  btn.className = 'mini-btn'; btn.type = 'button'; btn.id = 'liteVoiceBtn'; btn.textContent = 'Turn on voice (commands and dictation)';
+  btn.className = 'mini-btn'; btn.type = 'button'; btn.id = 'liteVoiceBtn'; btn.hidden = true; btn.textContent = 'Turn on voice (commands and dictation)';
   const vstat = document.createElement('div');                                    // what the microphone is doing, in words (errors are never silent)
   vstat.className = 'lite-stat'; vstat.id = 'liteVoiceStat'; vstat.setAttribute('aria-live', 'polite');
   const note = document.createElement('p');
-  note.textContent = 'Voice uses your browser’s speech recognition (Chrome or Edge); on Chrome it may send audio to Google unless on-device recognition is available. The EYEable app uses Whisper on your own PC. Try: “volume up”, “brightness down”, “open YouTube”, “search for cats”, “click Mail”, “hi Dizzy”, then speak, then “yes”.';
+  note.textContent = 'Voice uses your browser’s speech recognition (Chrome or Edge); on Chrome it may send audio to Google unless on-device recognition is available. The EYEable app uses Whisper on your own PC. Try: “scroll”, “volume up”, “open the browser”, “open YouTube”, “play video two”, “search YouTube for piano music”, “new email”, “click Mail”, “hi Dizzy”, then speak, then “yes”.';
   const host = document.querySelector('.lite') || $('#camBox').parentElement;
   const anchor = host.querySelector('.lite-stat') || null;
   host.insertBefore(btn, anchor); host.insertBefore(vstat, anchor); (host.querySelector('#liteInfo') || host).append(note);

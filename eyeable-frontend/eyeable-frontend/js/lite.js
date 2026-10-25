@@ -32,7 +32,7 @@
     blinkClose: 0.55, blinkOpen: 0.35, blinkMinMs: 400, blinkMaxMs: 1600,   // a long blink: same window as the engine (config.py)
     // edge help, ported from the engine's head-nose mode: the turn that reaches a side edge / the top or bottom is
     // 19 / 11 degrees; past 70% of it the pointer is carried on to the spot that angle points at (never backward)
-    edgeYaw: 19, edgePitch: 11, edgeZone: 0.7, edgeRate: 5, edgeMaxPx: 45,
+    edgeYaw: 19, edgePitch: 11, edgeZone: 0.8, edgeRate: 3, edgeMaxPx: 25,   // lite: much weaker than the engine's (0.7 / 5 / 45): the nose pull made the pointer drift; it also only helps while the head is still moving outward
     absYaw: 15, absPitch: 10,          // 'face map' mode: this many degrees from straight ahead reaches a side edge / the top or bottom
     neutralFrames: 15,                 // straight ahead = the median of this many frames after start or recenter
     freezeAt: 0.30, freezeAfterMs: 350, backMs: 300,                        // the pointer holds still while the eyelids move
@@ -93,7 +93,7 @@
       for (const [ang, edge, key, stepPx] of axes) {
         const a = ang / edge, m = Math.abs(a), dir = a > 0 ? 1 : -1;
         if (m <= cfg.edgeZone) continue;                       // not far enough into the turn
-        if (stepPx * dir < -0.5) continue;                     // the head is already coming back
+        if (stepPx * dir < 0.5) continue;                      // only while the head is still moving outward: stopped or coming back, no pull at all
         const target = clamp(0.5 + dir * Math.min(m, 1) * 0.5, 0, 1);
         const gap = (target - st[key]) * dir; if (gap <= 0) continue;   // already there, or past it
         const w = (1 - Math.exp(-cfg.edgeRate * dt)) * ramp(m, cfg.edgeZone, 1);
@@ -267,6 +267,8 @@
   css.textContent = `
   .lite{margin-top:10px;display:grid;gap:8px;font-size:13px}
   .lite button{cursor:pointer}
+  .lite [hidden]{display:none!important}
+  .lite-main{font-weight:700}
   .lite-stat{font:600 12px var(--f-mono,monospace);color:var(--muted,#667);min-height:1.3em}
   .lite details{border:1px solid var(--line,#d8d8d8);border-radius:10px;padding:6px 10px}
   .lite summary{cursor:pointer;font-weight:600}
@@ -286,8 +288,9 @@
   const panel = document.createElement('div');
   panel.className = 'lite';
   panel.innerHTML = `
-    <button class="mini-btn" id="liteBtn" type="button">Try hands-free in your browser (lite)</button>
-    <button class="mini-btn" id="liteScrollBtn" type="button" disabled title="Needs lite mode on. Chin down scrolls down, chin up scrolls up.">Scroll with my head</button>
+    <button class="mini-btn lite-main" id="liteStartBtn" type="button">Start hands-free</button>
+    <button class="mini-btn" id="liteBtn" type="button" hidden>Try hands-free in your browser (lite)</button>
+    <button class="mini-btn" id="liteScrollBtn" type="button" hidden disabled title="Needs lite mode on. Chin down scrolls down, chin up scrolls up.">Scroll with my head</button>
     <div class="lite-stat" id="liteStat" aria-live="polite"></div>
     <details id="liteSet"><summary>Lite settings</summary>
       <label>Pointer <select id="liteMode"><option value="rel">Mouse-style, reaches the edges (best)</option><option value="abs">Face map: where you face is where it points</option></select></label>
@@ -309,6 +312,7 @@
     (roomy.addEventListener ? roomy.addEventListener('change', sync) : roomy.addListener(sync)); }
   const el = id => document.getElementById(id);
   const setStat = t => { el('liteStat').textContent = t; };
+  setStat('One button starts the camera and the voice. Then say “scroll”, “volume up” or “hi Dizzy”.');
 
   /* ---------------- run / stop ---------------- */
   const core = createCore();
@@ -469,5 +473,19 @@
     const V = window.DZVoice && window.DZVoice.voice;
     if (scrolling) { if (V) V.leaveScroll('Scroll off'); else endScroll(); } else if (V) V.enterScroll(); else scrollMode(true);
   });
-  window.DZLite = { start, stop, core, scroll: scrollMode, isScrolling: () => scrolling };
+  /* the one button: camera (head pointer, blink click), microphone (commands, dictation) and head scrolling ("scroll") start and stop together */
+  const mainBtn = el('liteStartBtn');
+  const voiceOn = () => !!(window.DZVoice && window.DZVoice.isOn && window.DZVoice.isOn());
+  function syncMain() {
+    const busy = starting && !on;
+    mainBtn.textContent = busy ? 'Starting…' : (on || voiceOn()) ? 'Stop' : 'Start hands-free';
+    mainBtn.disabled = busy; mainBtn.setAttribute('aria-pressed', String(on || voiceOn()));
+  }
+  mainBtn.addEventListener('click', () => {
+    if (on || voiceOn()) { if (window.DZVoice) window.DZVoice.stop(); stop(); }
+    else { if (window.DZVoice && window.DZVoice.start) window.DZVoice.start(); start(); }       // both inside this click, so the browser asks for camera and microphone together
+    syncMain();
+  });
+  setInterval(syncMain, 250); syncMain();
+  window.DZLite = { start, stop, core, scroll: scrollMode, isScrolling: () => scrolling, isOn: () => on };
 })();

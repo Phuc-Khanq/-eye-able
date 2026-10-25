@@ -336,6 +336,29 @@
     if (k === 'ctrl+tab' || k === 'ctrl+shift+tab') { toast('One tab in this demo'); return; }
     log('sys', 'Key ' + k + ' (nothing to do in the demo)');
   }
+  /* lite voice: commands for what is inside the simulated windows */
+  function actSim(m) {
+    const b = W.browser;
+    switch (m.name) {
+      case 'home': D.openWin('browser'); b.page !== 'home' && D.nav('home'); W.focus = null; D.renderAll(); log('voice', 'Browser home page'); break;
+      case 'close_browser': if (b.open) D.run('close:browser', 'voice'); else toast('Chrome is not open.'); break;
+      case 'close_mail': if (W.mail.open) D.run('close:mail', 'voice'); else toast('Mail is not open.'); break;
+      case 'watch': {
+        const i = Math.max(1, Math.min(8, +m.n || 1)) - 1;
+        if (!b.open) { D.run('open:youtube', 'voice'); }
+        if (b.page === 'yresults') D.run('watchq:' + Math.min(i, 3), 'voice');
+        else if (b.page === 'youtube' || b.page === 'watch') D.run('watch:' + i, 'voice');
+        else { D.run('open:youtube', 'voice'); D.run('watch:' + i, 'voice'); }
+        D.renderAll(); break;
+      }
+      case 'play_toggle': case 'like':
+        if (b.page !== 'watch') { toast('Open a video first, for example say “play video one”.'); break; }
+        D.run(m.name === 'like' ? 'like' : 'play', 'voice'); D.renderAll(); break;
+      case 'compose': D.openWin('mail'); D.run('compose', 'voice'); D.renderAll(); break;
+      case 'inbox': D.openWin('mail'); D.run('inbox', 'voice'); D.renderAll(); break;
+      case 'sent': D.openWin('mail'); D.run('sentbox', 'voice'); D.renderAll(); break;
+    }
+  }
   function actLaunch(m) {
     if (m.app) {
       const a = m.app;
@@ -449,6 +472,7 @@
       case 'scroll': for (let i = 0; i < 2; i++) D.scrollBy(m.direction === 'up' ? -1 : 1); D.glabel('SCROLL ' + (m.direction === 'up' ? 'UP' : 'DOWN')); break;
       case 'undo': { const last = typed.pop(); if (last && W.f[last.field].endsWith(last.text)) { W.f[last.field] = W.f[last.field].slice(0, -last.text.length); D.renderAll(); log('voice', 'Undid the last typing'); } break; }
       case 'launch': actLaunch(m); break;
+      case 'sim': actSim(m); break;
     }
   }
 

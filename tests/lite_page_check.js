@@ -20,9 +20,9 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
       return { faceLandmarks: [lm], faceBlendshapes: [{ categories: [{ categoryName: 'eyeBlinkLeft', score: s.b }, { categoryName: 'eyeBlinkRight', score: s.b }, { categoryName: 'jawOpen', score: s.jaw }] }] };
     } });
   });
-  await p.goto('http://localhost:8099/#demo'); await p.waitForSelector('#liteBtn');
+  await p.goto('http://localhost:8099/#demo'); await p.waitForSelector('#liteBtn', { state: 'attached' });
   await p.evaluate(() => { window.__clicks = []; const o = window.DZ.clickAt; window.DZ.clickAt = (...a) => { window.__clicks.push(a.slice(2)); return o(...a); }; });
-  await p.click('#liteBtn');
+  await p.$eval('#liteBtn', e => e.click());
   await p.waitForFunction(() => document.querySelector('#liteStat').textContent.startsWith('Tracking'), null, { timeout: 15000 });
   const pos = () => p.evaluate(() => ({ x: window.DZ.G.pos.x, y: window.DZ.G.pos.y, w: window.DZ.screen.clientWidth, h: window.DZ.screen.clientHeight }));
   const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
@@ -36,7 +36,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   ok((await p.evaluate(() => window.__clicks.length)) === 1, 'a quick blink did not click');
   await p.evaluate(() => { window.__face.none = true; }); await p.waitForTimeout(300);
   ok((await p.textContent('#liteStat')).startsWith('No face'), 'no face is reported');
-  await p.click('#liteBtn'); await p.waitForTimeout(200);
+  await p.$eval('#liteBtn', e => e.click()); await p.waitForTimeout(200);
   ok(await p.evaluate(() => !document.querySelector('.lite-cur') && !document.querySelector('#liteCanvas')), 'stopping removes the cursor and preview');
   ok(errs.length === 0, 'no page errors' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await p.screenshot({ path: process.env.SHOT || '/tmp/lite.png' });

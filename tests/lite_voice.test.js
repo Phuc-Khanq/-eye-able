@@ -127,6 +127,20 @@ test('the card shows the tidied words and "yes" types exactly those, for the mes
   assert.deepStrictEqual(out.acts.at(-1), { action: 'type', text: 'Hello.\nBye now. ' });
 });
 
+test('lite-only commands for the simulated windows, and the browser/YouTube open rules', () => {
+  const { simCommand } = require('../eyeable-frontend/eyeable-frontend/js/lite-voice.js');
+  const n = s => require('../eyeable-frontend/eyeable-frontend/js/lite-voice.js').normalize(s);
+  assert.deepStrictEqual(simCommand(n('Play video two.')), { name: 'watch', n: 2, say: 'Video 2' });
+  assert.strictEqual(simCommand(n('play the first video')).n, 1); assert.strictEqual(simCommand(n('watch number five')).n, 5);
+  for (const [s, name] of [['go home', 'home'], ['close the browser', 'close_browser'], ['close mail', 'close_mail'], ['pause the video', 'play_toggle'], ['like this video', 'like'], ['new email', 'compose'], ['open the inbox', 'inbox'], ['sent mail', 'sent']]) assert.strictEqual((simCommand(n(s)) || {}).name, name, s);
+  for (const s of ['like', 'play', 'home', 'play one', 'we went home', 'I want to play video games']) assert.strictEqual(simCommand(n(s)), null, s);
+  assert.deepStrictEqual(launch('open the browser'), { app: 'chrome' }); assert.deepStrictEqual(launch('Open the internet.'), { app: 'chrome' });
+  assert.deepStrictEqual(launch('search YouTube for piano music'), { url: 'https://www.youtube.com/results?search_query=piano+music' });
+  assert.deepStrictEqual(launch('search for youtube tips').url.includes('google.com/search'), true);
+  const r = rig(); r.v.heard('play video three'); assert.deepStrictEqual(r.acts.at(-1), { action: 'sim', name: 'watch', n: 3 });
+  const d = rig(); d.v.heard('start dictation'); d.v.heard('go home'); assert(!d.acts.some(a => a.action === 'sim'), 'while dictating these are words to type');
+});
+
 function scrollRig(canScroll = true) {
   const r = rig(); const calls = []; r.calls = calls;
   const hooks = {
@@ -145,7 +159,7 @@ test('a misheard "scroll" (scrawl, stroll, scrolls...) still starts it, but thos
 });
 test('"scroll" without the camera says what to do and stays in pointer mode', () => {
   const r = scrollRig(false); r.v.heard('scroll');
-  assert.strictEqual(r.v.state.mode, 'pointer'); assert(/Try hands-free/.test(r.last('status').text), JSON.stringify(r.last('status')));
+  assert.strictEqual(r.v.state.mode, 'pointer'); assert(/Start hands-free/.test(r.last('status').text), JSON.stringify(r.last('status')));
 });
 test('scroll mode: "stop", "done" and "stop scrolling" leave it; other speech is ignored', () => {
   for (const word of ['stop', 'done', 'Stop scrolling.']) { const r = scrollRig(); r.v.heard('scroll'); r.v.heard('hello there my friend'); assert.strictEqual(r.v.state.mode, 'scroll'); r.v.heard(word); assert.strictEqual(r.v.state.mode, 'pointer', word); assert.strictEqual(r.calls[r.calls.length - 1], false); }

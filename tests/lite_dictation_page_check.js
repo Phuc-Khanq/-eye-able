@@ -16,14 +16,14 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
     window.SpeechRecognition = window.webkitSpeechRecognition = class { constructor() { window.__sr = this; } start() { setTimeout(() => this.onstart && this.onstart(), 0); } abort() {} stop() {} };
     window.__say = (text, final = true) => window.__sr.onresult({ resultIndex: 0, results: [{ 0: { transcript: text }, isFinal: final, length: 1 }] });
   });
-  await p.goto('http://localhost:8099/#demo'); await p.waitForSelector('#liteVoiceBtn');
+  await p.goto('http://localhost:8099/#demo'); await p.waitForSelector('#liteVoiceBtn', { state: 'attached' });
   const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
   const say = async (t, final = true, w = 150) => { await p.evaluate(([t, f]) => window.__say(t, f), [t, final]); await p.waitForTimeout(w); };
   const F = () => p.evaluate(() => ({ ...window.DZ.W.f, focus: window.DZ.W.focus }));
   const card = () => p.textContent('.dz-body');
   const dictate = async text => { await say('hi dizzy'); await say(text); await say('yes', true, 250); };
   await p.evaluate(() => { window.DZ.engineLive = true; });
-  await p.click('#liteVoiceBtn'); await p.waitForTimeout(400);
+  await p.$eval('#liteVoiceBtn', e => e.click()); await p.waitForTimeout(400);
 
   // Chrome's search box: words are typed exactly as heard
   await say('open chrome', true, 300); await say('hi dizzy'); await say('cats and dogs');

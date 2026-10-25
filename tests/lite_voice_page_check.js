@@ -22,7 +22,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   await p.$eval('#liteVoiceBtn', e => e.click()); await p.waitForTimeout(400);
   ok(await p.evaluate(() => window.__sr && window.__sr.started), 'the recogniser started while the head pointer is on');
   ok(/Listening/.test(await p.textContent('#liteVoiceStat')), 'the voice status says Listening: ' + JSON.stringify(await p.textContent('#liteVoiceStat')));
-  ok(await p.evaluate(() => !document.querySelector('.dz-card').hidden), 'the EYEable card is showing on the simulated screen');
+  ok(await p.evaluate(() => !document.querySelector('.dz-card').hidden), 'the [eye]able card is showing on the simulated screen');
   await say('volume', false); ok(/Hearing: “volume”/.test(await p.textContent('#liteVoiceStat')), 'interim words show in the status');
   await say('volume up'); ok(/Heard: “volume up”/.test(await p.textContent('#liteVoiceStat')), 'final words show in the status');
   ok(await p.evaluate(() => document.querySelector('.sim-osd').classList.contains('show')), '"volume up" shows the volume bar');
@@ -37,7 +37,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   ok(await p.evaluate(() => /hello world/.test(Object.values(window.DZ.W.f).join('|'))), '"yes" typed the words into a text box');
   await say('hi dizzy'); await say('drop me'); await p.click('.dz-actions button:nth-child(2)'); await p.waitForTimeout(150);
   ok((await p.textContent('.dz-body')) === '' || !(await p.textContent('.dz-body')).includes('drop me'), 'the Drop it button on the card drops the words');
-  await say('bye'); await p.waitForTimeout(1200); ok(/Dictation off|EYEable/.test(await p.textContent('.dz-pt')) && (await p.evaluate(() => window.DZVoice.voice.state.mode)) === 'pointer', '"bye" ends dictation');
+  await say('bye'); await p.waitForTimeout(1200); ok(/Dictation off|\[eye\]able/.test(await p.textContent('.dz-pt')) && (await p.evaluate(() => window.DZVoice.voice.state.mode)) === 'pointer', '"bye" ends dictation');
   await say('click banana'); await p.waitForTimeout(100);
   await say('click mail'); await p.waitForTimeout(150);
   ok(/Click/.test(await p.textContent('.dz-body')) , 'click <name> asks first on the card: ' + JSON.stringify(await p.textContent('.dz-body')));

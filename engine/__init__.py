@@ -1,1 +1,1 @@
-"""EYEable engine: turns webcam, mic and screen input into computer control."""
+"""[eye]able engine: turns webcam, mic and screen input into computer control."""

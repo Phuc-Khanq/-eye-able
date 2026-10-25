@@ -314,7 +314,7 @@ COMMAND_INFO: dict[str, tuple[str, str]] = {
                                      "Also \"hi Dizzy\""),
     "stop_dictation": ("Dictation", "Ends dictation (asks first if words are waiting). Also \"bye\", \"bye Dizzy\", \"bye bye\". "
                                     "While dictating, \"close\", \"off\" and \"turn off\" also work"),
-    "quit_app": ("Setup", "Quits EYEable completely: the engine, camera, mic and card all stop. Say \"quit\" alone; works "
+    "quit_app": ("Setup", "Quits [eye]able completely: the engine, camera, mic and card all stop. Say \"quit\" alone; works "
                           "in every mode, even paused"),
     "send_it": ("Dictation", "Types the preview and presses Enter, after asking \"send?\""),
     "undo": ("Dictation", "Drops the preview, or presses Ctrl+Z when none is showing"),

@@ -35,7 +35,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   // a new message starts with the cursor in To: a sentence goes to the message instead
   await say('click mail'); await say('yes', true, 300); await say('click new mail'); await say('yes', true, 300);
   ok((await F()).focus === 'to', 'a new message starts in the To box');
-  ok(!/^EYEable asks:/.test(await p.textContent('#tip')), 'the mascot no longer shows the answered question: ' + JSON.stringify(await p.textContent('#tip')));
+  ok(!/^\[eye\]able asks:/.test(await p.textContent('#tip')), 'the mascot no longer shows the answered question: ' + JSON.stringify(await p.textContent('#tip')));
   await say('hi dizzy'); await say('quarterly demo is ready', false);
   ok((await p.textContent('.dz-lab')).includes('Hearing') && (await card()).includes('quarterly demo is ready'), 'while you speak the card says Hearing');
   await say('quarterly demo is ready');

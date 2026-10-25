@@ -150,5 +150,7 @@ Link xem online (artifact, chỉ chủ project mở được trừ khi chia sẻ
 - Trang → engine: nút Pause (hoặc phím P), Calibrate, thanh Gaze hold time, Yes/No, Type it / Drop it.
 - Chưa nối: thanh Pointer steadiness (engine dùng `sensitivity`), bật/tắt dwell (chỉ có lệnh giọng nói "start clicking").
 
-### Allow camera khởi động engine (serve_demo.py)
-Trình duyệt không tự chạy được chương trình, nên có một server nhỏ chạy trên máy: `python serve_demo.py --engine-dir C:\path\to\diseyeble`, rồi mở `http://localhost:8000/#demo`. Bấm **Allow camera** thì server chạy `python -m engine.main` (cửa sổ mới); camera do engine giữ, trang không mở webcam của trình duyệt. Server chỉ nghe ở 127.0.0.1 và từ chối yêu cầu không đến từ chính trang này. Ctrl+C tắt cả server lẫn engine.
+### Allow camera: theo dõi mặt ngay trong trình duyệt
+Bấm **Allow camera** (mở thẳng file `index.html` cũng được) thì `js/browser_tracker.js` dùng MediaPipe Face Landmarker (tải từ CDN, cần internet) để nhận nháy mắt lâu, nhướn mày, gật, lắc, nghiêng đầu và di chuyển con trỏ trong màn hình demo; luật nhận diện nằm ở `js/gesture_detect.js` (test: `node test/gesture_detect.test.js`). Các cử chỉ hiện ở **Activity**. Cách này chỉ điều khiển màn hình demo trong trang. Nếu `tilt` trái/phải bị đảo, đổi `rollSign` trong `gesture_detect.js`.
+
+Điều khiển máy thật vẫn cần engine Python (`python -m engine.main`). Khi engine kết nối, trang tự tắt theo dõi trong trình duyệt và nhường webcam cho engine. Tùy chọn: `python serve_demo.py --engine-dir C:\path\to\diseyeble`, mở `http://localhost:8000/#demo` và bấm **Start engine** để chạy engine không hiện cửa sổ.

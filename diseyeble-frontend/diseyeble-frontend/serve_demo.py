@@ -1,9 +1,9 @@
-"""Serves this demo page on http://localhost:8000 and starts the engine when the page's Allow camera is clicked.
+"""Optional: serves this demo page on http://localhost:8000 and lets its "Start engine" button run the engine (real computer control).
+Plain Allow camera needs none of this: the page tracks your face by itself.
 
 Run it from any Python 3 (no packages needed):
     python serve_demo.py --engine-dir C:\\path\\to\\diseyeble
-Then open http://localhost:8000/#demo. The engine's own window (python -m engine.main) opens when you click
-Allow camera, and the page shows Engine live once it is up. Ctrl+C here stops this server and the engine it started.
+Then open http://localhost:8000/#demo and click Start engine. No window opens; the page shows Engine live once it is up. Ctrl+C here stops this server and the engine it started.
 
 The page cannot start programs by itself, so this small local server does it. It only listens on 127.0.0.1,
 only ever runs the engine command given here, and refuses requests that don't come from this page.
@@ -15,11 +15,13 @@ import json
 import socket
 import subprocess
 import sys
+import tempfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 PAGE_DIR = Path(__file__).resolve().parent
 ENGINE_PORT = 8765
+LOG_PATH = Path(tempfile.gettempdir()) / "diseyeble-engine.log"
 
 
 def engine_listening(port: int = ENGINE_PORT) -> bool:
@@ -51,8 +53,11 @@ class Engine:
     def start(self) -> str:
         if engine_listening() or (self.proc and self.proc.poll() is None):
             return "already running"
-        kwargs = {"creationflags": subprocess.CREATE_NEW_CONSOLE} if sys.platform == "win32" else {}
-        self.proc = subprocess.Popen([self.python, "-m", self.module], cwd=self.dir, **kwargs)
+        # No console window: the page shows what the engine does. Its own printout goes to a log file.
+        self.log = open(LOG_PATH, "w", encoding="utf-8", errors="replace")
+        kwargs = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
+        self.proc = subprocess.Popen([self.python, "-m", self.module], cwd=self.dir, stdout=self.log,
+                                     stderr=subprocess.STDOUT, **kwargs)
         return "started"
 
     def stop(self) -> None:
@@ -112,7 +117,7 @@ def main() -> None:
     engine = Engine(engine_dir.resolve(), args.python, args.module)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(engine, args.port))
     print(f"Demo page: http://localhost:{args.port}/#demo   engine folder: {engine.dir}")
-    print("Click Allow camera on the page to start the engine. Ctrl+C stops everything.")
+    print("Click \"Start engine\" on the page to start the engine (no window; its log is " + str(LOG_PATH) + "). Ctrl+C stops everything.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

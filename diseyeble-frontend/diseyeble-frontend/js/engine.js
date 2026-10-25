@@ -39,8 +39,8 @@
   function setLive(on) {
     if (on === live) return;
     live = on; D.engineLive = on;   // app.js stops the fake natural blinks while live
-    if (on) starting = false;
-    $('#allowCamTxt').textContent = on ? 'Engine camera on ✓' : 'Allow camera'; $('#demoCamBtn').textContent = on ? 'Camera on' : 'Allow camera';
+    if (on) { starting = false; if (D.stopTracking) D.stopTracking(); if (D.stopCam) D.stopCam(); }   // the engine takes the webcam
+    if (on) { $('#allowCamTxt').textContent = 'Engine camera on ✓'; $('#demoCamBtn').textContent = 'Camera on'; }
     pill.classList.toggle('off', !on);
     $('#engTxt').textContent = on ? 'Engine live' : (starting ? 'Starting engine…' : 'Simulated');
     if (on) {
@@ -96,6 +96,8 @@
     D.glabel(g[3]);
     log(g[2], g[4] + ' seen by the engine');
   }
+
+  D.showGesture = gesture;   // js/browser_tracker.js shows its own detections the same way
 
   function onPreview(m) {
     const meant = $('#meantTxt'), heard = $('#heardTxt');
@@ -207,11 +209,20 @@
     }
     setTimeout(() => { if (starting && !live) { starting = false; $('#engTxt').textContent = 'Simulated'; toast('The engine did not come up. Check its window for errors.'); } }, 120000);
   }
-  // capture phase: the page's own camera code never runs, because one app at a time can hold a webcam on Windows
+  // the engine owns the webcam while it is connected, so the page's own camera code must not run then
   document.addEventListener('click', e => {
-    if (!e.target.closest('#allowCam, #demoCamBtn')) return;
-    e.stopImmediatePropagation(); e.preventDefault(); startEngine();
+    if (!live || !e.target.closest('#allowCam, #demoCamBtn')) return;
+    e.stopImmediatePropagation(); e.preventDefault(); toast('The engine is already using the webcam, and its gestures show here.');
   }, true);
+
+  // served by serve_demo.py: offer a button that starts the engine (controls the real computer)
+  if (location.protocol.startsWith('http')) {
+    fetch('/api/status').then(r => r.json()).then(j => {
+      if (!j.launcher) return;
+      const b = document.createElement('button'); b.className = 'mini-btn'; b.textContent = 'Start engine (control my computer)';
+      b.onclick = startEngine; bar.insertBefore(b, read.nextSibling);
+    }).catch(() => {});
+  }
 
   connect();
 })();

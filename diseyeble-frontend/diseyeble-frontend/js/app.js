@@ -837,7 +837,7 @@
   const label = el => (el.getAttribute('aria-label') || el.querySelector('b')?.textContent || el.textContent || '').replace(/\s+/g,' ').trim().slice(0,32) || el.dataset.act;
 
   /* natural blinks on the simulated face */
-  (function natural(){ setTimeout(()=>{ if (!$('#demo').hidden && !FACE.active && !G.scripted && !(window.DZ && window.DZ.engineLive)) gesture('natural'); natural(); }, 3500+Math.random()*3500); })();
+  (function natural(){ setTimeout(()=>{ if (!$('#demo').hidden && !FACE.active && !G.scripted && !(window.DZ && (window.DZ.engineLive || window.DZ.tracking))) gesture('natural'); natural(); }, 3500+Math.random()*3500); })();
 
   /* keyboard shortcuts */
   let vHeld = false;
@@ -1116,6 +1116,7 @@
     const roll = tp>=0&&tp<1 ? FACE.tiltDir*Math.sin(tp*Math.PI)*20 : 0;     // degrees, - = towards left shoulder
     const open = eyeOpen(now), blinking = open < 0.25, speaking = now < FACE.speakUntil;
     const sig = { ear: 0.04 + 0.26*open + (Math.random()-.5)*.006, pitch: gy*-6 - nod*0.75 + (Math.random()-.5)*.4, yaw: gx*9 + shake*0.78 + (Math.random()-.5)*.4, roll: gx*1.5 + roll + (Math.random()-.5)*.4 };
+    if (window.DZ && window.DZ.signal) Object.assign(sig, window.DZ.signal);   // real values from js/browser_tracker.js
     SIGNAL = sig; sample(now, sig);
     let fx = Wd/2 + gx*10 + shake + roll*1.6, fy = H*.52 + gy*5 + nod + Math.abs(roll)*.5, tilt = gx*.03 + shake*.004 + roll*Math.PI/180;
     if (S.stream && video.readyState>=2){
@@ -1305,7 +1306,9 @@
   }
 
   /* ---------------- hooks for js/engine.js (the real engine over WebSocket) ---------------- */
-  window.DZ = { $, esc, log, toast, tip, flashSig, glabel, mascotDo, setCaption, addEvent, FACE, DUR, G, screen, mic,
+  function stopCam(){ if (S.stream) S.stream.getTracks().forEach(t => t.stop()); S.stream = null; S.camState = 'idle'; const v = $('#camVideo'); v.srcObject = null; setCamUI(); }
+  function clickAtPointer(){ const el = hitTest(); if (el) run(el.dataset.act, 'eye'); }
+  window.DZ = { $, esc, log, toast, tip, flashSig, glabel, mascotDo, setCaption, addEvent, FACE, DUR, G, screen, mic, stopCam, click: clickAtPointer, signal: null,
     get micLive(){ return micLive; }, set micLive(v){ micLive = v; mic.classList.toggle('live', v); } };
 
   /* ---------------- boot ---------------- */

@@ -67,10 +67,11 @@ class Settings:
     click_sound: bool = True       # ...and a short tick (a lower one for a right click)
     click_sound_volume: float = 0.5   # 0 to 1
     sensitivity: float = 1.0
-    pointer_mode: str = "head-eyes"   # head-eyes: the head moves the cursor, the eyes pull it toward where you look
+    pointer_mode: str = "head"        # head: the head alone moves the cursor (default again, Oct 24 night: the eye pull
+                                      # was too hard to control). head-eyes: the eyes also pull it toward where you look
                                       # while the head turns that way (engine/eyes/pointer.py; needs
                                       # calibration/gaze_model.json, else it is "head"). "head": the head alone
-    eye_pull: float = 1.0             # head-eyes: how hard the eyes pull (0 = never, 0.5 = half as hard, 1.5 = harder)
+    eye_pull: float = 0.5             # head-eyes: how hard the eyes pull (0 = never, 0.5 = half as hard, 1.5 = harder)
     gpu_log_every_s: float = 10.0   # --gpu-log: print the GPU memory this often (engine/gpu_log.py)
     gpu_warn_mb: int = 14000        # ...and warn above this (the 5080 has 16 GB; the demo needs room to spare)
 

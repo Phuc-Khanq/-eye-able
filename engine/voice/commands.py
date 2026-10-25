@@ -347,7 +347,7 @@ DICTATION_EXIT = {"close", "off", "turn off", "turn it off", "exit", "stop", "do
 # ("Don't."). With nothing waiting they are just words, and "I know" never matches (the whole utterance must be one).
 # Before Oct 24 night this only worked for a question, so "Know." while a dictation preview waited was typed into it.
 ANSWER_MISHEARINGS: dict[str, str] = {
-    "know": "no", "noh": "no", "naw": "no", "nop": "no",      # not "now": "now!" can mean "do it now"
+    "know": "no", "noh": "no", "naw": "no", "nop": "no", "gnaw": "no",      # not "now": "now!" can mean "do it now"
     "don't": "no", "dont": "no", "do not": "no",
     "yea": "yes", "yah": "yes", "ya": "yes", "yas": "yes", "yess": "yes", "yesh": "yes", "ye": "yes",
 }

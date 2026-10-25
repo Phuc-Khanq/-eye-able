@@ -254,7 +254,10 @@ class ModeManager:
                 # the wrong button); the eyes service freezes the cursor while the eyes are shut, so the last gaze
                 # is where it froze. A raise while talking never gets here.
                 brow_off = gesture.type == "brow_raise" and self._brow_click == "off"
-                if self.preview or self.search or (self.mode == Mode.POINTER and not brow_off):
+                # A long blink also clicks in Dictation mode when nothing waits, so the user can click into a
+                # text box while dictating (Khang's live test, Oct 24 night: six blinks there did nothing)
+                clicks_here = self.mode == Mode.POINTER or (self.mode == Mode.DICTATION and gesture.type == "blink")
+                if self.preview or self.search or (clicks_here and not brow_off):
                     self._ui(messages.GESTURE, gesture=gesture.type)
                 if self.preview:
                     self._insert_preview()
@@ -262,7 +265,7 @@ class ModeManager:
                     if not self.search.preconfirmed:
                         self.search.preconfirmed = True
                         self._status("info", f"Will click {self.search.label} as soon as it's found")
-                elif self.mode == Mode.POINTER and not brow_off:
+                elif clicks_here and not brow_off:
                     if self._brow_click == "right" and gesture.type == "brow_raise":
                         self._right_click()
                     elif self._snap_gestures:

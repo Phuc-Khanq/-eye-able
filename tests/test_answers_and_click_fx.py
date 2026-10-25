@@ -193,7 +193,7 @@ class TestSettings(unittest.TestCase):
     def test_defaults(self):
         from engine.config import Settings
         s = Settings()
-        self.assertEqual((s.pointer_mode, s.snap_gesture_clicks, s.click_flash, s.click_sound), ("head-eyes", False,
+        self.assertEqual((s.pointer_mode, s.snap_gesture_clicks, s.click_flash, s.click_sound), ("head", False,
                                                                                                  True, True))
         self.assertEqual(s.whisper_hotwords, "")
 

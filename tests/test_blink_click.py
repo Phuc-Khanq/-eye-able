@@ -201,6 +201,28 @@ class TestModeManagerBlink(Base):
         self.gesture("blink")
         self.assertEqual(self.mm.mode, Mode.POINTER)
 
+    def test_a_blink_clicks_in_dictation_mode_when_nothing_waits(self):
+        self.say("start dictation")
+        self.assertEqual(self.mm.mode, Mode.DICTATION)
+        self.look(400, 250)
+        self.gesture("blink")
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 400, "y": 250})])
+        self.assertEqual(self.mm.mode, Mode.DICTATION)
+
+    def test_a_raise_does_not_click_in_dictation_mode(self):
+        self.say("start dictation")
+        self.look(400, 250)
+        self.gesture("brow_raise")
+        self.assertEqual(self.os(), [])
+
+    def test_gnaw_drops_a_waiting_preview(self):
+        self.say("start dictation")
+        self.say("take that")
+        self.assertTrue(self.mm.preview)
+        self.say("Gnaw.")
+        self.assertFalse(self.mm.preview)
+        self.assertEqual(self.os(), [])
+
     def test_a_blink_does_nothing_while_paused(self):
         self.say("pause")
         self.gesture("blink")

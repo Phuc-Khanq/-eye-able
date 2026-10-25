@@ -1,7 +1,7 @@
 // Headless check of the lite voice on the real page with a stand-in speech recogniser. Run: node tests/lite_voice_page_check.js
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
-const root = path.join(__dirname, '..', 'diseyeble-frontend', 'diseyeble-frontend');
+const root = path.join(__dirname, '..', 'eyeable-frontend', 'eyeable-frontend');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.jpg': 'image/jpeg' };
 const srv = http.createServer((q, r) => { const f = path.join(root, decodeURIComponent(q.url.split('?')[0]).replace(/\/$/, '/index.html'));
   fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); } else { r.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' }); r.end(d); } }); });
@@ -22,7 +22,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   await p.click('#liteVoiceBtn'); await p.waitForTimeout(400);
   ok(await p.evaluate(() => window.__sr && window.__sr.started), 'the recogniser started while the head pointer is on');
   ok(/Listening/.test(await p.textContent('#liteVoiceStat')), 'the voice status says Listening: ' + JSON.stringify(await p.textContent('#liteVoiceStat')));
-  ok(await p.evaluate(() => !document.querySelector('.dz-card').hidden), 'the Diseyeble card is showing on the simulated screen');
+  ok(await p.evaluate(() => !document.querySelector('.dz-card').hidden), 'the EYEable card is showing on the simulated screen');
   await say('volume', false); ok(/Hearing: “volume”/.test(await p.textContent('#liteVoiceStat')), 'interim words show in the status');
   await say('volume up'); ok(/Heard: “volume up”/.test(await p.textContent('#liteVoiceStat')), 'final words show in the status');
   ok(await p.evaluate(() => document.querySelector('.sim-osd').classList.contains('show')), '"volume up" shows the volume bar');

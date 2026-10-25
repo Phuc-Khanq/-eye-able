@@ -1,6 +1,6 @@
 # EYEable – website (English note on the engine connection, Oct 25)
 
-**Run it with the real engine:** double-click `Diseyeble Website.bat` in the repo root (or `python diseyeble-frontend/diseyeble-frontend/serve_demo.py`). It opens `http://localhost:8000/#demo`. Click **Allow camera**: the engine starts in its own window and the page switches from "Simulated" to "Engine live". Keep the page full screen (F11) so every real click lands on the page.
+**Run it with the real engine:** double-click `EYEable Website.bat` in the repo root (or `python eyeable-frontend/eyeable-frontend/serve_demo.py`). It opens `http://localhost:8000/#demo`. Click **Allow camera**: the engine starts in its own window and the page switches from "Simulated" to "Engine live". Keep the page full screen (F11) so every real click lands on the page.
 
 **What changes while the engine is live ("page mode")** (`js/engine.js`, engine side: `engine/core/page_mode.py`):
 - The pointer on the simulated screen is the real mouse. The engine moves the real mouse with your head; a long blink is a real click, exactly where the pointer is.
@@ -38,7 +38,7 @@ Frontend demo cho **EYEable**: phần mềm giúp **người già và người k
 
 - Thuần HTML + CSS + JS, **không cần build, không cần `npm install`**, không phụ thuộc thư viện nào:
   ```
-  diseyeble-frontend/
+  eyeable-frontend/
   ├── index.html        cấu trúc 2 màn hình (Introduction, Live demo)
   ├── css/style.css     toàn bộ giao diện
   ├── js/app.js         toàn bộ logic (Peep, gaze engine, demo Windows, voice, ...)
@@ -149,7 +149,7 @@ Ghi chú: khối `(unused) wavy halftone dot field` là nền chấm cũ, **khô
    - Gọi `gesture('blink' | 'nod' | 'shake' | 'tiltL' | 'tiltR')` là demo tự phản ứng.
    - Lưu ý: từ MediaPipe 0.10.30, API `mp.solutions` cũ đã bị bỏ, phải dùng **Tasks API**.
 2. **Giọng nói ngọng:** hiện chỉ là fuzzy match từ vựng (Levenshtein) + regex intent. Bản thật cần model ASR có fine-tune hoặc voice profile riêng cho từng người.
-3. **Điều khiển chuột thật của Windows:** trình duyệt không làm được. Đã có bản Python thử nghiệm (`diseyeble_tracker.py`: MediaPipe + pyautogui, nằm trong `Desktop\diseyeble` trên máy chủ project). Bản đó **chưa test với webcam thật**.
+3. **Điều khiển chuột thật của Windows:** trình duyệt không làm được. Đã có bản Python thử nghiệm (`eyeable_tracker.py`: MediaPipe + pyautogui, nằm trong `Desktop\eyeable` trên máy chủ project). Bản đó **chưa test với webcam thật**.
 4. **Thương hiệu:** demo không dùng logo thật của Chrome, YouTube hay Windows, chỉ dùng icon chung chung.
 
 ---

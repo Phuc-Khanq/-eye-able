@@ -3,7 +3,7 @@ About 2 minutes. Only numbers are saved (eye scores and head angles, 30 a second
 calibration/blink_data/blink_<date>_<time>.csv (git-ignored).
 
 Run:  .\\.venv\\Scripts\\python.exe -m tests.blink_record          (--camera 1 if the picture is black)
-A dark full-screen page shows a yellow dot and what to do. Point with your HEAD, the way you use Diseyeble:
+A dark full-screen page shows a yellow dot and what to do. Point with your HEAD, the way you use EYEable:
   LOOK   look at the dot; blink normally, don't close your eyes on purpose        (3 s)
   CLICK  look at the dot and close BOTH eyes on purpose for about half a second, twice  (6 s)
 at 9 spots (top, middle and bottom rows), then:
@@ -25,7 +25,7 @@ ROW_Y = {"top": 0.12, "middle": 0.5, "bottom": 0.88}
 COL_X = {"left": 0.15, "center": 0.5, "right": 0.85}
 SHAPES = ["eyeBlinkLeft", "eyeBlinkRight", "eyeLookDownLeft", "eyeLookDownRight",
           "eyeSquintLeft", "eyeSquintRight"]
-READ_TEXT = ("Read this slowly, the way you would read an email. Diseyeble lets people use a computer with "
+READ_TEXT = ("Read this slowly, the way you would read an email. EYEable lets people use a computer with "
              "their head, eyes and voice. A long blink clicks, and the card at the top shows what you said. "
              "Keep reading until the page moves on, and only blink the way you normally would.")
 

@@ -178,7 +178,7 @@ def start_key_listener(keys: "queue.Queue[str]"):
     return listener
 
 
-MARK_WINDOW = "Diseyeble recenter"
+MARK_WINDOW = "EYEable recenter"
 
 
 def show_mark(W: int, H: int) -> None:

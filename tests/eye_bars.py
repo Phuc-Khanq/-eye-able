@@ -27,7 +27,7 @@ from engine.eyes.eye_features import LEFT_EYE, RIGHT_EYE, EyeFeatureExtractor
 from engine.eyes.face_mesh import FaceMesh
 from engine.eyes.smoothing import OneEuroFilter
 
-WINDOW = "Diseyeble - eye features (Q to quit)"
+WINDOW = "EYEable - eye features (Q to quit)"
 PANEL_W = 440
 DISPLAY_H = 540
 SCREEN_W = 1920  # used only to turn jitter into an example pixel figure

@@ -2,7 +2,7 @@
 understand the same phrases:  python scripts/make_lite_phrases.py   (tests/test_lite_phrases.py checks it is up to date)
 
 Reads engine/voice/commands.py and engine/config.py with ast (nothing is imported or run) and writes
-diseyeble-frontend/diseyeble-frontend/js/lite-phrases.js.
+eyeable-frontend/eyeable-frontend/js/lite-phrases.js.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "diseyeble-frontend" / "diseyeble-frontend" / "js" / "lite-phrases.js"
+OUT = ROOT / "eyeable-frontend" / "eyeable-frontend" / "js" / "lite-phrases.js"
 
 COMMAND_NAMES = ["FIXED_COMMANDS", "KEY_SHORTCUTS", "ANSWER_MISHEARINGS", "DICTATION_EXIT", "EXACT_ONLY", "FILLER_WORDS",
                  "FILLER_PREFIXES", "TRIGGER_WORDS", "TYPE_VERBS", "TARGET_VERBS", "LABEL_LEADING_WORDS", "POINTING_WORDS",

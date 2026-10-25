@@ -281,7 +281,7 @@ class TestLayout(unittest.TestCase):
         fonts = {k: F() for k in ("pill", "pill_hint", "label", "chip", "body", "shaky", "action", "hint", "key")}
         for chip in ("click", "new tab", "open chrome and go to the library website please now"):
             c = Canvas()
-            D.draw(c, D.View("heard", pill="Diseyeble", label="Heard", chip=chip), (0.0,) * D.WAVE_BARS, fonts)
+            D.draw(c, D.View("heard", pill="EYEable", label="Heard", chip=chip), (0.0,) * D.WAVE_BARS, fonts)
             boxes = [r for r in c.rects if r]
             panel = next(r for r in boxes if r[2] == D.PANEL)
             chip_box = next(r for r in boxes if r[2] == D.CHIP)

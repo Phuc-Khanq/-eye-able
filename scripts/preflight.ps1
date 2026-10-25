@@ -1,4 +1,4 @@
-# Checks the laptop is ready to run Diseyeble, in about a minute, before every demo or test:
+# Checks the laptop is ready to run EYEable, in about a minute, before every demo or test:
 #   .\scripts\preflight.ps1            checks, then runs the unit tests with the GPU hidden
 #   .\scripts\preflight.ps1 -NoTests   checks only
 # It changes nothing. Each line says OK, WARN (read it) or FAIL (fix it before running the app).
@@ -54,7 +54,7 @@ $py = Get-CimInstance Win32_Process -Filter "name='python.exe'" | Where-Object {
 if ($py) {
     Fail "other Python programs may hold the camera or GPU. Stop them (Stop-Process -Id <id>):"
     $py | ForEach-Object { Write-Host "          $($_.ProcessId)  $($_.CommandLine)" }
-} else { Ok "no other Diseyeble Python program is running" }
+} else { Ok "no other EYEable Python program is running" }
 $trainer = Get-CimInstance Win32_Process -Filter "name='python.exe'" | Where-Object { $_.CommandLine -match "finetune" }
 if ($trainer) { Fail "training is running and uses the GPU: wait for it to finish" }
 # What the settings will put on the GPU (MB, measured on the demo PC): Whisper 2500, UI-Venus 6000, clean-up 5000 (3B) / 3500 (1.5B)

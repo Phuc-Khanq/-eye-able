@@ -220,7 +220,7 @@ def record(args) -> None:
     estimator = HeadPoseEstimator()
     live = GestureDetector()
     live_brow = make_brow_from(args)()
-    window = "Diseyeble head session (Q to quit)"
+    window = "EYEable head session (Q to quit)"
     cv2.namedWindow(window, cv2.WINDOW_AUTOSIZE)
 
     def put(img, s, y, scale=0.8, color=TEXT, thick=1, x=None):

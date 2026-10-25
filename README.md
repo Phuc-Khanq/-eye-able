@@ -1,4 +1,4 @@
-# Diseyeble
+# EYEable
 
 Control your whole computer hands-free, with nothing but a webcam and a microphone. Your head moves the cursor, a long blink clicks, and your voice runs commands and types. UI-Venus 1.5 (released February 2026) turns a spoken name, like "click Send", into an exact click.
 
@@ -8,9 +8,9 @@ Built at Gator Hack V (UF AI Days 2026). Everything runs on the laptop: camera f
 
 **Needs:** Windows 10 or 11, a webcam, a microphone, internet for the first install, and 4 to 22 GB of disk (depends on your GPU, below). No Python or other setup needed.
 
-1. Download `Diseyeble-<version>.zip` from [Releases](../../releases) (or the green **Code -> Download ZIP** button) and unzip it anywhere, for example `Documents\Diseyeble`.
-2. Double-click **`Install Diseyeble.bat`**. If Windows says "Windows protected your PC", click **More info -> Run anyway** (the script isn't signed). It installs its own Python, the packages and the models into that folder, picks what your PC can run, and adds a **Diseyeble** shortcut to the Desktop and Start menu. Takes 10 to 40 minutes, mostly downloads.
-3. Start **Diseyeble** from the shortcut. Face the screen and look at its center for a second. Say "hi Dizzy" to dictate, "bye" to stop dictating, "quit" to close it.
+1. Download `EYEable-<version>.zip` from [Releases](../../releases) (or the green **Code -> Download ZIP** button) and unzip it anywhere, for example `Documents\EYEable`.
+2. Double-click **`Install EYEable.bat`**. If Windows says "Windows protected your PC", click **More info -> Run anyway** (the script isn't signed). It installs its own Python, the packages and the models into that folder, picks what your PC can run, and adds a **EYEable** shortcut to the Desktop and Start menu. Takes 10 to 40 minutes, mostly downloads.
+3. Start **EYEable** from the shortcut. Face the screen and look at its center for a second. Say "hi Dizzy" to dictate, "bye" to stop dictating, "quit" to close it.
 
 What you get depends on your graphics card (the installer picks for you; `scripts\setup.ps1 -Profile cpu` forces one):
 

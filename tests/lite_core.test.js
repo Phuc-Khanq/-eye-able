@@ -1,7 +1,7 @@
-// Unit tests for the lite-mode head pointer and blink click (diseyeble-frontend/diseyeble-frontend/js/lite.js).
+// Unit tests for the lite-mode head pointer and blink click (eyeable-frontend/eyeable-frontend/js/lite.js).
 // Run: node tests/lite_core.test.js
 const assert = require('assert');
-const { createCore, anglesFromMatrix } = require('../diseyeble-frontend/diseyeble-frontend/js/lite.js');
+const { createCore, anglesFromMatrix } = require('../eyeable-frontend/eyeable-frontend/js/lite.js');
 
 let T = 0;
 const face = (t, o = {}) => ({ yaw: o.yaw || 0, pitch: o.pitch || 0, blinkL: o.b || 0, blinkR: o.b || 0, jaw: o.jaw || 0, t });

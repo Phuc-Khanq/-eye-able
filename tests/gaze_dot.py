@@ -418,7 +418,7 @@ def main() -> None:
     app = GazeDotApp(W, H, points=args.points, y_inputs=args.y_inputs, sweep=args.sweep and not args.no_head,
                      profile=args.profile, trained=trained, camera=camera, iris_mode=args.iris)
 
-    window = "Diseyeble gaze"
+    window = "EYEable gaze"
     cv2.namedWindow(window, cv2.WINDOW_NORMAL)
     cv2.moveWindow(window, 0, 0)
     cv2.setWindowProperty(window, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)

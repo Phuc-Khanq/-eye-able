@@ -1,8 +1,8 @@
 // Headless check of the lite-mode page glue with a stand-in tracker (no CDN needed). Run: node tests/lite_page_check.js
-// Needs playwright (npm i playwright) and a Chromium. Serves diseyeble-frontend/diseyeble-frontend on localhost.
+// Needs playwright (npm i playwright) and a Chromium. Serves eyeable-frontend/eyeable-frontend on localhost.
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
-const root = path.join(__dirname, '..', 'diseyeble-frontend', 'diseyeble-frontend');
+const root = path.join(__dirname, '..', 'eyeable-frontend', 'eyeable-frontend');
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.jpg': 'image/jpeg', '.png': 'image/png' };
 const srv = http.createServer((q, r) => { const f = path.join(root, decodeURIComponent(q.url.split('?')[0]).replace(/\/$/, '/index.html'));
   fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); } else { r.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' }); r.end(d); } }); });

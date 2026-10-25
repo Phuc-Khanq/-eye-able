@@ -328,7 +328,7 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
         gpu.start()
     if stdin:
         threading.Thread(target=read_stdin, args=(bus, stop), daemon=True).start()
-    print(f"Diseyeble engine on ws://{settings.ws_host}:{relay.port}  (Ctrl+C or say \"quit\" to stop)")
+    print(f"EYEable engine on ws://{settings.ws_host}:{relay.port}  (Ctrl+C or say \"quit\" to stop)")
     loop = asyncio.get_running_loop()
     quit_now = asyncio.Event()
     bus.subscribe(topics.QUIT, lambda _msg: loop.call_soon_threadsafe(quit_now.set))   # "quit": any thread
@@ -350,7 +350,7 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Diseyeble engine")
+    p = argparse.ArgumentParser(description="EYEable engine")
     p.add_argument("--wav", help="use this recording instead of the mic")
     p.add_argument("--no-eyes", action="store_true", help="no camera, cursor, clicks or typing (voice only)")
     p.add_argument("--pointer", choices=["head-eyes", "head", "head-nose", "head-abs", "hybrid", "gaze"],

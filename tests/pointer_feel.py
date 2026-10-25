@@ -36,7 +36,7 @@ EDGES = ["left", "top", "right", "bottom"]
 EDGE_PX = 3          # the real cursor within this of the edge counts (its dead zone keeps it 2 px inside)
 HOLD_S = 0.3
 TIMEOUT_S = 10.0
-WINDOW = "Diseyeble pointer feel"
+WINDOW = "EYEable pointer feel"
 BG, TEXT, QUIET, RING, GOOD = (32, 28, 26), (235, 235, 235), (150, 150, 150), (90, 200, 250), (120, 210, 120)
 
 

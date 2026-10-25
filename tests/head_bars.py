@@ -32,7 +32,7 @@ from engine.eyes.head_gestures import GestureDetector
 from engine.eyes.head_pose import HeadPoseEstimator
 from tests.eye_bars import BAD, BAR_BG, BAR_FG, BG, DISPLAY_H, GOOD, QUIET, TEXT, WARN, bar, text
 
-WINDOW = "Diseyeble - head pose (Q to quit)"
+WINDOW = "EYEable - head pose (Q to quit)"
 PANEL_W = 420
 
 

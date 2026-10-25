@@ -1,4 +1,4 @@
-# Starts the Diseyeble engine for the demo. Run from anywhere:  .\scripts\run_demo.ps1
+# Starts the EYEable engine for the demo. Run from anywhere:  .\scripts\run_demo.ps1
 #   .\scripts\run_demo.ps1                 normal run (head pointer, long-blink click, voice, dictation)
 #   .\scripts\run_demo.ps1 -Record         recording the demo video: the dictation card shows up in OBS
 #   .\scripts\run_demo.ps1 -GpuLog         also print the GPU memory in use, and the peak when you stop

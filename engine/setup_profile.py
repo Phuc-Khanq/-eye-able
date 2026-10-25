@@ -1,4 +1,4 @@
-"""Picks what this PC can run and gets it ready: called by scripts/setup.ps1 (Install Diseyeble.bat).
+"""Picks what this PC can run and gets it ready: called by scripts/setup.ps1 (Install EYEable.bat).
 
 Route: Khang
     python -m engine.setup_profile --vram 16303 --write     # choose a profile, write config.local.json if missing

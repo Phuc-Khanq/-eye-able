@@ -1,7 +1,7 @@
 """Serves this demo page on http://localhost:8000 and starts the engine when the page's Allow camera is clicked.
 
 Run it from any Python 3 (no packages needed):
-    python serve_demo.py --engine-dir C:\\path\\to\\diseyeble
+    python serve_demo.py --engine-dir C:\\path\\to\\eyeable
 Then open http://localhost:8000/#demo. The engine's own window (python -m engine.main) opens when you click
 Allow camera, and the page shows Engine live once it is up. Ctrl+C here stops this server and the engine it started.
 
@@ -30,11 +30,11 @@ def engine_listening(port: int = ENGINE_PORT) -> bool:
 
 
 def find_engine_dir() -> Path | None:
-    """A folder named diseyeble next to this page's folders (the usual worktree layout), then any folder above."""
+    """A folder named eyeable next to this page's folders (the usual worktree layout), then any folder above."""
     levels = [PAGE_DIR, *PAGE_DIR.parents]
     for level in levels:
-        if (level / "diseyeble" / "engine" / "main.py").exists():
-            return level / "diseyeble"
+        if (level / "eyeable" / "engine" / "main.py").exists():
+            return level / "eyeable"
     for level in levels:
         if (level / "engine" / "main.py").exists():
             return level
@@ -85,7 +85,7 @@ def make_handler(engine: Engine, port: int):
             if self.path != "/api/start-engine":
                 return self._json(404, {"ok": False, "error": "not found"})
             # a custom header plus this page's own origin: another website can't make us start anything
-            if self.headers.get("X-Diseyeble") != "1" or self.headers.get("Origin") not in origins:
+            if self.headers.get("X-Eyeable") != "1" or self.headers.get("Origin") not in origins:
                 return self._json(403, {"ok": False, "error": "not from the demo page"})
             try:
                 return self._json(200, {"ok": True, "result": engine.start()})
@@ -110,7 +110,7 @@ def main() -> None:
 
     engine_dir = args.engine_dir or find_engine_dir()
     if not engine_dir or not (engine_dir / "engine").is_dir():
-        sys.exit("Give the folder that holds engine/main.py:  python serve_demo.py --engine-dir C:\\path\\to\\diseyeble")
+        sys.exit("Give the folder that holds engine/main.py:  python serve_demo.py --engine-dir C:\\path\\to\\eyeable")
     engine = Engine(engine_dir.resolve(), args.python, args.module)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(engine, args.port))
     url = f"http://localhost:{args.port}/#demo"

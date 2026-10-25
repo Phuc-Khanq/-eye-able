@@ -41,7 +41,7 @@ sentences no training speaker read.
    - **Accelerator:** **GPU T4 x2** (we use one of them). Not "None", not TPU.
    - **Internet:** **On**. It needs to download the code, the data and the Whisper model.
    - Language: Python. Environment: leave the default ("Always use latest environment").
-5. Rename it at the top, for example `diseyeble-whisper-finetune`.
+5. Rename it at the top, for example `eyeable-whisper-finetune`.
 
 ---
 
@@ -53,16 +53,16 @@ Delete any example cells, then add these two code cells.
 
 ```python
 !mkdir -p /kaggle/temp
-!rm -rf /kaggle/temp/diseyeble
-!git clone --depth 1 --branch voice https://github.com/Phuc-Khanq/diseyeble.git /kaggle/temp/diseyeble
-!pip install -q -r /kaggle/temp/diseyeble/requirements-train.txt
+!rm -rf /kaggle/temp/eyeable
+!git clone --depth 1 --branch voice https://github.com/Phuc-Khanq/eyeable.git /kaggle/temp/eyeable
+!pip install -q -r /kaggle/temp/eyeable/requirements-train.txt
 !python -c "import sys, torch; print(sys.version); print('torch', torch.__version__, 'GPU:', torch.cuda.get_device_name(0))"
 ```
 
 **Cell 2: run everything (about 10 hours, nobody needs to watch)**
 
 ```python
-%cd /kaggle/temp/diseyeble
+%cd /kaggle/temp/eyeable
 !python -m engine.voice.finetune.run_all --platform kaggle --hours 10 --out /kaggle/working
 ```
 
@@ -148,9 +148,9 @@ To use a second session, for example to try more settings or finish a run cut sh
 3. Change cell 2 to:
 
    ```python
-   %cd /kaggle/temp/diseyeble
+   %cd /kaggle/temp/eyeable
    !python -m engine.voice.finetune.run_all --platform kaggle --hours 10 --out /kaggle/working \
-       --resume-from /kaggle/input/diseyeble-whisper-finetune
+       --resume-from /kaggle/input/eyeable-whisper-finetune
    ```
 4. Save & Run All again.
 

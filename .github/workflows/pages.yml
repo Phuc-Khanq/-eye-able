@@ -1,5 +1,5 @@
-# Publishes the website (diseyeble-frontend/diseyeble-frontend) to GitHub Pages:
-#   https://phuc-khanq.github.io/diseyeble/   (landing page)   ...#demo (the live demo page)
+# Publishes the website (eyeable-frontend/eyeable-frontend) to GitHub Pages:
+#   https://phuc-khanq.github.io/eyeable/   (landing page)   ...#demo (the live demo page)
 # One-time setup by a repo admin: GitHub -> Settings -> Pages -> Source: "GitHub Actions".
 # It runs on every push to the branches below, or by hand (Actions -> Publish website -> Run workflow).
 # Only the website folder is published: no engine code, no models.
@@ -8,7 +8,7 @@ name: Publish website
 on:
   push:
     branches: [live, eyes, main]
-    paths: ["diseyeble-frontend/**", ".github/workflows/pages.yml"]
+    paths: ["eyeable-frontend/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -31,6 +31,6 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: diseyeble-frontend/diseyeble-frontend
+          path: eyeable-frontend/eyeable-frontend
       - id: deployment
         uses: actions/deploy-pages@v4

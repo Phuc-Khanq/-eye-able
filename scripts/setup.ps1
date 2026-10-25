@@ -1,4 +1,4 @@
-# Installs Diseyeble on this Windows PC. Double-click "Install Diseyeble.bat" in the folder, or run:
+# Installs EYEable on this Windows PC. Double-click "Install EYEable.bat" in the folder, or run:
 #   powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 #   ... -Profile cpu        force a profile (auto, full, gpu12, gpu8, cpu); auto picks from the GPU
 #   ... -SkipModels         don't download the models now (the app downloads them on its first start)
@@ -20,8 +20,8 @@ Set-Location $root
 function Step($what) { Write-Host "`n== $what" -ForegroundColor Cyan }
 function Check($what) { if ($LASTEXITCODE -ne 0) { throw "Failed: $what (exit code $LASTEXITCODE). Run the installer again; if it fails twice, send this window's text to the team." } }
 
-Write-Host "Diseyeble setup in $root" -ForegroundColor Green
-if ($env:OS -ne "Windows_NT") { throw "Diseyeble runs on Windows 10 or 11 only." }
+Write-Host "EYEable setup in $root" -ForegroundColor Green
+if ($env:OS -ne "Windows_NT") { throw "EYEable runs on Windows 10 or 11 only." }
 
 # ---------------------------------------------------------------- 1. the GPU decides the profile
 Step "Checking this PC"
@@ -38,7 +38,7 @@ if ($smi) {
         Write-Host "WARNING: driver $driver is older than 570, which CUDA 12.8 needs. Update it from nvidia.com/drivers, or the GPU parts fall back to the CPU." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "No NVIDIA GPU found: Diseyeble will run on the CPU (fewer features)."
+    Write-Host "No NVIDIA GPU found: EYEable will run on the CPU (fewer features)."
 }
 $useGpu = ($Profile -ne "cpu") -and ($vram -ge 7500)
 $needGb = if (-not $useGpu) { 4 } elseif ($vram -ge 15000) { 22 } else { 14 }
@@ -88,7 +88,7 @@ if ($useGpu) {
     Step "PyTorch, CPU only (small)"
     & $uv pip install --python $py torch torchvision --index-url https://download.pytorch.org/whl/cpu; Check "install PyTorch (CPU)"
 }
-Step "Diseyeble's packages (exact versions from the demo PC)"
+Step "EYEable's packages (exact versions from the demo PC)"
 & $uv pip install --python $py -r requirements.lock.txt; Check "install packages"
 
 Step "MediaPipe face model"
@@ -119,17 +119,17 @@ if (-not $NoShortcuts) {
     Step "Shortcuts"
     $shell = New-Object -ComObject WScript.Shell
     foreach ($dir in @([Environment]::GetFolderPath("Desktop"), [Environment]::GetFolderPath("Programs"))) {
-        $lnk = $shell.CreateShortcut((Join-Path $dir "Diseyeble.lnk"))
-        $lnk.TargetPath = Join-Path $root "Diseyeble.bat"
+        $lnk = $shell.CreateShortcut((Join-Path $dir "EYEable.lnk"))
+        $lnk.TargetPath = Join-Path $root "EYEable.bat"
         $lnk.WorkingDirectory = $root
         $lnk.Description = "Hands-free computer control with your head, eyes and voice"
         $lnk.IconLocation = "$env:SystemRoot\System32\shell32.dll,22"
         $lnk.Save()
-        Write-Host "Shortcut: $(Join-Path $dir 'Diseyeble.lnk')"
+        Write-Host "Shortcut: $(Join-Path $dir 'EYEable.lnk')"
     }
 }
 
 Step "Final check"
 & (Join-Path $PSScriptRoot "preflight.ps1") -NoTests
-Write-Host "`nDiseyeble is installed. Start it with the Diseyeble shortcut (or Diseyeble.bat in this folder)." -ForegroundColor Green
+Write-Host "`nEYEable is installed. Start it with the EYEable shortcut (or EYEable.bat in this folder)." -ForegroundColor Green
 Write-Host "First start: face the screen and look at its center for a second; say `"hi Dizzy`" to dictate, `"quit`" to stop."

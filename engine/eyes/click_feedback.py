@@ -120,7 +120,7 @@ class ClickSound:
             return
         try:
             for button, (pitch, decay) in TICKS.items():
-                path = self._folder / f"diseyeble_click_{button}_{int(self.volume * 100)}.wav"
+                path = self._folder / f"eyeable_click_{button}_{int(self.volume * 100)}.wav"
                 if not path.exists():
                     path.write_bytes(tick_wav(pitch, decay, self.volume))
                 self._paths[button] = path

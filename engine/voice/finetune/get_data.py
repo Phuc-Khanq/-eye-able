@@ -41,7 +41,7 @@ PARTS = {
 }
 TINY_PARTS = ["librispeech-test-clean"]
 CHUNK = 1 << 20
-USER_AGENT = "diseyeble-get-data/1.0"
+USER_AGENT = "eyeable-get-data/1.0"
 
 
 def gb(n: float) -> str:

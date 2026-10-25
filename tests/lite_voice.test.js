@@ -1,6 +1,6 @@
-// Unit tests for the in-browser voice (diseyeble-frontend/diseyeble-frontend/js/lite-voice.js). Run: node tests/lite_voice.test.js
+// Unit tests for the in-browser voice (eyeable-frontend/eyeable-frontend/js/lite-voice.js). Run: node tests/lite_voice.test.js
 const assert = require('assert');
-const { createVoice, parse, launch } = require('../diseyeble-frontend/diseyeble-frontend/js/lite-voice.js');
+const { createVoice, parse, launch } = require('../eyeable-frontend/eyeable-frontend/js/lite-voice.js');
 
 function rig(findResult) {
   const out = { msgs: [], acts: [], clicks: [], timers: [], finds: [] };

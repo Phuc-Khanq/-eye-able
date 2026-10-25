@@ -37,6 +37,7 @@ ui/out/
 ui/dist/
 
 # Private team notes (roles, judge prep). Keep out of the public repo.
-Diseyeble_Project_Description.md
-Diseyeble Build Plan.md
+# (the wildcards also match the same files under their old names, so renaming a local copy never exposes it)
+*_Project_Description.md
+*Build Plan.md
 *Handoff*.md

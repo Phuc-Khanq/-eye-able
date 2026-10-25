@@ -54,7 +54,7 @@ READ_PAGE = [   # (text, kind): a pretend web page; links and buttons are what a
     ("[ Add to calendar ]      [ Share ]      [ Report a problem ]", "button"),
     ("Questions? Ask any organizer in a blue shirt, or post in the #help channel on Discord.", "text"),
 ]
-WINDOW = "Diseyeble eyebrow click"
+WINDOW = "EYEable eyebrow click"
 BG, TEXT, QUIET = (32, 28, 26), (235, 235, 235), (150, 150, 150)
 RING, GOOD, BAD, YELLOW = (90, 200, 250), (120, 210, 120), (90, 90, 230), (60, 210, 230)
 TALK_TEXT = [

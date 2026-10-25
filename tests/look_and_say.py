@@ -37,7 +37,7 @@ import numpy as np
 from tests.gaze_cursor import GazeCursor, hide_mark, show_mark
 
 DEFAULT_LABELS = ["channel avatar", "search box", "subscribe button", "like button", "settings icon"]
-PANEL = "Diseyeble status"
+PANEL = "EYEable status"
 PANEL_W, PANEL_H = 420, 230
 MODES = ("head", "hybrid", "gaze")
 BG, TEXT, QUIET, GOOD, WARN, BAD, ACCENT = (32, 28, 26), (235, 235, 235), (150, 150, 150), (120, 210, 120), (60, 170, 240), (90, 90, 230), (240, 200, 90)

@@ -83,7 +83,7 @@ KEYCAP = "#3a3b42"
 FONT = "Segoe UI"
 WDA_EXCLUDEFROMCAPTURE = 0x11
 OFF_SCREEN = "+-5000+-5000"
-MODE_NAMES = {"pointer": "Diseyeble", "dictation": "Dictation", "scroll": "Scroll", "paused": "Paused",
+MODE_NAMES = {"pointer": "EYEable", "dictation": "Dictation", "scroll": "Scroll", "paused": "Paused",
               "menu": "Menu"}
 MODE_HINTS = {"dictation": "say “dictate off” to stop", "scroll": "tilt your head · say “stop”",
               "paused": "say “resume”"}
@@ -227,7 +227,7 @@ class CardModel:
 
     def view(self) -> View:
         now = self.clock()
-        pill, hint, listening = MODE_NAMES.get(self.mode, "Diseyeble"), MODE_HINTS.get(self.mode, ""), self.listening()
+        pill, hint, listening = MODE_NAMES.get(self.mode, "EYEable"), MODE_HINTS.get(self.mode, ""), self.listening()
         show_heard = self.heard_outside_dictation or self.mode == "dictation"
         listening = listening and show_heard
         if listening:

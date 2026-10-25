@@ -67,7 +67,9 @@ FIXED_COMMANDS: dict[str, str] = {
     "quit": "quit_app",
     "quit app": "quit_app",
     "quit program": "quit_app",
-    "quit diseyeble": "quit_app",
+    "quit eyeable": "quit_app",
+    "quit eye able": "quit_app",        # how Whisper often writes the name
+    "quit i able": "quit_app",
     "quit dizzy": "quit_app",
     "exit program": "quit_app",
     "exit app": "quit_app",
@@ -312,7 +314,7 @@ COMMAND_INFO: dict[str, tuple[str, str]] = {
                                      "Also \"hi Dizzy\""),
     "stop_dictation": ("Dictation", "Ends dictation (asks first if words are waiting). Also \"bye\", \"bye Dizzy\", \"bye bye\". "
                                     "While dictating, \"close\", \"off\" and \"turn off\" also work"),
-    "quit_app": ("Setup", "Quits Diseyeble completely: the engine, camera, mic and card all stop. Say \"quit\" alone; works "
+    "quit_app": ("Setup", "Quits EYEable completely: the engine, camera, mic and card all stop. Say \"quit\" alone; works "
                           "in every mode, even paused"),
     "send_it": ("Dictation", "Types the preview and presses Enter, after asking \"send?\""),
     "undo": ("Dictation", "Drops the preview, or presses Ctrl+Z when none is showing"),
@@ -419,7 +421,7 @@ EXACT_ONLY = {"use original", "use the original", "clean it up", "stop clicking"
               "dictation on", "dictation off",
               # greeting, goodbye and quit: exact, so only these words ever start dictation or stop the program
               "hi dizzy", "hi dizzie", "hi dizzi", "high dizzy", "bye dizzy", "bye dizzie", "bye bye", "quit app",
-              "quit program", "quit diseyeble", "quit dizzy", "exit program", "exit app", "shut down",
+              "quit program", "quit eyeable", "quit eye able", "quit i able", "quit dizzy", "exit program", "exit app", "shut down",
               # pause / resume and the answers: exact, so "passed" never pauses and "note that" never says no
               "paused", "pause it", "pause listening", "take a break", "go to sleep", "resumed", "resuming",
               "unpause", "continue", "yes please", "write that", "type that", "insert it", "put it in", "keep it",

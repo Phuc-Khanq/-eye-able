@@ -454,7 +454,7 @@
     starting = true; $('#engTxt').textContent = 'Starting engine…';
     log('sys', 'Starting the engine, a new window opens. The first start takes a minute.'); toast('Starting the engine…');
     try {
-      const r = await fetch('/api/start-engine', { method: 'POST', headers: { 'X-Diseyeble': '1' } });
+      const r = await fetch('/api/start-engine', { method: 'POST', headers: { 'X-Eyeable': '1' } });
       const j = await r.json();
       if (!j.ok) throw new Error(j.error || 'refused');
     } catch (err) {

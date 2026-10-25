@@ -26,6 +26,10 @@ downloads/
 # Secrets and per-laptop settings
 .env
 config.local.json
+config.local.json.*
+
+# Release zips (scripts/make_release.ps1)
+dist/
 
 # Front end
 ui/node_modules/

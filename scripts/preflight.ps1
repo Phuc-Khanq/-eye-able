@@ -12,25 +12,28 @@ function Warn($t) { Write-Host "  WARN  $t" -ForegroundColor Yellow }
 function Fail($t) { Write-Host "  FAIL  $t" -ForegroundColor Red; $script:fails++ }
 
 Write-Host "1. The code" -ForegroundColor Cyan
-$branch = (git rev-parse --abbrev-ref HEAD) 2>$null
-$last = (git log -1 --format="%h %s") 2>$null
-Ok "branch $branch, last commit: $last"
-$dirty = (git status --porcelain) 2>$null
-if ($dirty) { Warn "uncommitted changes:`n$(($dirty | Select-Object -First 8) -join "`n")" } else { Ok "everything is committed" }
+if ((Test-Path ".git") -and (Get-Command git -ErrorAction SilentlyContinue)) {
+    $branch = (git rev-parse --abbrev-ref HEAD) 2>$null
+    $last = (git log -1 --format="%h %s") 2>$null
+    Ok "branch $branch, last commit: $last"
+    $dirty = (git status --porcelain) 2>$null
+    if ($dirty) { Warn "uncommitted changes:`n$(($dirty | Select-Object -First 8) -join "`n")" } else { Ok "everything is committed" }
+} else { Ok "downloaded copy (not a git clone)" }
 # Features that must be in the files (a missing one means a robocopy folder wasn't applied):
 $needs = @(
-    @("engine\config.py", "mouth_endpoint",   "eyes46: a still mouth ends a clip"),
-    @("engine\config.py", "live_preview",     "eyes43: live dictation preview"),
-    @("engine\core\topics.py", "PARTIAL_AUDIO", "eyes43: live preview audio topic"),
-    @("engine\core\topics.py", "QUIT",        "eyes38: quit"),
-    @("engine\config.py", "refine_dictation", "eyes39: whole-passage refine"),
-    @("engine\eyes\nose.py", "class NoseTracker", "eyes42: head-nose pointer"),
-    @("engine\main.py", "--no-venus",         "eyes44: --no-venus"),
-    @("engine\voice\dictation.py", "[whisper]", "eyes45: timing lines")
+    @("engine\config.py", "mouth_endpoint",   "a still mouth ends a clip (eyes46)"),
+    @("engine\config.py", "live_preview",     "live dictation preview (eyes43)"),
+    @("engine\core\topics.py", "PARTIAL_AUDIO", "live preview audio (eyes43)"),
+    @("engine\core\topics.py", "QUIT",        '"quit" command (eyes38)'),
+    @("engine\config.py", "refine_dictation", "whole-passage refine (eyes39)"),
+    @("engine\eyes\nose.py", "class NoseTracker", "head-nose pointer (eyes42)"),
+    @("engine\main.py", "--no-venus",         "--no-venus (eyes44)"),
+    @("engine\voice\dictation.py", "[whisper]", "timing lines (eyes45)"),
+    @("engine\setup_profile.py", "def pick",  "installer profiles (eyes47)")
 )
 foreach ($n in $needs) {
     if ((Test-Path $n[0]) -and (Select-String -Path $n[0] -SimpleMatch -Pattern $n[1] -Quiet)) { Ok $n[2] }
-    else { Fail "$($n[2]): not found in $($n[0]); apply its engine-eyesNN folder (robocopy ... . /E)" }
+    else { Fail "$($n[2]): not found in $($n[0]); this copy is out of date (download it again, or apply the missing engine-eyesNN folder)" }
 }
 
 Write-Host "2. Settings and models" -ForegroundColor Cyan
@@ -54,14 +57,27 @@ if ($py) {
 } else { Ok "no other Diseyeble Python program is running" }
 $trainer = Get-CimInstance Win32_Process -Filter "name='python.exe'" | Where-Object { $_.CommandLine -match "finetune" }
 if ($trainer) { Fail "training is running and uses the GPU: wait for it to finish" }
-$smi = (nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu --format=csv,noheader,nounits) 2>$null
-if ($smi) {
-    $p = $smi.Split(",") | ForEach-Object { [int]($_.Trim()) }
+# What the settings will put on the GPU (MB, measured on the demo PC): Whisper 2500, UI-Venus 6000, clean-up 5000 (3B) / 3500 (1.5B)
+$cfg = $null
+if (Test-Path "config.local.json") { try { $cfg = Get-Content "config.local.json" -Raw | ConvertFrom-Json } catch { } }
+if (-not $cfg) { $cfg = [pscustomobject]@{} }
+$need = 0
+if (-not $cfg.whisper_device -or $cfg.whisper_device -eq "cuda") { $need += 2500 }
+if ($cfg.use_ui_venus -ne $false) { $need += 6000 }
+if ($cfg.rewrite_dictation -ne $false) { if ("$($cfg.rewrite_model)" -like "*1.5B*") { $need += 3500 } else { $need += 5000 } }
+$smi = $null
+if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
+    try { $smi = (nvidia-smi --query-gpu=memory.used,memory.total,utilization.gpu --format=csv,noheader,nounits) 2>$null } catch { }
+}
+if ($need -eq 0) { Ok "these settings run everything on the CPU" }
+elseif ($smi) {
+    $p = ($smi | Select-Object -First 1).Split(",") | ForEach-Object { [int]($_.Trim()) }
     $free = $p[1] - $p[0]
-    if ($free -ge 11000) { Ok "GPU: $($p[0]) of $($p[1]) MB used, $($p[2])% busy, $free MB free" }
-    elseif ($free -ge 8000) { Warn "GPU: only $free MB free ($($p[0]) used, $($p[2])% busy); the full app peaks near 15000 MB: close Chrome/other GPU programs or use --no-venus" }
-    else { Fail "GPU: only $free MB free ($($p[0]) used, $($p[2])% busy): close the programs using it (nvidia-smi shows them)" }
-} else { Warn "nvidia-smi not found: can't check the GPU" }
+    $line = "GPU: $($p[0]) of $($p[1]) MB used, $($p[2])% busy, $free MB free; these settings need about $need MB"
+    if ($free -ge $need + 1000) { Ok $line }
+    elseif ($free -ge $need) { Warn "$line. Tight: close Chrome and other GPU programs" }
+    else { Fail "$line. Close the programs using the GPU (nvidia-smi lists them), or run with --no-venus" }
+} else { Warn "no NVIDIA GPU found, but the settings ask for one: Whisper falls back to the CPU (slower) and look-and-say and the clean-up are off" }
 if (Test-Path ".venv\Scripts\python.exe") {
     $mic = & ".venv\Scripts\python.exe" -c "import sounddevice as sd; d=sd.query_devices(kind='input'); print(d['name'])" 2>$null
     if ($mic) { Ok "default microphone: $mic" } else { Fail "no microphone found" }

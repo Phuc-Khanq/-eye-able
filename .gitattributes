@@ -4,3 +4,5 @@
 *.jpg binary
 *.ico binary
 *.task binary
+# cmd.exe wants Windows line endings in batch files
+*.bat text eol=crlf

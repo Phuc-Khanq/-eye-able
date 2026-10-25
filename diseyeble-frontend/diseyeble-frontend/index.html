@@ -180,7 +180,7 @@
 
     <div class="sec-head">
       <h2>Speech others find hard to follow.<br>Understood.</h2>
-      <p>Standard speech recognition struggles with slurred speech. On recordings of people with dysarthria (speech affected by cerebral palsy or ALS), the standard Whisper model got 41% of words wrong, and 71% for the most severely affected speaker. So we taught it to listen better.</p>
+      <p>Standard Whisper gets 41% of words wrong on slurred (dysarthric) speech. So we taught it to listen better.</p>
     </div>
     <div class="vx">
       <div class="vx-live" id="vxLive">
@@ -195,12 +195,12 @@
         <div class="vx-ask" id="vxAsk"><span>Real mishearing from our testing</span><em>fixed</em></div>
       </div>
       <div class="vx-feats">
-        <div class="vf"><span class="vf-n">01</span><div><h3>Fine-tuned on dysarthric speech</h3><p>Whisper large-v3-turbo (LoRA) on TORGO: 5 speakers to train, 1 to choose settings, 2 kept apart for testing. LibriSpeech mixed in so it doesn&rsquo;t forget ordinary voices.</p></div></div>
-        <div class="vf"><span class="vf-n">02</span><div><h3>Errors cut by more than half</h3><p>On 2 test speakers it never heard: <b>41.4% &rarr; 19.4%</b> of words wrong. Severely affected <b>71.3% &rarr; 37.4%</b>. Typical speech unchanged, about 0.1 s per 5 s clip.</p></div></div>
-        <div class="vf"><span class="vf-n">03</span><div><h3>Time to speak</h3><p>Sentence pause adjustable 1&ndash;4 s, questions wait 12 s, nothing is typed until you say yes or blink. &ldquo;Use original&rdquo; brings back your exact words.</p></div></div>
-        <div class="vf"><span class="vf-n">04</span><div><h3>Forgiving commands</h3><p>About 60 commands, several ways to say each. Filler words dropped, near-misses still match, known mishearings count only when an answer is expected.</p></div></div>
-        <div class="vf"><span class="vf-n">05</span><div><h3>Only your voice</h3><p>Speech counts only when the camera saw your mouth moving as it was said, so other people talking don&rsquo;t trigger commands.</p></div></div>
-        <div class="vf"><span class="vf-n">06</span><div><h3>Your own voice, optionally</h3><p>Record about 150 everyday phrases to adapt it (experimental). Needs your consent, stays on your PC; &ldquo;delete my voice data&rdquo; removes it.</p></div></div>
+        <div class="vf"><span class="vf-n">01</span><div><h3>Fine-tuned on dysarthric speech</h3><p>Whisper large-v3-turbo, trained on the TORGO database.</p></div></div>
+        <div class="vf"><span class="vf-n">02</span><div><h3>Errors cut by more than half</h3><p><b>41.4% &rarr; 19.4%</b> word errors on 2 unseen speakers.</p></div></div>
+        <div class="vf"><span class="vf-n">03</span><div><h3>Time to speak</h3><p>Pause up to 4 s. Nothing is typed until you say yes or blink.</p></div></div>
+        <div class="vf"><span class="vf-n">04</span><div><h3>Forgiving commands</h3><p>About 60 commands, many ways to say each.</p></div></div>
+        <div class="vf"><span class="vf-n">05</span><div><h3>Only your voice</h3><p>Counts only when the camera sees your mouth move.</p></div></div>
+        <div class="vf"><span class="vf-n">06</span><div><h3>Your own voice, optionally</h3><p>Record about 150 phrases to adapt it. Stays on your PC.</p></div></div>
       </div>
     </div>
     <div class="vx-nav"><button class="btn btn-ghost" data-page-go="2">← Back</button><button class="btn btn-ghost" data-page-go="4">Gestures →</button></div>
@@ -213,20 +213,20 @@
 
     <div class="sec-head">
       <h2>Gesture map.<br>One move, one action.</h2>
-      <p>The default mapping. Everything runs on the laptop: frames, audio and screenshots stay in memory and are never saved (the only exception is the voice pack you choose to record).</p>
+      <p>Everything runs on your laptop. Nothing is saved, except a voice pack you choose to record.</p>
     </div>
     <div class="gx">
       <div class="gx-list" role="tablist" aria-label="Gestures">
-        <button class="gr on" type="button" data-g="0" aria-selected="true"><span class="gr-n">01</span><span class="gr-do">Turn your head</span><span class="gr-tag">Move pointer</span><template>Like a mouse: small turns aim finely, quick turns go far. Optional eye pull and nose assist. Set by a one-look calibration.</template></button>
-        <button class="gr" type="button" data-g="1" aria-selected="false"><span class="gr-n">02</span><span class="gr-do">Hold a long blink</span><span class="gr-tag">Left click · exact spot</span><template>Both eyes shut <b>0.4 – 1.6 s</b>; also answers yes. Ordinary blinks and winks never click; the pointer freezes while your eyes are shut.</template></button>
-        <button class="gr" type="button" data-g="2" aria-selected="false"><span class="gr-n">03</span><span class="gr-do">Raise your eyebrows</span><span class="gr-tag">Yes</span><template>Answers a waiting question or text. Not a click; ignored while you are talking.</template></button>
-        <button class="gr" type="button" data-g="3" aria-selected="false"><span class="gr-n">04</span><span class="gr-do">Shake your head</span><span class="gr-tag">No · cancel</span><template>Two quick swings of about <b>14°</b>. Cancels a question or drops waiting text.</template></button>
-        <button class="gr" type="button" data-g="4" aria-selected="false"><span class="gr-n">05</span><span class="gr-do">Tilt toward a shoulder</span><span class="gr-tag">Scroll · one step</span><template>About <b>18°</b>, held <b>0.4 s</b>: left scrolls up, right scrolls down.</template></button>
-        <button class="gr" type="button" data-g="5" aria-selected="false"><span class="gr-n">06</span><span class="gr-do">Say &ldquo;scroll&rdquo;, then chin up / down</span><span class="gr-tag">Scroll · smooth</span><template>The further you move, the faster. &ldquo;Stop&rdquo;, a blink or a raise ends it; it also stops after <b>10 s</b>.</template></button>
-        <button class="gr" type="button" data-g="6" aria-selected="false"><span class="gr-n">07</span><span class="gr-do">Say &ldquo;click&rdquo;</span><span class="gr-tag">Left click · snaps</span><template><b>UI-Venus 1.5</b> moves the click onto the nearest button within <b>150 px</b>; at once if you&rsquo;re already on a link.</template></button>
-        <button class="gr" type="button" data-g="7" aria-selected="false"><span class="gr-n">08</span><span class="gr-do">Say &ldquo;click Send&rdquo;</span><span class="gr-tag">Find &amp; click · asks first</span><template><b>UI-Venus 1.5</b> finds the button on screen, then you confirm.</template></button>
-        <button class="gr" type="button" data-g="8" aria-selected="false"><span class="gr-n">09</span><span class="gr-do">Say &ldquo;right click&rdquo;</span><span class="gr-tag">Right click</span><template>Opening and closing your mouth can do it too (optional, off by default).</template></button>
-        <button class="gr" type="button" data-g="9" aria-selected="false"><span class="gr-n">10</span><span class="gr-do">Rest the pointer on a button</span><span class="gr-tag">Left click · optional</span><template>Dwell of <b>1.0 s</b>, off by default; say &ldquo;start clicking&rdquo;. Buttons and links only.</template></button>
+        <button class="gr on" type="button" data-g="0" aria-selected="true"><span class="gr-n">01</span><span class="gr-do">Turn your head</span><span class="gr-tag">Move pointer</span><template>Small turns aim finely, quick turns go far. Set by a one-look calibration.</template></button>
+        <button class="gr" type="button" data-g="1" aria-selected="false"><span class="gr-n">02</span><span class="gr-do">Hold a long blink</span><span class="gr-tag">Left click · exact spot</span><template>Eyes shut <b>0.4 – 1.6 s</b>. Normal blinks never click.</template></button>
+        <button class="gr" type="button" data-g="2" aria-selected="false"><span class="gr-n">03</span><span class="gr-do">Raise your eyebrows</span><span class="gr-tag">Yes</span><template>Answers a waiting question. Not a click.</template></button>
+        <button class="gr" type="button" data-g="3" aria-selected="false"><span class="gr-n">04</span><span class="gr-do">Shake your head</span><span class="gr-tag">No · cancel</span><template>Two quick swings of about <b>14°</b>. Cancels a question.</template></button>
+        <button class="gr" type="button" data-g="4" aria-selected="false"><span class="gr-n">05</span><span class="gr-do">Tilt toward a shoulder</span><span class="gr-tag">Scroll · one step</span><template>About <b>18°</b>, held <b>0.4 s</b>. Left scrolls up, right scrolls down.</template></button>
+        <button class="gr" type="button" data-g="5" aria-selected="false"><span class="gr-n">06</span><span class="gr-do">Say &ldquo;scroll&rdquo;, then chin up / down</span><span class="gr-tag">Scroll · smooth</span><template>Move further to scroll faster. Say &ldquo;stop&rdquo; to end.</template></button>
+        <button class="gr" type="button" data-g="6" aria-selected="false"><span class="gr-n">07</span><span class="gr-do">Say &ldquo;click&rdquo;</span><span class="gr-tag">Left click · snaps</span><template><b>UI-Venus 1.5</b> snaps the click to the nearest button within <b>150 px</b>.</template></button>
+        <button class="gr" type="button" data-g="7" aria-selected="false"><span class="gr-n">08</span><span class="gr-do">Say &ldquo;click Send&rdquo;</span><span class="gr-tag">Find &amp; click · asks first</span><template><b>UI-Venus 1.5</b> finds the button, then you confirm.</template></button>
+        <button class="gr" type="button" data-g="8" aria-selected="false"><span class="gr-n">09</span><span class="gr-do">Say &ldquo;right click&rdquo;</span><span class="gr-tag">Right click</span><template>Opening and closing your mouth works too (off by default).</template></button>
+        <button class="gr" type="button" data-g="9" aria-selected="false"><span class="gr-n">10</span><span class="gr-do">Rest the pointer on a button</span><span class="gr-tag">Left click · optional</span><template>Dwell of <b>1.0 s</b>, off by default.</template></button>
         <button class="gr" type="button" data-g="10" aria-selected="false"><span class="gr-n">11</span><span class="gr-do">Say &ldquo;pause&rdquo; / &ldquo;resume&rdquo;</span><span class="gr-tag">Stop · restart</span><template>While paused, only &ldquo;resume&rdquo; and &ldquo;quit&rdquo; work.</template></button>
       </div>
       <div class="gx-panel" role="tabpanel">
@@ -242,19 +242,19 @@
             <canvas id="gxCv" aria-hidden="true"></canvas>
           </div>
         </div>
-        <div class="gx-how"><small class="label">How it&rsquo;s detected</small><p id="gxHow">Like a mouse: small turns aim finely, quick turns go far. Optional eye pull and nose assist. Set by a one-look calibration.</p></div>
+        <div class="gx-how"><small class="label">How it&rsquo;s detected</small><p id="gxHow">Small turns aim finely, quick turns go far. Set by a one-look calibration.</p></div>
       </div>
     </div>
     <div class="gx-foot">
       <button class="btn btn-ghost" data-page-go="3">← Back</button>
-      <p class="gnote"><b>Honest limits:</b> a webcam is less precise than a dedicated eye tracker · not yet tested with people who have motor or speech disabilities · blink settings are tuned to one person&rsquo;s face · the speech research model isn&rsquo;t in the download · the full version needs a 16 GB NVIDIA GPU · English only · Windows only for now.</p>
+      <p class="gnote"><b>Honest limits:</b> less precise than an eye tracker · not yet tested with people who have motor or speech disabilities · full version needs a 16 GB NVIDIA GPU · English and Windows only.</p>
     </div>
     <div class="gx-cta">
       <div class="mascot-slot"></div>
       <h2>Ready? See it open YouTube, search and send an email without a single touch.</h2>
       <button class="btn btn-primary" data-go="demo">Open the live demo →</button>
     </div>
-    <p class="gx-credits"><b>Credits:</b> built at Gator Hack V, UF AI Days 2026, by Khang, Khoi, Khoa, Hung and Nhi. Speech data: TORGO (Rudzicz, Namasivayam &amp; Wolff, 2012, University of Toronto; academic, non-profit use) and LibriSpeech (Panayotov et al., 2015, CC BY 4.0). Models: Whisper (OpenAI, MIT) via faster-whisper, MediaPipe Face Landmarker (Google, Apache 2.0), UI-Venus 1.5 (Ant Group), Qwen2.5 (Alibaba Qwen). Our code is MIT licensed.</p>
+    <p class="gx-credits"><b>Credits:</b> built at Gator Hack V, UF AI Days 2026, by Khang, Khoi, Khoa, Hung and Nhi. Data: TORGO (University of Toronto), LibriSpeech (CC BY 4.0). Models: Whisper, MediaPipe, UI-Venus 1.5, Qwen2.5. Code: MIT.</p>
     <img id="gxBlinkSrc" hidden alt="" src="assets/ctl-blink.jpg">
     </div>
   </section>

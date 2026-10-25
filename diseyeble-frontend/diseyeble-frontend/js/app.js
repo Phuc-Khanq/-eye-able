@@ -774,12 +774,12 @@
     const ease = 'cubic-bezier(.22,.9,.24,1)', slide = 'cubic-bezier(.3,.7,.3,1)';
     head.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateX(-70px)'},{opacity:1, transform:'none'}], {duration:620, delay:k*90, easing:ease, fill:'backwards'}));
     const T0 = 420;
-    rows.forEach((c, k) => { const r = c.getBoundingClientRect(), dx = innerWidth - r.left + 40, at = T0 + k*110, D = 520;
-      c.animate([{transform:`translateX(${dx}px)`},{transform:'none'}], {duration:D, delay:at, easing:slide, fill:'backwards', composite:'add'});
-      c.animate([{filter:'blur(2px) brightness(1.3) drop-shadow(34px 0 6px rgba(255,255,255,.4)) drop-shadow(90px 0 18px rgba(143,227,106,.32))', skew:'-6deg 0deg'},
-                 {filter:'blur(0px) brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)) drop-shadow(0 0 0 rgba(143,227,106,0))', skew:'0deg 0deg'}], {duration:D, delay:at, easing:slide, fill:'backwards'});
+    rows.forEach((c, k) => { const r = c.getBoundingClientRect(), dy = innerHeight - r.top + 40, at = T0 + k*90, D = 560;   // 01 first, each flies up from below the screen
+      c.animate([{transform:`translateY(${dy}px)`},{transform:'none'}], {duration:D, delay:at, easing:slide, fill:'backwards', composite:'add'});
+      c.animate([{filter:'blur(2px) brightness(1.3) drop-shadow(0 26px 6px rgba(255,255,255,.4)) drop-shadow(0 70px 18px rgba(143,227,106,.32))', opacity:.6},
+                 {filter:'blur(0px) brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)) drop-shadow(0 0 0 rgba(143,227,106,0))', opacity:1}], {duration:D, delay:at, easing:slide, fill:'backwards'});
     });
-    const P = T0 + 6*110 + 300;
+    const P = T0 + (rows.length - 1)*90 + 420;
     panel.animate([{opacity:0, scale:'.96', filter:'blur(8px) brightness(1.5)'},{opacity:1, scale:'1', filter:'blur(0) brightness(1)'}], {duration:650, delay:P, easing:ease, fill:'backwards'});
     rest.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateY(16px)'},{opacity:1, transform:'none'}], {duration:500, delay:P + 350 + k*140, easing:ease, fill:'backwards'}));
   }

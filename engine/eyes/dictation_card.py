@@ -350,6 +350,16 @@ def fit(text: str, font, max_w: float) -> str:
     return text.rstrip() + "\u2026"
 
 
+MAX_PREVIEW_LINES = 9      # a longer passage shows its last lines (a card taller than the screen lost its buttons)
+
+
+def clip_lines(lines, max_lines: int = MAX_PREVIEW_LINES):
+    """(the last max_lines lines, how many words were left out before them)."""
+    if len(lines) <= max_lines:
+        return lines, 0
+    return lines[-max_lines:], sum(len(line) for line in lines[:-max_lines])
+
+
 def layout_words(words, font, shaky_font, max_w):
     """[(text, shaky)] -> [[(text, shaky, x)]] lines that fit max_w."""
     lines, line, x = [], [], 0
@@ -427,7 +437,12 @@ def draw(c, v: View, levels, fonts) -> int:
     y += row_h + (10 if row_h else 0)
     if v.words:
         line_h = fonts["body"].metrics("linespace") + 4
-        for line in layout_words(v.words, fonts["body"], fonts["shaky"], inner):
+        lines, hidden = clip_lines(layout_words(v.words, fonts["body"], fonts["shaky"], inner))
+        if hidden:
+            c.create_text(x0 + PAD, y, text=f"\u2026 {hidden} earlier words", fill=MUTED, font=fonts["hint"],
+                          anchor="nw")
+            y += fonts["hint"].metrics("linespace") + 4
+        for line in lines:
             for text, shaky, wx in line:
                 c.create_text(x0 + PAD + wx, y, text=text, fill=SHAKY if shaky else TEXT,
                               font=fonts["shaky" if shaky else "body"], anchor="nw")

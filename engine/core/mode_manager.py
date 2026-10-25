@@ -83,6 +83,7 @@ CONFIRM_TIMEOUT_S = 12.0  # Whisper only answers after the pause, so a spoken "y
 TARGET_TIMEOUT_S = 6.0   # UI-Venus should answer well inside this
 SNAP_TIMEOUT_S = 3.0     # a snap click later than this would surprise; it doesn't click
 SNAP_LABEL = "here"      # the label of a snap request (there is no name)
+REFINE_QUIET_S = 1.0     # the refine waits until the mic has heard no speech for this long
 SPEECH_GUARD_S = 1.0     # a mouth gesture this soon after the mic heard speech is talking
 TICK_S = 0.25
 REPEAT_CLICK_S = 3.0      # "click Send" again this soon after Send was clicked is a repeat, not a new click
@@ -153,11 +154,14 @@ class _Search:
 
 class ModeManager:
     def __init__(self, bus, clock: Callable[[], float] = time.monotonic,
-                 rewrite_wait_s: float | None = None, mouth=None, settings=None, log=print) -> None:
+                 rewrite_wait_s: float | None = None, mouth=None, settings=None, log=print,
+                 refine_after_s: float | None = None) -> None:
         """rewrite_wait_s: the dictation clean-up is on (engine/voice/rewrite.py's RewriteWorker is
         running) and "yes" waits at most this long for it. None (the default): off, exactly as before.
         mouth: engine.eyes.mouth.MouthTracker. With it, an eyebrow raise made while the user is talking
-        is ignored (see _raised_while_talking). None (the default): no guard, exactly as before."""
+        is ignored (see _raised_while_talking). None (the default): no guard, exactly as before.
+        refine_after_s: with the clean-up on, the whole passage is refined (rewritten to read well, mis-heard
+        words fixed from context) once the user has been quiet this long; None (default): no refine."""
         self.bus = bus
         self.clock = clock
         self.mouth = mouth
@@ -189,6 +193,14 @@ class ModeManager:
         self._clean: list[dict] | None = None    # the accepted clean words for the current preview
         self._use_clean = True                   # "use original" turns it off for this preview only
         self._pending: tuple[float, Callable[[], None] | None] | None = None  # (deadline, then): a waiting insert
+        # Whole-passage refine (see _start_refine): starts refine_after_s after the last words, or at once on "yes"
+        self.refine_after_s = refine_after_s
+        self.refine_min_words = int(getattr(settings, "refine_min_words", 8))
+        self.refine_wait_s = float(getattr(settings, "refine_wait_s", 6.0))
+        self._rf_id = 0
+        self._rf_running = False                 # a refine of the current preview is running
+        self._rf_due: float | None = None        # clock time the refine starts if the user stays quiet
+        self._refined: list[dict] | None = None  # the accepted refined words for the current preview
         self._lock = threading.RLock()
         self._stop = threading.Event()
 
@@ -458,6 +470,11 @@ class ModeManager:
                                          "clicked. Try again")
                 else:
                     self._ui(messages.TARGET_NONE, label=s.label)
+            if self._rf_due is not None and now >= self._rf_due and not self.question:
+                if now - self._heard_speech < REFINE_QUIET_S:
+                    self._rf_due = now + REFINE_QUIET_S    # still talking: wait for the next pause
+                else:
+                    self._start_refine()
             if self._pending and now >= self._pending[0]:
                 self._type_now(self._pending[1])   # the clean-up took too long: type what's showing
 
@@ -631,8 +648,8 @@ class ModeManager:
         elif name == "clean_up":
             if not self.preview:
                 return
-            if self._clean is None:
-                self._status("info", "Still cleaning up..." if self._rw_running
+            if self._best_clean() is None:
+                self._status("info", "Still cleaning up..." if self._rw_running or self._rf_running
                              else "There's no cleaned-up version of this text")
             elif not self._use_clean:
                 self._use_clean = True
@@ -767,9 +784,19 @@ class ModeManager:
         """Type the preview, then run `then` ("send it": press Enter; "stop dictation": leave the mode).
         If the clean-up of this text is still running, don't block (this may be the camera thread):
         the insert waits until the result arrives or rewrite_wait_s passes (tick), whichever is first."""
-        if self.preview and self._rw_running and self._use_clean:
-            self._pending = (self.clock() + self.rewrite_wait_s, then)
-            return self._preview_text()
+        if self.preview and self._use_clean:
+            now, deadline = self.clock(), None
+            if self._rw_running:
+                deadline = now + self.rewrite_wait_s
+            if (self.refine_after_s is not None and self._refined is None
+                    and (self._rf_running or self._rf_due is not None)):
+                if not self._rf_running:
+                    self._start_refine()           # "yes" before the pause is up: refine now, type the result
+                if self._rf_running:
+                    deadline = max(deadline or 0.0, now + self.refine_wait_s)
+            if deadline is not None:
+                self._pending = (deadline, then)
+                return self._preview_text()
         return self._type_now(then)
 
     def _type_now(self, then: Callable[[], None] | None = None) -> str:
@@ -792,9 +819,13 @@ class ModeManager:
     def _cleaning(self) -> bool:
         return self.rewrite_wait_s is not None
 
+    def _best_clean(self) -> list[dict] | None:
+        """The refined passage if there is one, else the quick clean-up, else None."""
+        return self._refined if self._refined is not None else self._clean
+
     def _shown_words(self) -> list[dict]:
-        if self._cleaning() and self._use_clean and self._clean is not None:
-            return self._clean
+        if self._cleaning() and self._use_clean and self._best_clean() is not None:
+            return self._best_clean()
         return self.preview
 
     def _preview_changed(self, clean_up: bool = True) -> None:
@@ -802,6 +833,10 @@ class ModeManager:
         Ask for a clean-up of the new text (unless the user fixed a word by hand) and show it raw."""
         self._pending = None
         self._clean = None
+        self._refined = None
+        self._rf_id += 1                                   # a refine of older text is ignored too
+        self._rf_running = False
+        self._rf_due = None
         self._rw_id += 1                                   # results for older text are ignored
         self._rw_running = False
         if not self.preview:
@@ -810,19 +845,45 @@ class ModeManager:
             self._rw_running = True
             self.bus.publish(topics.REWRITE_REQUEST,
                              {"id": self._rw_id, "text": " ".join(w["text"] for w in self.preview)})
+            if self.refine_after_s is not None and len(self.preview) >= self.refine_min_words:
+                self._rf_due = self.clock() + self.refine_after_s   # quiet this long: refine the whole passage
         self._show_preview()
+
+    def _start_refine(self) -> None:
+        """Ask the model to rewrite the whole passage (engine/voice/rewrite.py, refine_full). The words Whisper
+        was unsure of go along marked (?word?), so it fixes them from context."""
+        self._rf_due = None
+        if not self.preview or self._refined is not None or self._rf_running:
+            return
+        from engine.voice.rewrite import mark_unsure
+        self._rf_running = True
+        self.bus.publish(topics.REWRITE_REQUEST,
+                         {"id": self._rf_id, "mode": "refine",
+                          "text": " ".join(w["text"] for w in self.preview),
+                          "marked": mark_unsure(self.preview)})
 
     def _show_preview(self) -> None:
         if not self._cleaning():
             self._ui(messages.DICTATION_PREVIEW, words=list(self.preview))   # exactly as before
-        elif self._clean is not None and self._use_clean:
-            self._ui(messages.DICTATION_PREVIEW, words=list(self._clean),
+        elif self._best_clean() is not None and self._use_clean:
+            self._ui(messages.DICTATION_PREVIEW, words=list(self._best_clean()),
                      original=" ".join(w["text"] for w in self.preview), cleaned=True)
         else:
             self._ui(messages.DICTATION_PREVIEW, words=list(self.preview), cleaned=False)
 
     def on_rewrite_result(self, result: dict) -> None:
         with self._lock:
+            if result.get("mode") == "refine":
+                if result.get("id") != self._rf_id or not self.preview:
+                    return                                 # the passage changed since: a newer one is coming
+                self._rf_running = False
+                if result.get("used") and str(result.get("clean", "")).strip():
+                    self._refined = self._clean_words(result["clean"])
+                    if self._use_clean:
+                        self._show_preview()
+                if self._pending and not self._rw_running:
+                    self._type_now(self._pending[1])
+                return
             if result.get("id") != self._rw_id or not self.preview:
                 return                                     # for text that has changed since
             self._rw_running = False
@@ -830,7 +891,7 @@ class ModeManager:
                 self._clean = self._clean_words(result["clean"])
                 if self._use_clean:
                     self._show_preview()
-            if self._pending:
+            if self._pending and not self._rf_running:
                 self._type_now(self._pending[1])
 
     def _clean_words(self, clean: str) -> list[dict]:

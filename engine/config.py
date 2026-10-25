@@ -103,10 +103,18 @@ class Settings:
     scroll_idle_s: float = 10.0         # scroll mode ends by itself after this long with no scrolling
     # Dictation clean-up: a small local model tidies the preview before it's typed (engine/voice/rewrite.py)
     rewrite_dictation: bool = True
-    rewrite_model: str = "Qwen/Qwen2.5-1.5B-Instruct"   # Apache 2.0; about 3.1 GB, downloaded once
+    rewrite_model: str = "Qwen/Qwen2.5-3B-Instruct"     # Apache 2.0; about 6 GB, downloaded once (was 1.5B until
+                                                        # Oct 24 night: too small to fix words from context)
     rewrite_device: str = "cuda"       # "cpu" works but is slow (seconds per sentence)
     rewrite_wait_s: float = 1.5        # "yes" waits at most this long for the clean-up, then types what's showing
     rewrite_max_s: float = 3.0         # a clean-up that takes longer is cut off and not used
+    # Whole-passage refine (engine/voice/rewrite.py): once you stop talking for refine_after_s, the whole passage is
+    # rewritten to read well and words Whisper was unsure of are fixed from context. Only with the clean-up on.
+    refine_dictation: bool = True
+    refine_after_s: float = 3.0        # quiet this long after the last words: start refining
+    refine_min_words: int = 8          # shorter passages only get the quick clean-up
+    refine_wait_s: float = 6.0         # "yes" while it refines waits at most this long, then types what's showing
+    refine_max_s: float = 15.0         # a refine that takes longer is cut off and not used
 
     # Opening apps and sites by voice (engine/voice/launch.py; engine/eyes/os_output.py starts them)
     # "open Chrome" starts an app only if its name is here; any other name stays look-and-say.

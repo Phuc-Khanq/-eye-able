@@ -47,7 +47,7 @@ class Engine:
         self.bus = bus
         self.warm_up = warm_up
         # Start order matters only for subscriptions; nothing is published until start().
-        # 0. dictation clean-up (Khoi): a small local model (Qwen2.5-1.5B on the GPU) tidies the preview
+        # 0. dictation clean-up (Khoi): a small local model (Qwen2.5-3B on the GPU) tidies the preview
         #    before it's typed; "yes" waits at most rewrite_wait_s for it. Off by default (rewrite=False),
         #    so tests never load a model; run() turns it on from settings.rewrite_dictation.
         self.rewrite = None
@@ -57,7 +57,9 @@ class Engine:
         # 1. core: the mode manager turns gaze, gestures and transcripts into actions
         self.mode_manager = ModeManager(
             bus, settings=settings,
-            rewrite_wait_s=float(getattr(settings, "rewrite_wait_s", 1.5)) if rewrite else None)
+            rewrite_wait_s=float(getattr(settings, "rewrite_wait_s", 1.5)) if rewrite else None,
+            refine_after_s=(float(getattr(settings, "refine_after_s", 3.0))
+                            if rewrite and getattr(settings, "refine_dictation", True) else None))
         # 2. eyes (Khang and Hung): camera -> face_mesh -> eye_features / head_pose -> pointer ->
         #    the cursor, plus head_gestures; UI-Venus answers target requests; os_output carries out
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
@@ -353,7 +355,7 @@ def main() -> None:
     p.add_argument("--rewrite", action=argparse.BooleanOptionalAction,
                    default=bool(getattr(settings, "rewrite_dictation", True)),
                    help="clean up dictated text with a small local model before it's typed (Qwen2.5-1.5B on the "
-                        "GPU, downloaded once, about 3 GB); on by default (rewrite_dictation), --no-rewrite turns it off")
+                        "GPU, downloaded once, about 6 GB); on by default (rewrite_dictation), --no-rewrite turns it off")
     p.add_argument("--record", action="store_true",
                    help="recording the demo video: the dictation card is visible to OBS (card_hide_from_capture off)")
     p.add_argument("--gpu-log", action="store_true",

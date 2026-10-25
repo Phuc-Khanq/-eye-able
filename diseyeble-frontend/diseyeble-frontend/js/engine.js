@@ -121,13 +121,13 @@
     screenEl.classList.toggle('dz-live', on);
     $('#accTxt').textContent = on ? 'head' : 'eyes';
     if (on) {
-      saved = { dwell: G.dwell, jitter: G.jitter, steady: G.steady, paused: G.paused };
-      G.dwell = false; G.jitter = 0; G.steady = 0;   // the pointer is the real mouse, which the engine moves: no fake wobble or lag
+      saved = { dwell: G.dwell, paused: G.paused };
+      G.dwell = false;   // the engine decides about dwell clicks
       G.seen = true;
       log('sys', 'Engine connected at ' + URL_WS); toast('Engine connected');
       tip('Move your head to move the pointer. A long blink clicks. Say “hi Dizzy” to dictate.');
     } else {
-      if (saved) { G.dwell = saved.dwell; G.jitter = saved.jitter; G.steady = saved.steady; setPausedUI(saved.paused); }
+      if (saved) { G.dwell = saved.dwell; setPausedUI(saved.paused); }
       $('#camSrc').textContent = 'source: simulated face'; showWebcam(false);
       setRead(''); D.micLive = false; lastWant = null;
       S.q = null; S.preview = null; S.liveText = ''; S.speaking = false;
@@ -250,28 +250,6 @@
     else if (v === 'discard') send('dictation', { action: 'discard' });
     else if (v === 'original') send('dictation', { action: 'use_original' });
   };
-
-  /* ---------- real clicks land exactly where the pointer is (no snapping) ---------- */
-  screenEl.addEventListener('pointerdown', e => {
-    if (!live || e.button > 2) return;
-    e.stopImmediatePropagation(); e.preventDefault();
-    const r = screenEl.getBoundingClientRect(), pos = { x: e.clientX - r.left, y: e.clientY - r.top };
-    G.target.x = G.pos.x = pos.x; G.target.y = G.pos.y = pos.y;
-    if (G.paused) return;
-    if (e.button === 2) { D.ripple('shake', pos); D.glabel('RIGHT CLICK'); D.openCtx(pos.x + 6, pos.y + 6); log('eye', 'Right click'); return; }
-    const t = document.elementFromPoint(e.clientX, e.clientY), el = t && screenEl.contains(t) ? t.closest('[data-act]') : null;
-    D.ripple('blink', pos);
-    if (el) { D.glabel('CLICK'); log('eye', 'Click “' + (el.getAttribute('aria-label') || el.textContent || el.dataset.act).replace(/\s+/g, ' ').trim().slice(0, 30) + '”'); D.run(el.dataset.act, 'eye'); }
-    else { D.glabel('CLICK'); $('#ctx').hidden = true; if (W.startOpen) { W.startOpen = false; D.renderAll(); } }
-  }, true);
-
-  /* the engine's head scrolling (scroll mode) is a real mouse wheel: it scrolls the simulated page */
-  let wheelAcc = 0;
-  screenEl.addEventListener('wheel', e => {
-    if (!live) return;
-    e.preventDefault(); wheelAcc += e.deltaY;
-    while (Math.abs(wheelAcc) >= 60) { const d = Math.sign(wheelAcc); D.scrollBy(d); wheelAcc -= d * 60; }
-  }, { passive: false });
 
   /* ---------- page_action: typing, keys, scroll, undo and "open ..." on the simulated desktop ---------- */
   const typed = [];            // {field, text} so "undo" can take back the last dictated chunk

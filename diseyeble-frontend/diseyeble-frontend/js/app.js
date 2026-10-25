@@ -816,18 +816,35 @@
 
   /* ---------------- gaze engine ---------------- */
   const screen = $('#screen'), gazeEl = $('#gaze'), prog = $('#prog');
-  const G = { target:{x:380,y:260}, pos:{x:380,y:260}, steady:.7, jitter:9, paused:false, scripted:false, seen:false,
+  // The pointer is the real mouse cursor (the engine moves it with your head): no simulated wobble or lag
+  const G = { target:{x:380,y:260}, pos:{x:380,y:260}, steady:0, jitter:0, paused:false, scripted:false, seen:false,
     brow:true, mouth:true, tilt:true, dwell:false, dwellMs:1000, calibrated:false, pending:null };
   let hot = null, hotSince = 0, dwellFired = false, dwellLock = null;
+  const pointerAt = e => { const r = screen.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
   screen.addEventListener('pointermove', e => {
     if (G.scripted) return;
-    const r = screen.getBoundingClientRect(); G.target.x = e.clientX-r.left; G.target.y = e.clientY-r.top;
-    if (!G.seen){ G.seen = true; tip('Look (move the mouse) roughly at Chrome on the taskbar and raise your brows (B or a left click): the click snaps onto it. You can also just say "open Chrome".'); }
+    const p = pointerAt(e); G.target.x = G.pos.x = p.x; G.target.y = G.pos.y = p.y;
+    if (!G.seen){ G.seen = true; tip('Point at something and click. With the engine on, your head moves the pointer and a long blink clicks. You can also just say "open Chrome".'); }
   });
+  // A click is a click: right where the pointer is, at once (a real mouse click, or the engine's blink click)
   screen.addEventListener('pointerdown', e => {
-    if (G.scripted) return; e.preventDefault();
-    if (e.button===2) gesture('mouth'); else gesture('brow');
+    if (G.scripted || e.button > 2) return;
+    e.preventDefault();
+    const pos = pointerAt(e);
+    G.target.x = G.pos.x = pos.x; G.target.y = G.pos.y = pos.y;
+    if (G.paused) return;
+    if (e.button === 2){ ripple('shake', pos); glabel('RIGHT CLICK'); log('eye','Right click'); openCtx(pos.x+6, pos.y+6); return; }
+    const t = document.elementFromPoint(e.clientX, e.clientY), el = t && screen.contains(t) ? t.closest('[data-act]') : null;
+    ripple('blink', pos); glabel('CLICK');
+    if (el){ log('eye', 'Click "' + label(el) + '"'); run(el.dataset.act, 'eye'); }
+    else { $('#ctx').hidden = true; if (W.startOpen){ W.startOpen = false; renderAll(); } }
   });
+  // the mouse wheel (and the engine's head scrolling, which is a real wheel) scrolls the simulated page
+  let wheelAcc = 0;
+  screen.addEventListener('wheel', e => {
+    e.preventDefault(); wheelAcc += e.deltaY;
+    while (Math.abs(wheelAcc) >= 60){ const d = Math.sign(wheelAcc); scrollBy(d); wheelAcc -= d*60; }
+  }, {passive:false});
   screen.addEventListener('contextmenu', e => e.preventDefault());
 
   function hitTest(){
@@ -1087,7 +1104,7 @@
     msg.innerHTML='<h3>One-look calibration</h3><p>Look at the dot in the middle of the screen for about 2 seconds.</p>';
     log('sys','Calibration started (1 dot)'); await wait(1400); msg.hidden=true; pt.hidden=false;
     pt.classList.remove('go'); pt.style.left='50%'; pt.style.top='50%'; await wait(300); void pt.offsetWidth; pt.classList.add('go'); await wait(1500);
-    pt.hidden=true; msg.hidden=false; G.jitter=3; G.calibrated=true;
+    pt.hidden=true; msg.hidden=false; G.calibrated=true;
     msg.innerHTML='<h3>Calibrated</h3><p>The pointer now follows your eyes more closely.</p>';
     log('sys','Calibrated: one look at the centre'); tip('Calibrated! Try a guided demo above the screen, or do it yourself.');
     await wait(1300); cal.hidden=true;

@@ -252,8 +252,15 @@
         </section>
 
         <!-- Hidden on purpose, not deleted: js/app.js still draws and wires these (signal chart, simulate buttons,
-             detected signals, voice commands, settings). Remove them together with the code that uses them. -->
+             detected signals, voice commands, settings, guided demos). Remove them together with the code that uses them. -->
         <div id="legacy" hidden>
+        <div class="demos" id="demoBar">
+            <span class="label">Guided demos</span>
+            <button class="demo-btn" data-demo="youtube">▶ Open YouTube &amp; search <span class="dur">eyes + brows + voice</span></button>
+            <button class="demo-btn" data-demo="mail">✉ Write an email <span class="dur">voice + confirm</span></button>
+            <button class="demo-btn" data-demo="google">🔍 Google search <span class="dur">on-screen keys + scroll</span></button>
+          </div>
+          <div class="running" id="runBar" hidden><span class="label" style="color:inherit;opacity:.7">Demo</span><span class="stepTxt" id="stepTxt">Starting…</span><button id="stopDemo">Stop</button></div>
           <div class="plot-wrap"><canvas id="plot" width="660" height="420" aria-label="Live signal chart for brow, mouth, pitch and yaw"></canvas></div>
           <div class="sim-row">
             <span class="label">Simulate</span>
@@ -324,14 +331,6 @@
           <span class="grow"></span>
           <button class="mini-btn" id="pauseBtn">Pause <span class="kbd">P</span></button>
         </div>
-        <div class="demos" id="demoBar">
-          <span class="label">Guided demos</span>
-          <button class="demo-btn" data-demo="youtube">▶ Open YouTube &amp; search <span class="dur">eyes + brows + voice</span></button>
-          <button class="demo-btn" data-demo="mail">✉ Write an email <span class="dur">voice + confirm</span></button>
-          <button class="demo-btn" data-demo="google">🔍 Google search <span class="dur">on-screen keys + scroll</span></button>
-        </div>
-        <div class="running" id="runBar" hidden><span class="label" style="color:inherit;opacity:.7">Demo</span><span class="stepTxt" id="stepTxt">Starting…</span><button id="stopDemo">Stop</button></div>
-
         <div class="monitor-scroll">
           <div class="monitor">
             <div class="screen" id="screen">
@@ -399,7 +398,7 @@
           </section>
           <section class="card buddy">
             <div class="mascot-slot"></div>
-            <p id="tip">Move your mouse over the screen: the dot is where your eyes look. Raise your brows (B or left click) to click the nearest button.</p>
+            <p id="tip">Point at something on the screen and click. With the engine on, your head moves the pointer and a long blink clicks.</p>
           </section>
         </div>
       </section>

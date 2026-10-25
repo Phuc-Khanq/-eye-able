@@ -854,7 +854,7 @@ header.top{border:1px solid rgba(255,255,255,.85)!important;box-shadow:0 0 6px r
 .dz-card.hearing .dz-wave{display:inline-flex}
 .dz-card.hearing .dz-pt,.dz-card.hearing .dz-ph{display:none}
 .dz-wave i{display:block;width:3px;height:4px;border-radius:2px;background:#fff;transition:height .08s}
-.dz-panel{pointer-events:auto;width:100%;box-sizing:border-box;padding:14px 16px;border-radius:18px;background:rgba(27,28,33,.82);color:#fff;
+.dz-panel{pointer-events:none;width:100%;box-sizing:border-box;padding:14px 16px;border-radius:18px;background:rgba(27,28,33,.82);color:#fff;
   border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);box-shadow:0 12px 40px rgba(0,0,0,.35)}
 .dz-panel[hidden]{display:none}
 .dz-label{font:600 11px var(--f-mono,monospace);letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
@@ -865,12 +865,18 @@ header.top{border:1px solid rgba(255,255,255,.85)!important;box-shadow:0 0 6px r
 .dz-bar{height:4px;border-radius:2px;background:rgba(255,255,255,.14);margin-top:10px;overflow:hidden}
 .dz-bar i{display:block;height:100%;background:#7aa7ff;width:100%}
 .dz-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.dz-actions button{padding:8px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font:700 13px var(--f-body,Inter,sans-serif);cursor:pointer}
+.dz-actions button{pointer-events:auto;padding:8px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font:700 13px var(--f-body,Inter,sans-serif);cursor:pointer}
 .dz-actions button.main{background:#fff;color:#111;border-color:#fff}
 .dz-actions button.hot{outline:2px solid #7aa7ff}
 .dz-hint{font-size:12px;opacity:.65;margin-top:8px}
 .dz-hint b{display:inline-block;padding:0 6px;border-radius:5px;background:rgba(255,255,255,.14);font-weight:700}
-#demo .screen.dz-live{cursor:none}
 .sim-badge{position:absolute;left:10px;bottom:54px;z-index:900;font:700 10.5px var(--f-mono,monospace);letter-spacing:.08em;color:#fff;background:rgba(0,0,0,.5);padding:3px 8px;border-radius:6px;pointer-events:none}
 
 @media (min-width:1101px){#demo .ws-grid{grid-template-columns:minmax(0,1fr) 420px}}
+
+/* The simulated screen uses the real mouse cursor (Oct 25): an arrow, a hand over things you can click, a text bar
+   over text boxes. The old gaze ring is gone; its CLICK / SCROLL label still pops next to the pointer. */
+#demo .screen{cursor:default}
+#demo .screen [data-act]{cursor:pointer}
+#demo .screen .field{cursor:text}
+#demo .gaze svg,#demo .gaze .core{display:none}

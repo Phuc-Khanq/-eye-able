@@ -202,7 +202,7 @@
       return true;
     } catch(e){
       S.camState = 'blocked'; setCamUI();
-      toast('Camera is blocked in this preview, so the demo uses a simulated face. Open the page file locally to use your webcam.');
+      toast('The browser did not give this page the webcam, so the demo is driven by your mouse. To use your head, eyes and voice, start Diseyeble on your PC: this page connects to it by itself.');
       return false;
     }
   }

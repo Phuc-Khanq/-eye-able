@@ -313,7 +313,8 @@
 
   async function start() {
     if (on || starting) return;
-    if (D.engineLive) return toast('Diseyeble is running on this PC and already controls this page. Lite mode is not needed.');
+    const pill = document.getElementById('engPill');                // the real engine is connected (D.engineLive is also set by lite mode itself)
+    if (pill && !pill.classList.contains('off')) return toast('Diseyeble is running on this PC and already controls this page. Lite mode is not needed.');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('This browser can’t give the page a webcam. Use Chrome or Edge on https.');
     starting = true; el('liteBtn').disabled = true; setStat('Loading the face tracker (about 10 MB the first time)…');
     try {

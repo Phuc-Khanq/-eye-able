@@ -263,48 +263,93 @@
   window.DZVoice = { voice, start: () => start(), stop: () => stop(), pending: () => voice.pending(), waiting: () => !!(voice.state.q || voice.state.chunks.length), answer: y => voice.answer(y) };
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let rec = null, on = false, cloud = false, restartT = 0, speaking = false;
+  let rec = null, on = false, starting = false, local = false, restartT = 0, speaking = false, fails = 0, lastStart = 0, lastErr = '';
   const btn = document.createElement('button');
   btn.className = 'mini-btn'; btn.type = 'button'; btn.id = 'liteVoiceBtn'; btn.textContent = 'Turn on voice (commands and dictation)';
+  const vstat = document.createElement('div');                                    // what the microphone is doing, in words (errors are never silent)
+  vstat.className = 'lite-stat'; vstat.id = 'liteVoiceStat'; vstat.setAttribute('aria-live', 'polite');
   const note = document.createElement('p');
   note.textContent = 'Voice uses your browser’s speech recognition (Chrome or Edge); on Chrome it may send audio to Google unless on-device recognition is available. The Diseyeble app uses Whisper on your own PC. Try: “volume up”, “brightness down”, “open YouTube”, “search for cats”, “click Mail”, “hi Dizzy”, then speak, then “yes”.';
   const host = document.querySelector('.lite') || $('#camBox').parentElement;
-  host.insertBefore(btn, host.querySelector('.lite-stat') || null); host.append(note);
-  if (!SR) { btn.disabled = true; btn.textContent = 'Voice needs Chrome or Edge'; }
+  const anchor = host.querySelector('.lite-stat') || null;
+  host.insertBefore(btn, anchor); host.insertBefore(vstat, anchor); host.append(note);
+  const setV = t => { vstat.textContent = t; };
+  if (!SR) { btn.disabled = true; btn.textContent = 'Voice needs Chrome or Edge'; setV('This browser has no speech recognition. Use Google Chrome or Microsoft Edge on a computer.'); }
+
+  // the real engine connected (lite mode's head pointer also sets D.engineLive, so look at the engine pill instead)
+  const engineUp = () => { const p = document.getElementById('engPill'); return !!(p && !p.classList.contains('off')); };
+  const ERR = {
+    'not-allowed': 'The microphone is blocked for this page. Click the microphone or lock icon in the address bar, allow the microphone, then turn voice on again.',
+    'service-not-allowed': 'This browser does not allow its speech service here. Use Google Chrome or Microsoft Edge (Brave, Opera and Firefox do not support it).',
+    'audio-capture': 'No microphone was found, or Windows is blocking it. Check Settings › Privacy › Microphone, and close other apps that use it (the Diseyeble app).',
+    'network': 'The browser’s speech service could not be reached. Online recognition needs internet.',
+  };
+  const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
+
+  async function micCheck() {                                                       // ask for the microphone once, so a blocked or missing mic says so
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
+    try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); return null; }
+    catch (e) { return (e.name === 'NotAllowedError' || e.name === 'SecurityError') ? 'not-allowed' : (e.name === 'NotFoundError' || e.name === 'NotReadableError') ? 'audio-capture' : null; }
+  }
+  async function onDeviceReady() {                                                  // use on-device speech only when the language pack is already installed
+    try { if (SR.available) return (await SR.available({ langs: ['en-US'], processLocally: true })) === 'available'; } catch (e) { /* older browser */ }
+    return false;
+  }
+  const listeningText = () => 'Listening' + (local ? ' (on this device)' : ' (browser’s online recognition)') + '. Say “volume up”, or “hi Dizzy” to dictate.';
 
   function setListening(v) { if (v !== speaking) { speaking = v; B.handle({ type: 'listening', speaking: v, level: 0.6 }); } }
   function begin() {
     rec = new SR(); rec.lang = 'en-US'; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
-    if ('processLocally' in rec && !cloud) rec.processLocally = true;                 // ask for on-device recognition first
+    if (local && 'processLocally' in rec) rec.processLocally = true;
+    lastStart = performance.now();
+    rec.onstart = () => { if (!fails) setV(listeningText()); };                  // keep an error message on screen while retrying
     rec.onspeechstart = () => setListening(true); rec.onspeechend = () => setListening(false);
     rec.onresult = ev => {
       let interim = '';
       for (let i = ev.resultIndex; i < ev.results.length; i++) {
         const r = ev.results[i], t = r[0].transcript;
-        if (r.isFinal) { setListening(false); log('voice', '“' + t.trim() + '”'); voice.heard(t); } else interim += t;
+        if (r.isFinal) { fails = 0; setListening(false); setV('Heard: “' + t.trim() + '”'); log('voice', '“' + t.trim() + '”'); voice.heard(t); } else interim += t;
       }
-      if (interim && voice.state.mode === 'dictation') voice.live(interim);
+      if (interim) { setV('Hearing: “' + interim.trim() + '”'); if (voice.state.mode === 'dictation') voice.live(interim); }
     };
     rec.onerror = e => {
-      if (e.error === 'language-not-supported' && !cloud) { cloud = true; toast('On-device speech recognition is not available here, so the browser’s online recognition is used (audio may go to Google).'); return; }
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { toast('The browser did not give this page the microphone.'); stop(); }
+      const code = e.error || 'unknown'; lastErr = code;
+      if (code === 'no-speech' || code === 'aborted') return;                         // silence, or we stopped it: just listen again
+      log('sys', 'Lite voice error: ' + code);
+      if (code === 'language-not-supported' && local) { local = false; setV('On-device speech is not installed, so the browser’s online recognition is used (audio may go to Google).'); return; }
+      if (FATAL.has(code)) { stop(ERR[code]); return; }
+      setV(ERR[code] || ('Speech recognition error: ' + code + '. Retrying…'));
     };
-    rec.onend = () => { setListening(false); if (on) restartT = setTimeout(begin, cloud ? 150 : 250); };    // browsers end a session after a while: keep listening
-    try { rec.start(); } catch (e) { /* already started */ }
+    rec.onend = () => {                                                               // browsers end a session after a while: keep listening
+      setListening(false); if (!on) return;
+      const dur = performance.now() - lastStart;
+      if (dur < 1500) fails++; else if (dur > 4000) fails = 0;                        // sessions that die at once are failures, long ones are normal
+      if (fails >= 6) { stop('Speech recognition keeps stopping' + (lastErr ? ' (' + lastErr + ')' : '') + '. ' + (ERR[lastErr] || 'Check the microphone and use Chrome or Edge, then turn voice on again.')); return; }
+      restartT = setTimeout(begin, fails ? Math.min(300 * fails, 2000) : 150);
+    };
+    try { rec.start(); } catch (e) { stop('Could not start speech recognition: ' + (e && e.message || e)); }
   }
-  function start() {
-    if (on || !SR) return;
-    if (D.engineLive) return toast('Diseyeble is running on this PC and already listens. Lite voice is not needed.');
-    on = true; cloud = false; btn.textContent = 'Turn off voice'; B.setCard(true); begin();
-    log('sys', 'Lite voice on: say “hi Dizzy” to dictate, or a command such as “volume up”');
+  async function start() {
+    if (on || starting || !SR) return;
+    if (engineUp()) return toast('Diseyeble is running on this PC and already listens. Lite voice is not needed.');
+    starting = true; btn.disabled = true; setV('Asking for the microphone…');
+    const bad = await micCheck();
+    if (bad) { starting = false; btn.disabled = false; setV(ERR[bad]); log('sys', 'Lite voice: microphone ' + bad); return; }
+    local = await onDeviceReady();
+    starting = false; btn.disabled = false;
+    on = true; fails = 0; lastErr = ''; btn.textContent = 'Turn off voice'; B.setCard(true);
+    setV(local ? 'Starting on-device speech…' : 'Starting the browser’s online speech recognition (audio may go to Google)…');
+    begin();
+    log('sys', 'Lite voice on (' + (local ? 'on-device' : 'online') + ' recognition): say “hi Dizzy” to dictate, or a command such as “volume up”');
   }
-  function stop() {
+  function stop(why) {
     if (!on) return; on = false; clearTimeout(restartT);
     try { rec.onend = null; rec.abort(); } catch (e) { /* ignore */ }
     setListening(false); voice.reset(); B.handle({ type: 'dictation_live', text: '' }); B.handle({ type: 'mode', mode: 'pointer' });
-    B.setCard(false); btn.textContent = 'Turn on voice (commands and dictation)'; log('sys', 'Lite voice off');
+    B.setCard(false); btn.textContent = 'Turn on voice (commands and dictation)';
+    setV(why || 'Voice off.'); log('sys', why ? 'Lite voice off: ' + why : 'Lite voice off');
   }
   btn.addEventListener('click', () => (on ? stop() : start()));
   // the engine took over: this page is now the real thing
-  setInterval(() => { const p = document.getElementById('engPill'); if (on && p && !p.classList.contains('off')) { stop(); toast('Diseyeble connected: using the real engine instead.'); } }, 1000);
+  setInterval(() => { if (on && engineUp()) { stop('Diseyeble connected: using the real engine instead.'); toast('Diseyeble connected: using the real engine instead.'); } }, 1000);
 })();

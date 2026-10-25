@@ -947,6 +947,15 @@
     log('voice', `“${heard}” not recognised`); tip('I did not catch that. Try one of the example phrases under the mic.');
     return false;
   }
+  function tryIntent(heard){   // commands only (no dictation fallback): used by js/browser_voice.js
+    const [meant, conf] = normalize(heard), intent = parseIntent(meant);
+    if (!intent) return false;
+    flashSig('#sigVoice'); FACE.speakUntil = performance.now()+900;
+    $('#heardTxt').textContent = '“' + heard + '”';
+    $('#meantTxt').innerHTML = esc(intent.say) + `<span class="conf">${conf}%</span>`;
+    log('voice', `“${heard}” → ${intent.say} (${conf}%)`);
+    execIntent(intent.cmd); return true;
+  }
   $('#vform').addEventListener('submit', e => { e.preventDefault(); const v=$('#vinput').value.trim(); if (!v) return; processVoice(v); $('#vinput').value=''; renderChips(); });
 
   /* contextual example phrases (slurred) */
@@ -970,7 +979,7 @@
   let rec=null, micLive=false, micT0=0, srGot=false;
   const mic = $('#mic');
   function micStart(){
-    if (micLive || G.scripted) return; micLive=true; micT0=performance.now(); srGot=false; mic.classList.add('live'); flashSig('#sigVoice');
+    if (micLive || G.scripted || (window.DZ && window.DZ.voiceOn)) return; micLive=true; micT0=performance.now(); srGot=false; mic.classList.add('live'); flashSig('#sigVoice');
     $('#heardTxt').textContent='Listening…'; $('#meantTxt').textContent='–';
     if (SR){ try{ rec=new SR(); rec.lang='en-US'; rec.interimResults=false; rec.onresult=ev=>{ srGot=true; processVoice(ev.results[0][0].transcript); renderChips(); }; rec.onerror=()=>{ rec=null; }; rec.start(); }catch(e){ rec=null; } }
   }
@@ -1311,7 +1320,7 @@
   function stopCam(){ if (S.stream) S.stream.getTracks().forEach(t => t.stop()); S.stream = null; S.camState = 'idle'; const v = $('#camVideo'); v.srcObject = null; setCamUI(); }
   function clickAtPointer(){ const el = hitTest(); if (el) run(el.dataset.act, 'eye'); }
   window.DZ = { $, esc, log, toast, tip, flashSig, glabel, mascotDo, setCaption, addEvent, FACE, DUR, G, screen, mic, stopCam, click: clickAtPointer, signal: null,
-    run, scrollBy, insertText, typeKey, openCtx, ctxAction, renderAll, W, label, hitTest, ripple, wtoast,
+    run, tryIntent, scrollBy, insertText, typeKey, openCtx, ctxAction, renderAll, W, label, hitTest, ripple, wtoast,
     get micLive(){ return micLive; }, set micLive(v){ micLive = v; mic.classList.toggle('live', v); } };
 
   /* ---------------- boot ---------------- */

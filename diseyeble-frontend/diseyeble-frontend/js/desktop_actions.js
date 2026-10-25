@@ -187,7 +187,7 @@
   /* the page's own "Type it" / "Drop it" buttons also type into the virtual box */
   function typedFromButton() { typeIntoFocus(previewText()); S.preview = null; }
 
-  D.act = { fromEngine, fromGesture, perform, typedFromButton, state: S };
+  D.act = { fromEngine, fromGesture, perform, typedFromButton, byLabel: l => (BY_LABEL[l] ? (BY_LABEL[l](), true) : false), clickByName: n => { const el = findByName(n); if (!el) return false; hover(el); clickTarget(el); return true; }, state: S };
 })();
 
 /* Optional exact feed, if the engine ever relays its OS actions to the UI (one new message in engine/core/messages.py, sent

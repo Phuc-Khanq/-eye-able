@@ -39,7 +39,7 @@
   function setLive(on) {
     if (on === live) return;
     live = on; D.engineLive = on;   // app.js stops the fake natural blinks while live
-    if (on) { starting = false; if (D.stopTracking) D.stopTracking(); if (D.stopCam) D.stopCam(); }   // the engine takes the webcam
+    if (on) { starting = false; if (D.stopTracking) D.stopTracking(); if (D.stopVoice) D.stopVoice(); if (D.stopCam) D.stopCam(); }   // the engine takes the webcam and mic
     if (on) { $('#allowCamTxt').textContent = 'Engine camera on ✓'; $('#demoCamBtn').textContent = 'Camera on'; }
     pill.classList.toggle('off', !on);
     $('#engTxt').textContent = on ? 'Engine live' : (starting ? 'Starting engine…' : 'Simulated');

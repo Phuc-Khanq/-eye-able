@@ -157,3 +157,10 @@ Bấm **Allow camera** (mở thẳng file `index.html` cũng được) thì `js/
 
 ### Màn hình ảo phản ứng theo engine (js/desktop_actions.js)
 Khi engine (hoặc bộ theo dõi trong trình duyệt) hoạt động, màn hình Windows ảo làm theo: nháy mắt lâu = click trái tại con trỏ, mở miệng = click phải, nghiêng đầu = cuộn, nhướn mày / nháy / gật khi có chữ đang chờ = gõ chữ đó vào ô đang chọn; lệnh giọng nói (scroll, page up/down, back, forward, refresh, new/close tab, minimize, maximize, show desktop, switch window, zoom, copy/paste, enter/tab/backspace, escape, volume, brightness, "click <tên>"). Engine chỉ báo cho trang những gì nó nghe và quyết định, không báo nó gõ hay click gì, nên phần lớn được suy ra. Nếu engine gửi thêm message `{"type": "os_action", ...}` (click, type, key, scroll, launch, system) thì trang dùng đúng các hành động đó và tắt phần đoán (xem cuối `desktop_actions.js`). Thanh **Wait after you stop talking** gửi `pause_seconds` cho engine; sóng âm lấy mức mic thật từ engine.
+
+## Giọng nói và dictation trong trình duyệt
+
+Mở `index.html`, bấm **Allow camera**: trang cũng bật micro (Chrome hoặc Edge, cần internet, trình duyệt sẽ hỏi quyền micro).
+Nói "dictate", bấm vào một ô chữ, đọc nội dung, rồi nói "yes" (hoặc bấm Type it) để gõ. "scratch that" bỏ đi, "stop dictation" quay lại Pointer.
+Lệnh khác: scroll down, volume up, zoom in, click Mail, open Chrome, maximize, send it, pause.
+Đây là nhận dạng giọng nói của trình duyệt, không phải Whisper đã tinh chỉnh. Khi engine.main kết nối, trang tự tắt micro để engine dùng.

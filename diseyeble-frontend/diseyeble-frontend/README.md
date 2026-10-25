@@ -1,6 +1,6 @@
-# disEYEble – Frontend (bàn giao)
+# EYEable – Frontend (bàn giao)
 
-Frontend demo cho **disEYEble**: phần mềm giúp **người già và người khuyết tật** điều khiển máy tính **không cần dùng tay**, bằng **mắt, mặt, đầu và giọng nói** (chỉ cần webcam và micro thường).
+Frontend demo cho **EYEable**: phần mềm giúp **người già và người khuyết tật** điều khiển máy tính **không cần dùng tay**, bằng **mắt, mặt, đầu và giọng nói** (chỉ cần webcam và micro thường).
 
 > ⚠️ Đây **chỉ là frontend / prototype giao diện**. Chưa có model nhận diện thật: ánh mắt được **mô phỏng bằng con trỏ chuột**, còn nháy mắt, gật đầu và lắc đầu được **mô phỏng bằng phím hoặc nút**.
 
@@ -20,7 +20,7 @@ Frontend demo cho **disEYEble**: phần mềm giúp **người già và người
 
 - Thuần HTML + CSS + JS, **không cần build, không cần `npm install`**, không phụ thuộc thư viện nào:
   ```
-  diseyeble-frontend/
+  eyeable-frontend/
   ├── index.html        cấu trúc 2 màn hình (Introduction, Live demo)
   ├── css/style.css     toàn bộ giao diện
   ├── js/app.js         toàn bộ logic (Peep, gaze engine, demo Windows, voice, ...)
@@ -38,7 +38,7 @@ Frontend demo cho **disEYEble**: phần mềm giúp **người già và người
 ## 2. Cấu trúc màn hình
 
 ### Màn 1 – Introduction (5 trang, mỗi trang full màn hình)
-Chuyển trang bằng **thanh menu bo góc nổi phía trên**: logo disEYEble bên trái, bên phải là các nút Home · How it works · Controls · Voice · Gestures · **Live demo** (nút trắng). Phím **← / →** (cả PageUp/PageDown) cũng chuyển trang. Có hiệu ứng trượt khi chuyển trang. Code nằm ở khối `intro pages` trong `js/app.js` (hàm `showPage`), class `.ipage`, `.top` và `.pagelinks` trong `css/style.css`.
+Chuyển trang bằng **thanh menu bo góc nổi phía trên**: logo EYEable bên trái, bên phải là các nút Home · How it works · Controls · Voice · Gestures · **Live demo** (nút trắng). Phím **← / →** (cả PageUp/PageDown) cũng chuyển trang. Có hiệu ứng trượt khi chuyển trang. Code nằm ở khối `intro pages` trong `js/app.js` (hàm `showPage`), class `.ipage`, `.top` và `.pagelinks` trong `css/style.css`.
 
 | # | Trang | Nội dung |
 |---|---|---|
@@ -85,7 +85,7 @@ Chuyển trang bằng **thanh menu bo góc nổi phía trên**: logo disEYEble b
 - **Luôn nền tối:** đã khóa, không bị đổi theo chế độ sáng/tối của trình duyệt. Bản sáng chỉ bật khi bấm ◐ (class `.page-light` trên `<html>`).
 - **Nền:** 3 ảnh vân sáng xám-đen (do chủ project gửi, đã xoay ngang) **chồng lên nhau, mờ dần sang nhau, trôi và zoom chậm**, vòng lặp 15 s. Ảnh đã giảm sáng (`brightness(.72)`) và có lớp phủ tối để chữ dễ đọc. Xem class `.bgimg` và `@keyframes bgflow`.
 - **Màu:** trắng / đen / xám. Panel kiểu **kính mờ** (`backdrop-filter`), nút dạng viên thuốc, nút chính trắng chữ đen.
-- **Font:** **Inter** cho toàn trang, **Rubik 800** riêng cho chữ disEYEble (đậm, hơi tròn nhẹ, thẳng hàng).
+- **Font:** **Inter** cho toàn trang, **Rubik 800** riêng cho chữ EYEable (đậm, hơi tròn nhẹ, thẳng hàng).
 - **Điểm màu duy nhất:** con mắt Peep giữ màu tròng mắt thật (xám xanh rêu + vòng hổ phách).
 
 ---
@@ -131,7 +131,7 @@ Ghi chú: khối `(unused) wavy halftone dot field` là nền chấm cũ, **khô
    - Gọi `gesture('blink' | 'nod' | 'shake' | 'tiltL' | 'tiltR')` là demo tự phản ứng.
    - Lưu ý: từ MediaPipe 0.10.30, API `mp.solutions` cũ đã bị bỏ, phải dùng **Tasks API**.
 2. **Giọng nói ngọng:** hiện chỉ là fuzzy match từ vựng (Levenshtein) + regex intent. Bản thật cần model ASR có fine-tune hoặc voice profile riêng cho từng người.
-3. **Điều khiển chuột thật của Windows:** trình duyệt không làm được. Đã có bản Python thử nghiệm (`diseyeble_tracker.py`: MediaPipe + pyautogui, nằm trong `Desktop\diseyeble` trên máy chủ project). Bản đó **chưa test với webcam thật**.
+3. **Điều khiển chuột thật của Windows:** trình duyệt không làm được. Đã có bản Python thử nghiệm (`eyeable_tracker.py`: MediaPipe + pyautogui, nằm trong `Desktop\eyeable` trên máy chủ project). Bản đó **chưa test với webcam thật**.
 4. **Thương hiệu:** demo không dùng logo thật của Chrome, YouTube hay Windows, chỉ dùng icon chung chung.
 
 ---
@@ -141,6 +141,6 @@ Ghi chú: khối `(unused) wavy halftone dot field` là nền chấm cũ, **khô
 - Thêm mô phỏng cử chỉ + biểu đồ tín hiệu, thêm nghiêng đầu trái/phải để click trái/phải, quay lại kiểu **nhìn giữ để click**.
 - Mascot: từ SVG, qua mắt đốm, khuôn mặt lưới, tròng mắt vẽ, rồi **nhãn cầu 3D đốm tụ/tản theo vòng lặp** (bản hiện tại).
 - Thử nhiều phong cách (Warm kem, kính tối, kẹo pastel, kính trắng), rồi chốt **trắng–đen, nền vân sáng chuyển động**.
-- Tên: thử logo vẽ tay, Fontdiner, Black Ops One, rồi chốt **disEYEble – Rubik 800**, chữ thẳng hàng.
+- Tên: thử logo vẽ tay, Fontdiner, Black Ops One, rồi chốt **EYEable – Rubik 800**, chữ thẳng hàng.
 
 Link xem online (artifact, chỉ chủ project mở được trừ khi chia sẻ): https://claude.ai/artifact/9MSaXb4iyvFQ33C3w9fErV

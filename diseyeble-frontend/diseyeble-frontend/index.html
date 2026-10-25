@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>diseyeble</title>
+<title>eyeable</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,7 +43,7 @@
 <div class="bgimg" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#intro" data-go="intro" aria-label="Diseyeble home"><span class="wordmark wm2" role="img" aria-label="diseyeble"><span class="wm2-a">dis</span><span class="wm2-eye"><i class="wc wc-tl"></i><i class="wc wc-tr"></i><i class="wc wc-bl"></i><i class="wc wc-br"></i><b>eye</b></span><span class="wm2-a">ble</span></span></a>
+    <a class="brand" href="#intro" data-go="intro" aria-label="Eyeable home"><span class="wordmark wm2" role="img" aria-label="eyeable"><span class="wm2-eye"><i class="wc wc-tl"></i><i class="wc wc-tr"></i><i class="wc wc-bl"></i><i class="wc wc-br"></i><b>eye</b></span><span class="wm2-a">able</span></span></a>
     <nav class="pagelinks" aria-label="Pages">
       <button data-page-go="0">Home</button><button data-page-go="1">How it works</button><button data-page-go="2">Controls</button><button data-page-go="3">Voice</button><button data-page-go="4">Gestures</button>
       <button class="nav-demo" id="tab-demo" data-go="demo" aria-selected="false">Live demo</button>
@@ -61,7 +61,7 @@
       <div>
         <div class="eyebrow">Hands-free computing for older adults and people with disabilities</div>
         <h1>Your eyes, face and voice are the <em>mouse</em>.</h1>
-        <p class="lead lead-lines"><span class="lead-name">&ldquo;dis<b>EYE</b>ble&rdquo;</span> turns an ordinary webcam and microphone into a full computer controller.<br>
+        <p class="lead lead-lines"><span class="lead-name">&ldquo;<b>EYE</b>able&rdquo;</span> turns an ordinary webcam and microphone into a full computer controller.<br>
           Look to move the pointer.<br>
           Raise your eyebrows to click, open your mouth to right-click.<br>
           Say what you want, even if your speech is slurred or quiet.</p>
@@ -79,7 +79,7 @@
         </div>
       </div>
 
-      <div class="hero-eye" id="heroEye" aria-label="Peep, the diseyeble mascot: an iris made of coloured dots that follows your pointer"></div>
+      <div class="hero-eye" id="heroEye" aria-label="Peep, the eyeable mascot: an iris made of coloured dots that follows your pointer"></div>
     </div>
   </div>
   </section>
@@ -93,7 +93,7 @@
       <div class="how-left">
         <div class="sec-head">
           <h2>How eye tracking works with a normal webcam</h2>
-          <p>No special hardware. diseyeble finds your face, measures where each iris sits inside the eye, maps that to a point on the screen, and reads small face gestures like a raised eyebrow.</p>
+          <p>No special hardware. eyeable finds your face, measures where each iris sits inside the eye, maps that to a point on the screen, and reads small face gestures like a raised eyebrow.</p>
         </div>
         <div class="lab-viz" id="howLab">
           <span class="label" style="color:inherit;opacity:.7">Try it · move your mouse over this panel</span>
@@ -145,8 +145,8 @@
         <div class="steps" id="howSteps">
           <div class="step"><span class="n">01</span><div><h3>Find the face</h3><p>Each webcam frame is scanned for a face and 478 landmark points, including the eyes, brows and mouth.</p></div></div>
           <div class="step"><span class="n">02</span><div><h3>Measure the eyes</h3><p>The iris centre is compared with the eye corners. Head movement, brows and mouth are compared with your own resting face.</p></div></div>
-          <div class="step"><span class="n">03</span><div><h3>Calibrate in 2 seconds</h3><p>Look at one dot in the middle of the screen. diseyeble learns where &ldquo;straight ahead&rdquo; is for your eyes.</p></div></div>
-          <div class="step"><span class="n">04</span><div><h3>Point, snap and act</h3><p>A filter removes jitter and tremor, and diseyeble moves the real mouse. Raise your brows and the click snaps onto the nearest button.</p></div></div>
+          <div class="step"><span class="n">03</span><div><h3>Calibrate in 2 seconds</h3><p>Look at one dot in the middle of the screen. eyeable learns where &ldquo;straight ahead&rdquo; is for your eyes.</p></div></div>
+          <div class="step"><span class="n">04</span><div><h3>Point, snap and act</h3><p>A filter removes jitter and tremor, and eyeable moves the real mouse. Raise your brows and the click snaps onto the nearest button.</p></div></div>
         </div>
         <div class="how-next"><button class="btn btn-ghost" data-page-go="2">Controls →</button></div>
       </div>
@@ -275,7 +275,7 @@
             <span class="cam-src" id="camSrc">source: simulated face</span>
           </div>
           <div class="plot-wrap"><canvas id="plot" width="660" height="420" aria-label="Live signal chart for brow, mouth, pitch and yaw"></canvas></div>
-          <div class="sim-row">
+          <div class="sim-row rail-off">
             <span class="label">Simulate</span>
             <button id="sBrow" title="Eyebrows up 0.3 → left click, snapped to the nearest button">⌒ Brow</button>
             <button id="sMouth" title="Mouth open 0.5 s → right click">◯ Mouth</button>
@@ -285,7 +285,7 @@
             <button id="sNod" title="Nod 12° → yes (while dictating)">↧ Nod</button>
             <button id="sNat" title="Normal blink → ignored, never clicks">Blink (ignored)</button>
           </div>
-          <dl class="cam-legend">
+          <dl class="cam-legend rail-off">
             <div><dt>brow</dt><dd>eyebrow raise above your resting face. Over 0.25 = click</dd></div>
             <div><dt>mouth</dt><dd>mouth opening. Open 0.3 – 1.5 s, then close = right click</dd></div>
             <div><dt>pitch</dt><dd>head up / down. Held = scroll, a quick small nod = yes</dd></div>
@@ -293,7 +293,7 @@
           </dl>
         </section>
 
-        <section class="card">
+        <section class="card rail-off">
           <div class="card-h"><h3>Detected signals</h3><span class="label" id="clock">00:00</span></div>
           <div class="signals">
             <div class="sig" id="sigGaze"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/><circle cx="13.2" cy="10.8" r=".9" fill="currentColor" stroke="none"/></svg><b>Gaze</b><small id="gazeXY">0, 0</small></div>
@@ -327,7 +327,7 @@
           <div class="chips" id="chips"></div>
         </section>
 
-        <section class="card set">
+        <section class="card set rail-off">
           <div class="card-h" style="margin:0"><h3>Settings</h3><button class="mini-btn" id="calibBtn">Calibrate · 1 look</button></div>
           <div class="tg"><span id="l1">Eyebrow raise to click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l1" id="swBrow"></button></div>
           <div class="tg"><span id="l3">Open mouth for right click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l3" id="swMouth"></button></div>
@@ -362,18 +362,19 @@
                 <button class="dicon" data-act="open:youtube"><span class="ai vt"></span>YouTube</button>
                 <button class="dicon" data-act="open:mail"><span class="ai ml"></span>Mail</button>
                 <button class="dicon" data-act="toast:This PC"><span class="ai fx"></span>This PC</button>
+                <button class="dicon" data-act="toast:Recycle Bin is empty"><span class="ai rb"></span>Recycle Bin</button>
               </div>
 
               <div class="win" id="winBrowser" hidden>
                 <div class="titlebar">
-                  <div class="tabs-row"><div class="wtab"><span class="fav" id="tabFav"></span><span id="tabTitle">New Tab</span></div></div>
+                  <div class="tabs-row"><div class="wtab"><span class="fav" id="tabFav"></span><span id="tabTitle">New Tab</span><i class="wtab-x" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M7 7l10 10M17 7L7 17"/></svg></i></div><i class="wtab-new" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 6v12M6 12h12"/></svg></i></div>
                   <div class="wbtns"><button class="wbtn" data-act="min:browser">—</button><button class="wbtn">▢</button><button class="wbtn x" data-act="close:browser">✕</button></div>
                 </div>
                 <div class="toolbar">
                   <button class="nb" data-act="back" aria-label="Back">←</button>
                   <button class="nb" data-act="fwd" aria-label="Forward">→</button>
                   <button class="nb" data-act="reload" aria-label="Reload">↻</button>
-                  <div class="omni"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="omni">google.com</span></div>
+                  <div class="omni"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="omni">google.com</span><i class="omni-star" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></i></div><span class="tb-prof" aria-hidden="true">A</span><i class="tb-dots" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="5.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="18.5" r="1.2" fill="currentColor"/></svg></i>
                 </div>
                 <div class="wbody"><div class="page"><div class="page-inner" id="bPage"></div></div></div>
               </div>
@@ -385,13 +386,22 @@
               </div>
 
               <div class="startmenu" id="startMenu" hidden>
-                <h4>Pinned</h4>
+                <div class="sm-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><span>Search for apps, settings, and documents</span></div>
+                <div class="sm-h"><h4>Pinned</h4><span class="sm-all">All ›</span></div>
                 <div class="sm-grid">
                   <button class="sm-app" data-act="open:browser"><span class="ai br"></span>Chrome</button>
                   <button class="sm-app" data-act="open:youtube"><span class="ai vt"></span>YouTube</button>
                   <button class="sm-app" data-act="open:mail"><span class="ai ml"></span>Mail</button>
                   <button class="sm-app" data-act="toast:Settings"><span class="ai fx"></span>Settings</button>
                 </div>
+                <div class="sm-h"><h4>Recommended</h4><span class="sm-all">More ›</span></div>
+                <div class="sm-rec">
+                  <div><span class="doc d1"></span><b>Grocery list</b><small>Yesterday at 5:12 PM</small></div>
+                  <div><span class="doc d2"></span><b>Family photos</b><small>Mon at 9:40 AM</small></div>
+                  <div><span class="doc d3"></span><b>Doctor appointments</b><small>Oct 20</small></div>
+                  <div><span class="doc d1"></span><b>Bus timetable</b><small>Oct 18</small></div>
+                </div>
+                <div class="sm-foot"><span class="sm-user"><i>A</i>Alex</span><i class="sm-pow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg></i></div>
               </div>
 
               <div class="osk" id="osk" hidden></div>
@@ -399,15 +409,16 @@
               <div id="wtoastSlot"></div>
 
               <div class="taskbar">
+                <div class="tb-weather" aria-hidden="true"><span class="sun"></span><span><b>72°F</b><small>Sunny</small></span></div>
                 <button class="tb" data-act="start" id="tbStart" aria-label="Start"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="12.5" y="2" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="2" y="12.5" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="12.5" y="12.5" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/></svg></button>
                 <div class="tb-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>Search</div>
                 <button class="tb" data-act="open:browser" id="tbBrowser" aria-label="Chrome"><span class="ai br"></span></button>
                 <button class="tb" data-act="open:mail" id="tbMail" aria-label="Mail"><span class="ai ml"></span></button>
                 <button class="tb" data-act="toast:File Explorer" aria-label="File Explorer"><span class="ai fx"></span></button>
-                <div class="tray"><span>ENG</span><span>📶 🔊 🔋</span><span class="clock" id="trayClock">9:41 AM<br>24/10/2026</span></div>
+                <div class="tray"><i class="tray-chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M7 14l5-5 5 5"/></svg></i><span>ENG</span><span class="tray-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.3" r="1.2" fill="currentColor" stroke="none"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="currentColor"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.3 6.6a7.6 7.6 0 0 1 0 10.8"/></svg><svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="19" height="10" rx="2.6"/><rect x="4.4" y="9.4" width="11.5" height="5.2" rx="1.2" fill="currentColor" stroke="none"/><path d="M23.4 10.4v3.2" stroke-linecap="round" stroke-width="2.2"/></svg></span><span class="clock" id="trayClock">9:41 AM<br>24/10/2026</span><i class="tray-bell" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></i></div>
               </div>
 
-              <div class="gaze" id="gaze"><svg viewBox="0 0 58 58"><circle class="track" cx="29" cy="29" r="25" fill="none" stroke-width="4"/><circle class="prog" id="prog" cx="29" cy="29" r="25" fill="none" stroke-width="4" stroke-dasharray="157.1" stroke-dashoffset="157.1"/></svg><div class="core"></div><span class="glabel" id="glabel">BLINK · CLICK</span></div>
+              <div class="gaze" id="gaze"><svg viewBox="0 0 58 58"><circle class="track" cx="29" cy="29" r="25" fill="none" stroke-width="4"/><circle class="prog" id="prog" cx="29" cy="29" r="25" fill="none" stroke-width="4" stroke-dasharray="157.1" stroke-dashoffset="157.1"/></svg><div class="core"></div><svg class="arrow" viewBox="0 0 20 28" aria-hidden="true"><path d="M2 1.5v21.2l5.3-5.1 3.4 8 3.4-1.5-3.4-7.8h7.3z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="glabel" id="glabel">BLINK · CLICK</span></div>
               <div class="calib" id="calib" hidden><div class="msg" id="calibMsg"></div><div class="pt" id="calibPt" hidden></div></div>
             </div>
           </div>

@@ -676,9 +676,9 @@
   function wtoast(title, body){ const s=$('#wtoastSlot'); s.innerHTML=`<div class="wtoast"><span class="ai ml" style="width:28px;height:28px;border-radius:7px;flex:none">${ICON.ml}</span><div><b>${esc(title)}</b>${esc(body)}</div></div>`; clearTimeout(wtoast.t); wtoast.t=setTimeout(()=>s.innerHTML='',3200); }
 
   function topScroller(){ return W.top==='mail' && W.mail.open ? 'mail' : (W.browser.open ? 'browser' : null); }
-  function scrollBy(dir){
+  function scrollBy(dir, amt=180){
     const t = topScroller(); if (!t) return;
-    if (t==='browser'){ const inner=$('#bPage'), max=Math.max(0, inner.scrollHeight - inner.parentElement.clientHeight); W.browser.scroll = clamp(W.browser.scroll + dir*180, 0, max); inner.style.transform=`translateY(${-W.browser.scroll}px)`; }
+    if (t==='browser'){ const inner=$('#bPage'), max=Math.max(0, inner.scrollHeight - inner.parentElement.clientHeight); W.browser.scroll = clamp(W.browser.scroll + dir*amt, 0, max); inner.style.transform=`translateY(${-W.browser.scroll}px)`; }
   }
 
   /* main action dispatcher: everything clickable has data-act */
@@ -1267,9 +1267,11 @@
     const col = getComputedStyle(document.documentElement).getPropertyValue('--violet').trim() || '#6A4BD6';
     const n=46, bw=Wd/n;
     for (let i=0;i<n;i++){
-      const amp = micLive ? (0.25 + 0.75*Math.abs(Math.sin(now/120 + i*0.7) * Math.sin(now/310 + i*0.23))) : 0.06;
+      const lv = window.DZ && window.DZ.micLevel;   // the engine's real microphone level (0 to 1), when connected
+      const amp = lv != null ? 0.06 + Math.min(1, lv*2.5)*0.9*(0.55 + 0.45*Math.abs(Math.sin(now/120 + i*0.7)))
+        : micLive ? (0.25 + 0.75*Math.abs(Math.sin(now/120 + i*0.7) * Math.sin(now/310 + i*0.23))) : 0.06;
       const h = Math.max(4, amp*H*0.8);
-      wx.fillStyle = col; wx.globalAlpha = micLive ? 0.9 : 0.35;
+      wx.fillStyle = col; wx.globalAlpha = (micLive || (lv != null && lv > 0.04)) ? 0.9 : 0.35;
       wx.fillRect(i*bw+2, (H-h)/2, bw-4, h);
     }
     wx.globalAlpha=1;
@@ -1309,6 +1311,7 @@
   function stopCam(){ if (S.stream) S.stream.getTracks().forEach(t => t.stop()); S.stream = null; S.camState = 'idle'; const v = $('#camVideo'); v.srcObject = null; setCamUI(); }
   function clickAtPointer(){ const el = hitTest(); if (el) run(el.dataset.act, 'eye'); }
   window.DZ = { $, esc, log, toast, tip, flashSig, glabel, mascotDo, setCaption, addEvent, FACE, DUR, G, screen, mic, stopCam, click: clickAtPointer, signal: null,
+    run, scrollBy, insertText, typeKey, openCtx, ctxAction, renderAll, W, label, hitTest, ripple, wtoast,
     get micLive(){ return micLive; }, set micLive(v){ micLive = v; mic.classList.toggle('live', v); } };
 
   /* ---------------- boot ---------------- */

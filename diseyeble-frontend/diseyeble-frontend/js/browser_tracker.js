@@ -76,7 +76,7 @@
     const pose = GD.poseFromMatrix(mat.data);
     for (const g of det.update(now, { blink, brow, pitch: pose.pitch, yaw: pose.yaw, roll: pose.roll })) {
       if (D.showGesture) D.showGesture(g);
-      if (g === 'blink') D.click();   // a long blink is the left click, as in the engine
+      if (D.act) D.act.fromGesture(g);   // long blink = click, tilt = scroll, as in the engine
     }
     // real values into the signal chart and the face readout
     const open = 1 - Math.min(1, blink / 0.6);

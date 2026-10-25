@@ -747,3 +747,8 @@ header.top{border:1px solid rgba(255,255,255,.85)!important;box-shadow:0 0 6px r
 #howDots{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;opacity:0;transition:opacity 1.2s ease}
 #pg-how:not([hidden]) #howDots{opacity:1}
 #pg-how > .wrap{position:relative;z-index:1}
+
+/* ---- actions mirrored onto the virtual desktop (js/desktop_actions.js) ---- */
+.win.max{left:0!important;right:0!important;top:0!important;bottom:46px!important;border-radius:0!important}
+.osd{position:absolute;right:14px;top:14px;z-index:60;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;background:rgba(30,32,40,.92);color:#fff;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.4);transition:opacity .25s}
+.osd[hidden]{display:none}.osd .bar{width:110px;height:6px;border-radius:3px;background:rgba(255,255,255,.25);overflow:hidden}.osd .bar i{display:block;height:100%;background:#fff}

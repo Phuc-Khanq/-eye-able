@@ -302,6 +302,7 @@
           <div class="tg"><span id="l5">Tilt head for left / right click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l5" id="swTilt"></button></div>
           <div class="tg"><span id="l4">Click by holding gaze</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l4" id="swDwell"></button></div>
           <div class="range"><label for="dwellMs">Gaze hold time <output id="dwellOut">900 ms</output></label><input type="range" id="dwellMs" min="400" max="2000" step="100" value="900"></div>
+          <div class="range"><label for="pauseS">Wait after you stop talking <output id="pauseOut">1.5 s</output></label><input type="range" id="pauseS" min="1" max="4" step="0.5" value="1.5"></div>
           <div class="range"><label for="steady">Pointer steadiness <output id="steadyOut">70%</output></label><input type="range" id="steady" min="0" max="95" step="5" value="70"></div>
         </section>
       </aside>
@@ -400,6 +401,7 @@
 <script src="js/app.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/gesture_detect.js"></script>
+<script src="js/desktop_actions.js"></script>
 <script src="js/browser_tracker.js"></script>
 </body>
 </html>

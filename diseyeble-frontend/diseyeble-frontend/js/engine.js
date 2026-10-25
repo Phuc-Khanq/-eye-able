@@ -52,7 +52,7 @@
     } else {
       if (saved) { G.dwell = saved.dwell; $('#swDwell').setAttribute('aria-checked', String(saved.dwell)); setPausedUI(saved.paused); }
       $('#camSrc').textContent = 'source: simulated face';
-      q.hidden = true; setRead(''); D.micLive = false;
+      q.hidden = true; setRead(''); D.micLive = false; D.micLevel = null;
       log('sys', 'Engine disconnected, back to the simulation');
     }
   }
@@ -112,7 +112,7 @@
     });
     const act = document.createElement('span'); act.className = 'eng-act';
     act.innerHTML = '<button class="ok">Type it</button><button class="no">Drop it</button>';
-    act.querySelector('.ok').onclick = () => send('dictation', { action: 'insert' });
+    act.querySelector('.ok').onclick = () => { if (D.act) D.act.typedFromButton(); send('dictation', { action: 'insert' }); };
     act.querySelector('.no').onclick = () => send('dictation', { action: 'discard' });
     meant.append(act);
   }
@@ -138,6 +138,7 @@
   q.querySelector('.no').onclick = () => send('confirm_answer', { id: qId, yes: false });
 
   function handle(m) {
+    if (D.act) D.act.fromEngine(m);   // js/desktop_actions.js: what the engine does, on the virtual screen
     switch (m.type) {
       case 'mode': {
         $('#trackTxt').textContent = MODES[m.mode] || m.mode;
@@ -156,7 +157,7 @@
       case 'gesture': gesture(m.gesture); break;
       case 'dwell': setRead(m.progress > 0 ? 'dwell ' + Math.round(m.progress * 100) + '%' : (m.ready ? 'dwell ready' : '')); break;
       case 'scroll': setRead(m.ready && m.rate ? 'scroll ' + (m.rate > 0 ? '↑' : '↓') + Math.abs(m.rate).toFixed(1) + '/s' : ''); break;
-      case 'listening': D.micLive = !!m.speaking; if (m.speaking) FACE.speakUntil = performance.now() + 400; break;
+      case 'listening': D.micLive = !!m.speaking; D.micLevel = m.level; if (m.speaking) FACE.speakUntil = performance.now() + 400; break;
       case 'dictation_live': $('#heardTxt').textContent = m.text ? '… ' + m.text : 'Listening…'; break;
       case 'dictation_preview': onPreview(m); break;
       case 'command': $('#meantTxt').textContent = 'Command: ' + m.label; flashSig('#sigVoice'); log('voice', 'Command: ' + m.label); break;
@@ -190,6 +191,9 @@
     if (e.target.closest('#pauseBtn')) { e.stopImmediatePropagation(); e.preventDefault(); send('set_mode', { mode: G.paused ? 'pointer' : 'paused' }); }
     else if (e.target.closest('#calibBtn')) { e.stopImmediatePropagation(); e.preventDefault(); send('calibrate', { action: 'start' }); }
   }, true);
+  $('#pauseS').addEventListener('input', e => {   // how long a pause ends a sentence: audio_in reads pause_seconds
+    $('#pauseOut').textContent = (+e.target.value).toFixed(1) + ' s'; send('settings', { pause_seconds: +e.target.value });
+  });
   $('#dwellMs').addEventListener('input', e => send('settings', { dwell_ms: +e.target.value }));
 
   /* ---------- Allow camera = start the engine (needs serve_demo.py; the engine owns the webcam) ---------- */

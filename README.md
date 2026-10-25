@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/media/eyeable-banner.jpg" alt="[eye]able: control your computer with your eyes, head and voice. No mouse, no keyboard, just your laptop's webcam and microphone." width="100%">
+  <img src="docs/media/eyeable-banner.jpg" alt="[eye]able: use a computer without a keyboard or mouse. Head, blinks and voice, with just your laptop's webcam and microphone." width="100%">
 </p>
 
 <p align="center">
@@ -192,6 +192,16 @@ Built at Gator Hack V by **Khang, Khoi, Khoa, Hung and Nhi**.
 | Eyes, cursor and UI-Venus | Khang | Hung | `engine/eyes/` |
 | Voice, dictation and control | Khoi | Khoa | `engine/voice/`, `engine/core/` |
 | Website, UI and live demo | Nhi | Hung, Khoa | `eyeable-frontend/eyeable-frontend/` |
+
+### Who built what
+
+- **Khang** built the eyes side: the head-driven pointer with acceleration and smoothing, the long-blink click, eyebrow yes and head-shake no, tilt scrolling, the UI-Venus "click by name" step, and the Windows installer and scripts. He also connected the engine to the website's live demo, ran the speech fine-tune evaluation, and kept the repository together.
+- **Khoi** built the voice and control side: the mode manager, voice commands (open apps and sites, pause, resume), dictation with the live preview, the WebSocket relay, the training scripts, and most of the automated tests for them.
+- **Khoa** worked on the speech model: the LoRA fine-tune on dysarthric speech, the benchmarks against stock Whisper, the live microphone checks, and the CPU fallback for computers without an NVIDIA GPU. He also did integration and testing across the team.
+- **Hung** shaped the head-gesture timing for slow webcams, ran teammate tests and collected feedback, and wrote the pitch, slides, demo video and Devpost story.
+- **Nhi** designed the website and its look: the landing page, the Controls, Gestures and Voice pages, the colors, and the interface the live demo uses.
+
+The git history shows commits from Khang, Khoi, Khoa and Hung; Nhi's design work came in from her own branch and was merged into the site by Khang. We also used Claude as a coding assistant, and its commits are marked as such.
 
 ## Third-party models and data
 

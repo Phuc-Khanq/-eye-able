@@ -1301,3 +1301,8 @@ main#intro,main#demo{position:relative}
 #demo .rail .lite details label:has(input[type=range]) input{flex:1 1 40px;min-width:40px}
 #demo .rail .lite details label:has(input[type=range]) span{flex:none;min-width:2.6em;text-align:right}
 #demo .rail .cam{min-height:120px}
+
+/* nav logo mark next to the wordmark; the whole brand link goes to the home page */
+.brand .brand-mark{width:36px;height:36px;flex:none;display:block;border-radius:9px}
+.brand:focus-visible{outline:2px solid #8FE36A;outline-offset:4px;border-radius:10px}
+@media (max-width:520px){.brand .brand-mark{width:30px;height:30px}}

@@ -686,13 +686,13 @@
     const pg = $('#pg-gestures'), rows = [...pg.querySelectorAll('.gr')], cv = $('#gxCv'), ctx = cv.getContext('2d');
     const img = $('#gxImg'), srcs = [...document.querySelectorAll('#ctlAcc .inp-img')].map(i => i.getAttribute('src'));
     srcs.push($('#gxBlinkSrc').getAttribute('src'));
-    const IMG = [4,6,1,4,3,3,5,5,2,0,5];
+    const IMG = [0,6,1,4,3,3,5,5,2,0,5];
     const bump = (t, a, b, h, e=.12) => { if (t < a - e || t > b + e) return 0; if (t < a) return h*(1 - (a - t)/e)**2*0 + h*Math.sin((t - a + e)/e*Math.PI/2)**2*(t>a-e?1:0); if (t > b) return h*Math.cos((t - b)/e*Math.PI/2)**2; return h; };
     const n = (t, k) => .03*Math.sin(t*23 + k) + .02*Math.sin(t*41 + k*2);
     // each gesture: signal name, value(t) in a 3 s loop (0..1 or -1..1), thresholds, events [time, label]
     const vox = (t, a, b) => (t > a && t < b ? (.25 + .45*Math.abs(Math.sin(t*31)*Math.sin(t*7.3))) * Math.sin(t*44) : 0);
     const SIG = [
-      {name:'head turn', sym:true, f:t => .55*Math.sin(t*2.1) + .25*Math.sin(t*5.3 + 1) + n(t,1), th:[], ev:[]},
+      {name:'gaze x', sym:true, f:t => .55*Math.sin(t*2.1) + .25*Math.sin(t*5.3 + 1) + n(t,1), th:[], ev:[]},
       {name:'eyes shut', f:t => .06 + bump(t, .35, .42, .8, .06) + bump(t, 1.0, 1.9, .85, .12) + n(t,8)*.6, th:[.6], ev:[[.45,'blink \u00b7 ignored'],[1.98,'LEFT CLICK']]},
       {name:'eyebrow raise', f:t => .06 + bump(t, 1.0, 1.55, .5) + n(t,2), th:[.3], ev:[[1.3,'YES']]},
       {name:'head shake', sym:true, f:t => (t > .6 && t < 1.5 ? .75*Math.sin((t - .6)*Math.PI*2/.45) : 0) + n(t,5), th:[.5,-.5], ev:[[1.55,'NO \u00b7 cancel']]},

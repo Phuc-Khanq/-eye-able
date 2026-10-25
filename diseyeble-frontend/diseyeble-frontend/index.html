@@ -217,7 +217,7 @@
     </div>
     <div class="gx">
       <div class="gx-list" role="tablist" aria-label="Gestures">
-        <button class="gr on" type="button" data-g="0" aria-selected="true"><span class="gr-n">01</span><span class="gr-do">Turn your head</span><span class="gr-tag">Move pointer</span><template>Small turns aim finely, quick turns go far. Set by a one-look calibration.</template></button>
+        <button class="gr on" type="button" data-g="0" aria-selected="true"><span class="gr-n">01</span><span class="gr-do">Look around (eye tracking)</span><span class="gr-tag">Move pointer</span><template>The pointer follows where your eyes look. Set by a one-look calibration.</template></button>
         <button class="gr" type="button" data-g="1" aria-selected="false"><span class="gr-n">02</span><span class="gr-do">Hold a long blink</span><span class="gr-tag">Left click · exact spot</span><template>Eyes shut <b>0.4 – 1.6 s</b>. Normal blinks never click.</template></button>
         <button class="gr" type="button" data-g="2" aria-selected="false"><span class="gr-n">03</span><span class="gr-do">Raise your eyebrows</span><span class="gr-tag">Yes</span><template>Answers a waiting question. Not a click.</template></button>
         <button class="gr" type="button" data-g="3" aria-selected="false"><span class="gr-n">04</span><span class="gr-do">Shake your head</span><span class="gr-tag">No · cancel</span><template>Two quick swings of about <b>14°</b>. Cancels a question.</template></button>
@@ -232,17 +232,17 @@
       <div class="gx-panel" role="tabpanel">
         <div class="gx-head">
           <span class="gx-n" id="gxN">01</span>
-          <div class="gx-do"><small class="label">You do</small><h3 id="gxDo">Turn your head</h3></div>
+          <div class="gx-do"><small class="label">You do</small><h3 id="gxDo">Look around (eye tracking)</h3></div>
           <div class="gx-res"><small class="label">Computer does</small><b id="gxRes">Move pointer</b></div>
         </div>
         <div class="gx-mid">
           <div class="gx-img"><img id="gxImg" alt=""></div>
           <div class="gx-scope">
-            <div class="gx-sl"><span class="label" id="gxSig">head turn</span><span class="gx-live"><i></i>live signal</span></div>
+            <div class="gx-sl"><span class="label" id="gxSig">gaze x</span><span class="gx-live"><i></i>live signal</span></div>
             <canvas id="gxCv" aria-hidden="true"></canvas>
           </div>
         </div>
-        <div class="gx-how"><small class="label">How it&rsquo;s detected</small><p id="gxHow">Small turns aim finely, quick turns go far. Set by a one-look calibration.</p></div>
+        <div class="gx-how"><small class="label">How it&rsquo;s detected</small><p id="gxHow">The pointer follows where your eyes look. Set by a one-look calibration.</p></div>
       </div>
     </div>
     <div class="gx-foot">

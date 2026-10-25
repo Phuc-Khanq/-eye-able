@@ -545,6 +545,245 @@
     });
     nav && nav.animate([{opacity:0, transform:'translateY(14px)'},{opacity:1, transform:'none'}], {duration:400, delay:T0 + 5*330 + 460, fill:'backwards'});
   }
+
+
+  /* dot-matrix voice wave, shared by the Voice panel and the Controls → Voice transition */
+  const vxSeed = n => { const x = Math.sin(n*127.1)*43758.5453; return x - Math.floor(x); };
+  function vxWave(ctx, X, Y, W, H, gap, speak, calm, k, s, reveal, rs){
+    rs = rs || 1;
+    const cols = Math.max(2, Math.floor(W/gap)), rows = Math.max(1, Math.floor(H/gap)), mid = Y + H/2, ox = X + (W - (cols-1)*gap)/2;
+    for (let c = 0; c < cols; c++){
+      const u = c/(cols-1), edge = Math.sin(Math.PI*u);
+      const front = reveal < 1 ? (u > reveal ? 0 : Math.min(1, (reveal - u)*14)) : 1;   // sweep: columns past the front are still dark
+      const lead = reveal < 1 ? Math.max(0, 1 - Math.abs(reveal - u)*22) : 0;            // bright leading edge
+      const jag = (.35 + .65*Math.abs(Math.sin(c*.73 + s*9.1) * Math.sin(c*.31 - s*5.3 + vxSeed(c+k)*6))) * (vxSeed(Math.floor(s*14)+c*3) > .18 ? 1 : .25);
+      const smooth = .55 + .45*Math.sin(u*Math.PI*3 - s*4);
+      const idle = .07 + .05*Math.sin(c*.4 + s*2);
+      const amp = Math.max(idle, speak*jag*front, calm*smooth) * edge;
+      const hh = amp * (H*.46);
+      for (let r = 0; r < rows; r++){
+        const y = mid + (r - (rows-1)/2)*gap, d = Math.abs(y - (mid));
+        const inside = d <= hh, near = Math.max(0, 1 - (d - hh)/(gap*1.6));
+        let a = inside ? .55 + .45*(1 - d/(hh+1)) : near*.12 + .05;
+        if (reveal < 1 && !inside) a *= .6;
+        let col;
+        if (inside && calm > .02){ const g = calm; col = `rgba(${Math.round(255 - 112*g)},${Math.round(255 - 28*g)},${Math.round(255 - 149*g)},${a})`; }
+        else if (inside && speak > .02 && vxSeed(c*31 + r*7 + Math.floor(s*6)) > .93){ col = `rgba(240,169,75,${a})`; }
+        else col = `rgba(255,255,255,${inside ? Math.min(1, a + lead*.45) : a*.8})`;
+        ctx.fillStyle = col; ctx.beginPath(); ctx.arc(ox + c*gap, y, (inside ? 1.7 + lead*.7 : 1.1)*rs, 0, 6.283); ctx.fill();
+      }
+    }
+  }
+
+  /* Voice: live listener. Garbled speech in, clean command out. Wave is noisy while "hearing", calm and green once understood */
+  const VX = (() => {
+    const EX = [
+      {h:'\u201cPot.\u201d', m:'Pause', ask:true},
+      {h:'\u201cKnow.\u201d', m:'No \u00b7 only while a question waits', ask:true},
+      {h:'\u201cDictation of.\u201d', m:'Dictation off', ask:true},
+      {h:'\u201cNew tap.\u201d', m:'New tab', ask:true},
+      {h:'\u201cRe center.\u201d', m:'Recenter', ask:true}
+    ];
+    const pg = $('#pg-voice'), cv = $('#vxWave'), ctx = cv.getContext('2d'), fl = $('.vx-flow');
+    const eh = $('#vxHeard'), em = $('#vxMeant'), mb = $('#vxMeantBox'), ec = $('#vxConf'), ln = $('#vxLine i'), ask = $('#vxAsk'), idx = $('#vxIdx');
+    const CYC = 4200, SPEAK = 1500, ARROW = 520;
+    let t0 = performance.now(), cur = -1, raf = 0;
+    const seed = n => { const x = Math.sin(n*127.1)*43758.5453; return x - Math.floor(x); };
+    function frame(now){
+      raf = requestAnimationFrame(frame);
+      if (pg.hidden || document.hidden) return;
+      const dpr = Math.min(2, devicePixelRatio||1), W = cv.clientWidth, H = cv.clientHeight;
+      if (!W || !H) return;
+      if (cv.width !== Math.round(W*dpr) || cv.height !== Math.round(H*dpr)){ cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr); }
+      const el = Math.max(0, now - t0), k = Math.floor(el / CYC) % EX.length, tt = el % CYC, ex = EX[k];
+      if (k !== cur){ cur = k; mb.classList.add('off'); mb.classList.remove('glow'); ask.classList.add('off'); ec.textContent = '\u2013'; idx.textContent = String(k+1).padStart(2,'0') + ' / 05'; }
+      // heard text types in while speaking
+      const nch = Math.min(ex.h.length, Math.ceil(ex.h.length * Math.min(1, tt / (SPEAK*.85))));
+      if (eh.textContent !== ex.h.slice(0,nch)) eh.textContent = ex.h.slice(0,nch) || '\u00a0';
+      // pulse runs along the arrow, then the command lands
+      const ap = Math.max(0, Math.min(1, (tt - SPEAK) / ARROW));
+      ln.style.width = (ap*100) + '%'; ln.style.opacity = tt > SPEAK + ARROW + 500 ? Math.max(0, 1 - (tt - SPEAK - ARROW - 500)/400) : 1;
+      const landed = tt >= SPEAK + ARROW;
+      if (landed && mb.classList.contains('off')){ em.textContent = ex.m; mb.classList.remove('off'); mb.classList.add('glow'); fl.classList.add('hit'); setTimeout(()=>{ mb.classList.remove('glow'); fl.classList.remove('hit'); }, 900); if (ex.ask) ask.classList.remove('off'); }
+      if (landed){ const cp = Math.min(1, (tt - SPEAK - ARROW)/500); ec.textContent = cp > .5 ? 'fixed' : '\u2026'; }
+      if (tt > CYC - 260){ mb.classList.add('off'); ask.classList.add('off'); }
+      // dot wave
+      ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+      const speak = tt < SPEAK ? Math.min(1, tt/220) * Math.min(1, (SPEAK - tt)/260 + .25) : 0;
+      const calm = landed ? Math.min(1, (tt - SPEAK - ARROW)/450) * Math.min(1, (CYC - tt)/400) : 0;
+      vxWave(ctx, 0, 0, W, H, 9, speak, calm, k, now/1000, 1);
+    }
+    raf = requestAnimationFrame(frame);
+    return { restart(ms){ t0 = performance.now() - (ms||0); cur = -1; } };
+  })();
+
+
+  /* Controls → Voice: a garbled voice wave sweeps across the whole screen, shrinks into the listener box,
+     then Heard → Understood rises in underneath and the six tiles slide in */
+  function voiceWaveIntro(){
+    const pg = $('#pg-voice'), head = [pg.querySelector('.ipage-num'), ...pg.querySelectorAll('.sec-head > *')];
+    const live = pg.querySelector('.vx-live'), wave = $('#vxWave'), flow = pg.querySelector('.vx-flow'), top = pg.querySelector('.vx-top');
+    const tiles = [...pg.querySelectorAll('.vf')], nav = pg.querySelector('.vx-nav');
+    const ease = 'cubic-bezier(.22,.9,.24,1)', slide = 'cubic-bezier(.3,.7,.3,1)';
+    const SWEEP = 950, HOLD = 150, SHRINK = 720, C0 = SWEEP + HOLD, C1 = C0 + SHRINK, END = C1 + 220;
+    head.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateX(-70px)'},{opacity:1, transform:'none'}], {duration:620, delay:C0 + 120 + k*90, easing:ease, fill:'backwards'}));
+    live.animate([{opacity:0, scale:'1.03'},{opacity:1, scale:'1'}], {duration:480, delay:C1 - 320, easing:ease, fill:'backwards'});
+    top.animate([{opacity:0},{opacity:1}], {duration:400, delay:C1, fill:'backwards'});
+    wave.animate([{opacity:0},{opacity:1}], {duration:240, delay:C1 - 240, fill:'backwards'});
+    flow.animate([{opacity:0, translate:'0 22px', filter:'blur(6px)'},{opacity:1, translate:'0 0', filter:'blur(0)'}], {duration:600, delay:END, easing:ease, fill:'backwards'});
+    const T0 = END + 520;
+    tiles.forEach((c, k) => { const r = c.getBoundingClientRect(), dx = innerWidth - r.left + 40, at = T0 + k*150, D = 520;
+      c.animate([{translate:`${dx}px 0`},{translate:'0 0'}], {duration:D, delay:at, easing:slide, fill:'backwards'});
+      c.animate([{filter:'blur(2px) brightness(1.3) drop-shadow(34px 0 6px rgba(255,255,255,.4)) drop-shadow(90px 0 18px rgba(143,227,106,.32))', skew:'-6deg 0deg'},
+                 {filter:'blur(0px) brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)) drop-shadow(0 0 0 rgba(143,227,106,0))', skew:'0deg 0deg'}], {duration:D, delay:at, easing:slide, fill:'backwards'});
+    });
+    nav && nav.animate([{opacity:0, transform:'translateY(14px)'},{opacity:1, transform:'none'}], {duration:400, delay:T0 + 5*150 + 520, fill:'backwards'});
+    // full-screen wave overlay
+    const ov = document.createElement('canvas'); ov.className = 'vx-overlay'; document.body.appendChild(ov);
+    const oc = ov.getContext('2d'), dpr = Math.min(2, devicePixelRatio||1);
+    const sm = x => x<=0?0:x>=1?1:x*x*x*(x*(x*6-15)+10);
+    const t0 = performance.now(); let restarted = false;
+    (function step(now){
+      const t = now - t0, vw = innerWidth, vh = innerHeight;
+      if (ov.width !== Math.round(vw*dpr) || ov.height !== Math.round(vh*dpr)){ ov.width = Math.round(vw*dpr); ov.height = Math.round(vh*dpr); }
+      oc.setTransform(dpr,0,0,dpr,0,0); oc.clearRect(0,0,vw,vh);
+      const R = wave.getBoundingClientRect();
+      const full = {x:-20, y:vh*.5 - vh*.34, w:vw + 40, h:vh*.68};
+      const p = sm((t - C0)/SHRINK);
+      const x = full.x + (R.left - full.x)*p, y = full.y + (R.top - full.y)*p, w = full.w + (R.width - full.w)*p, h = full.h + (R.height - full.h)*p;
+      const gap = 12 + (9 - 12)*p, reveal = t < SWEEP ? sm(t/SWEEP)*1.08 : 1;
+      if (t > C1 - 260 && !restarted){ restarted = true; VX.restart(380); }
+      ov.style.opacity = t < C1 ? 1 : Math.max(0, 1 - (t - C1)/220);
+      vxWave(oc, x, y, w, h, gap, 1, 0, 0, now/1000, Math.min(1, reveal), 1.3 - .3*p);
+      if (t < C1 + 260) requestAnimationFrame(step); else ov.remove();
+    })(t0);
+  }
+
+  /* Controls → Voice: heading slides in, the listener panel glides in, then the six tiles follow from the right with a light trail */
+  function voiceIntro(){
+    const pg = $('#pg-voice'), head = [pg.querySelector('.ipage-num'), ...pg.querySelectorAll('.sec-head > *')];
+    const live = pg.querySelector('.vx-live'), tiles = [...pg.querySelectorAll('.vf')], nav = pg.querySelector('.vx-nav');
+    const ease = 'cubic-bezier(.22,.9,.24,1)', slide = 'cubic-bezier(.3,.7,.3,1)';
+    head.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateX(-70px)'},{opacity:1, transform:'none'}], {duration:620, delay:k*90, easing:ease, fill:'backwards'}));
+    live.animate([{opacity:0, translate:'0 40px', scale:'.96', filter:'blur(6px) brightness(1.4)'},{opacity:1, translate:'0 0', scale:'1', filter:'blur(0) brightness(1)'}], {duration:700, delay:380, easing:ease, fill:'backwards'});
+    const T0 = 640;
+    tiles.forEach((c, k) => { const r = c.getBoundingClientRect(), dx = innerWidth - r.left + 40, at = T0 + k*150, D = 520;
+      c.animate([{translate:`${dx}px 0`},{translate:'0 0'}], {duration:D, delay:at, easing:slide, fill:'backwards'});
+      c.animate([{filter:'blur(2px) brightness(1.3) drop-shadow(34px 0 6px rgba(255,255,255,.4)) drop-shadow(90px 0 18px rgba(143,227,106,.32))', skew:'-6deg 0deg'},
+                 {filter:'blur(0px) brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)) drop-shadow(0 0 0 rgba(143,227,106,0))', skew:'0deg 0deg'}], {duration:D, delay:at, easing:slide, fill:'backwards'});
+    });
+    nav && nav.animate([{opacity:0, transform:'translateY(14px)'},{opacity:1, transform:'none'}], {duration:400, delay:T0 + 5*150 + 520, fill:'backwards'});
+    VX.restart();
+  }
+
+
+  /* Gestures: pick a gesture on the left, the panel shows its picture and a live signal trace crossing its threshold */
+  const GX = (() => {
+    const pg = $('#pg-gestures'), rows = [...pg.querySelectorAll('.gr')], cv = $('#gxCv'), ctx = cv.getContext('2d');
+    const img = $('#gxImg'), srcs = [...document.querySelectorAll('#ctlAcc .inp-img')].map(i => i.getAttribute('src'));
+    srcs.push($('#gxBlinkSrc').getAttribute('src'));
+    const IMG = [4,6,1,4,3,3,5,5,2,0,5];
+    const bump = (t, a, b, h, e=.12) => { if (t < a - e || t > b + e) return 0; if (t < a) return h*(1 - (a - t)/e)**2*0 + h*Math.sin((t - a + e)/e*Math.PI/2)**2*(t>a-e?1:0); if (t > b) return h*Math.cos((t - b)/e*Math.PI/2)**2; return h; };
+    const n = (t, k) => .03*Math.sin(t*23 + k) + .02*Math.sin(t*41 + k*2);
+    // each gesture: signal name, value(t) in a 3 s loop (0..1 or -1..1), thresholds, events [time, label]
+    const vox = (t, a, b) => (t > a && t < b ? (.25 + .45*Math.abs(Math.sin(t*31)*Math.sin(t*7.3))) * Math.sin(t*44) : 0);
+    const SIG = [
+      {name:'head turn', sym:true, f:t => .55*Math.sin(t*2.1) + .25*Math.sin(t*5.3 + 1) + n(t,1), th:[], ev:[]},
+      {name:'eyes shut', f:t => .06 + bump(t, .35, .42, .8, .06) + bump(t, 1.0, 1.9, .85, .12) + n(t,8)*.6, th:[.6], ev:[[.45,'blink \u00b7 ignored'],[1.98,'LEFT CLICK']]},
+      {name:'eyebrow raise', f:t => .06 + bump(t, 1.0, 1.55, .5) + n(t,2), th:[.3], ev:[[1.3,'YES']]},
+      {name:'head shake', sym:true, f:t => (t > .6 && t < 1.5 ? .75*Math.sin((t - .6)*Math.PI*2/.45) : 0) + n(t,5), th:[.5,-.5], ev:[[1.55,'NO \u00b7 cancel']]},
+      {name:'head tilt', sym:true, f:t => bump(t, .4, 1.1, .6, .18) - bump(t, 1.8, 2.5, .6, .18) + n(t,4), th:[.4,-.4], ev:[[.8,'SCROLL UP'],[2.2,'SCROLL DOWN']]},
+      {name:'voice \u2192 chin', sym:true, f:t => t < .9 ? vox(t, .1, .7) : bump(t, 1.2, 2.6, .55, .3) + n(t,4), th:[], ev:[[.75,'\u201cscroll\u201d'],[1.45,''],[1.7,''],[1.95,'SCROLL'],[2.2,''],[2.45,'']]},
+      {name:'voice', sym:true, f:t => vox(t, .4, 1.1) + n(t,7)*.4, th:[], ev:[[1.35,'CLICK \u00b7 snapped']]},
+      {name:'voice', sym:true, f:t => vox(t, .3, 1.4) + n(t,7)*.4, th:[], ev:[[1.65,'FIND & CLICK \u00b7 asks first']]},
+      {name:'voice', sym:true, f:t => vox(t, .4, 1.2) + n(t,7)*.4, th:[], ev:[[1.45,'RIGHT CLICK']]},
+      {name:'pointer movement', below:true, f:t => t < .6 ? .5 + .25*Math.sin(t*19) + n(t,8) : t < 1.9 ? .05 + n(t,9)*.5 : .45 + .2*Math.sin(t*17) + n(t,9), th:[.12], ev:[[1.6,'LEFT CLICK \u00b7 dwell 1.0 s']]},
+      {name:'voice', sym:true, f:t => vox(t, .2, .7) + vox(t, 1.7, 2.3) + n(t,7)*.4, th:[], ev:[[.9,'PAUSED'],[2.5,'RESUMED']]}
+    ];
+
+    let cur = 0;
+    function pick(i, instant){
+      if (i === cur && !instant) return; cur = i;
+      rows.forEach((r,k) => { r.classList.toggle('on', k===i); r.setAttribute('aria-selected', k===i); });
+      const r = rows[i];
+      $('#gxN').textContent = String(i+1).padStart(2,'0');
+      $('#gxDo').innerHTML = r.querySelector('.gr-do').innerHTML;
+      $('#gxRes').innerHTML = r.querySelector('.gr-tag').innerHTML;
+      $('#gxHow').innerHTML = r.querySelector('template').innerHTML;
+      $('#gxSig').textContent = SIG[i].name;
+      const s = srcs[IMG[i]]; if (s){ if (instant){ img.src = s; } else { img.classList.add('swap'); setTimeout(() => { img.src = s; img.classList.remove('swap'); }, 200); } }
+    }
+    rows.forEach((r,k) => { r.addEventListener('mouseenter', () => pick(k)); r.addEventListener('focus', () => pick(k)); r.addEventListener('click', () => pick(k)); });
+    pick(0, true);
+    const CYC = 3, WIN = 3;
+    function frame(now){
+      requestAnimationFrame(frame);
+      if (pg.hidden || document.hidden) return;
+      const dpr = Math.min(2, devicePixelRatio||1), W = cv.clientWidth, H = cv.clientHeight;
+      if (!W || !H) return;
+      if (cv.width !== Math.round(W*dpr) || cv.height !== Math.round(H*dpr)){ cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr); }
+      ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+      const g = SIG[cur], T = now/1000, top = 14, bot = H - 6, mid = g.sym ? (top + bot)/2 : bot, amp = g.sym ? (bot - top)/2 : (bot - top);
+      const Y = v => mid - Math.max(-1, Math.min(1, v))*amp*.92;
+      // dot grid
+      ctx.fillStyle = 'rgba(255,255,255,.07)';
+      for (let x = 6; x < W; x += 12) for (let y = top; y <= bot; y += 12){ ctx.beginPath(); ctx.arc(x, y, .8, 0, 6.283); ctx.fill(); }
+      if (g.sym){ ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(W, mid); ctx.stroke(); }
+      // thresholds
+      ctx.setLineDash([4,6]); ctx.lineWidth = 1;
+      g.th.forEach(th => { const y = Y(th); ctx.strokeStyle = 'rgba(240,169,75,.7)'; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+        ctx.fillStyle = 'rgba(240,169,75,.9)'; ctx.font = '10px JetBrains Mono, monospace'; ctx.fillText('threshold', 6, y - 4); });
+      ctx.setLineDash([]);
+      // events in the visible window
+      ctx.font = '600 10.5px JetBrains Mono, monospace';
+      for (let c = Math.floor((T - WIN)/CYC); c <= Math.floor(T/CYC); c++) g.ev.forEach(([et, lab]) => {
+        const at = c*CYC + et; if (at > T || at < T - WIN) return;
+        const x = W - (T - at)/WIN*W, age = T - at, a = Math.max(.25, 1 - age/1.2);
+        ctx.strokeStyle = `rgba(143,227,106,${a})`; ctx.lineWidth = lab ? 1.5 : 1; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke();
+        if (lab){ const tw = ctx.measureText(lab).width + 12, lx = Math.min(W - tw - 2, Math.max(2, x - tw/2));
+          ctx.fillStyle = `rgba(143,227,106,${.18*a})`; ctx.strokeStyle = `rgba(143,227,106,${.8*a})`; ctx.beginPath(); ctx.roundRect(lx, top - 12, tw, 18, 9); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = `rgba(232,245,223,${a})`; ctx.fillText(lab, lx + 6, top + 1); }
+        ctx.lineWidth = 1;
+      });
+      // trace: glowing line, green while it is past the threshold
+      const step = 2; let px = null, py = null;
+      ctx.lineWidth = 1.7; ctx.lineCap = 'round';
+      for (let x = 0; x <= W; x += step){
+        const t = T - (1 - x/W)*WIN, v = g.f(((t % CYC) + CYC) % CYC), y = Y(v), fresh = x/W;
+        const over = g.th.length && (g.sym ? g.th.some(th => th > 0 ? v > th : v < th) : (g.below ? v < g.th[0] : v > g.th[0]));
+        if (px !== null){
+          ctx.strokeStyle = over ? `rgba(143,227,106,${.35 + .65*fresh})` : `rgba(255,255,255,${.2 + .75*fresh})`;
+          ctx.shadowColor = over ? 'rgba(143,227,106,.8)' : 'rgba(255,255,255,.5)'; ctx.shadowBlur = over ? 8 : 4;
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x, y); ctx.stroke();
+        }
+        px = x; py = y;
+      }
+      ctx.shadowBlur = 0;
+      // live head
+      const v = g.f(((T % CYC) + CYC) % CYC), y = Y(v);
+      ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(255,255,255,.9)'; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(W - 3, y, 3.2, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
+    }
+    requestAnimationFrame(frame);
+    return {pick};
+  })();
+
+  /* Voice → Gestures: heading slides in, rows slide in from the right one by one, then the panel lights up */
+  function gestIntro(){
+    const pg = $('#pg-gestures'), head = [pg.querySelector('.ipage-num'), ...pg.querySelectorAll('.sec-head > *')];
+    const rows = [...pg.querySelectorAll('.gr')], panel = pg.querySelector('.gx-panel'), rest = [pg.querySelector('.gx-foot'), pg.querySelector('.gx-cta')];
+    const ease = 'cubic-bezier(.22,.9,.24,1)', slide = 'cubic-bezier(.3,.7,.3,1)';
+    head.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateX(-70px)'},{opacity:1, transform:'none'}], {duration:620, delay:k*90, easing:ease, fill:'backwards'}));
+    const T0 = 420;
+    rows.forEach((c, k) => { const r = c.getBoundingClientRect(), dx = innerWidth - r.left + 40, at = T0 + k*110, D = 520;
+      c.animate([{transform:`translateX(${dx}px)`},{transform:'none'}], {duration:D, delay:at, easing:slide, fill:'backwards', composite:'add'});
+      c.animate([{filter:'blur(2px) brightness(1.3) drop-shadow(34px 0 6px rgba(255,255,255,.4)) drop-shadow(90px 0 18px rgba(143,227,106,.32))', skew:'-6deg 0deg'},
+                 {filter:'blur(0px) brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)) drop-shadow(0 0 0 rgba(143,227,106,0))', skew:'0deg 0deg'}], {duration:D, delay:at, easing:slide, fill:'backwards'});
+    });
+    const P = T0 + 6*110 + 300;
+    panel.animate([{opacity:0, scale:'.96', filter:'blur(8px) brightness(1.5)'},{opacity:1, scale:'1', filter:'blur(0) brightness(1)'}], {duration:650, delay:P, easing:ease, fill:'backwards'});
+    rest.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateY(16px)'},{opacity:1, transform:'none'}], {duration:500, delay:P + 350 + k*140, easing:ease, fill:'backwards'}));
+  }
+
   function showPage(i, viaPortal){
     i = clamp(i, 0, IP.list.length-1);
     if (!viaPortal && i === 1 && IP.cur === 0 && !$('#intro').hidden && !$('#pg-home').hidden && portalToHow()) return;
@@ -552,8 +791,13 @@
     const back = i < IP.cur;
     IP.list.forEach((p,k) => { p.hidden = k!==i; p.classList.remove('enter','back'); });
     const ctlIn = !viaPortal && i === 2 && IP.cur === 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches && innerWidth > 1100;
-    const p = IP.list[i]; void p.offsetWidth; if (!viaPortal && !ctlIn){ p.classList.add('enter'); if (back) p.classList.add('back'); }
+    const fromCtl = IP.cur === 2;
+    const vxIn = !viaPortal && i === 3 && i !== IP.cur && !matchMedia('(prefers-reduced-motion: reduce)').matches && innerWidth > 1100;
+    const gxIn = !viaPortal && i === 4 && i !== IP.cur && !matchMedia('(prefers-reduced-motion: reduce)').matches && innerWidth > 1100;
+    const p = IP.list[i]; void p.offsetWidth; if (!viaPortal && !ctlIn && !vxIn && !gxIn){ p.classList.add('enter'); if (back) p.classList.add('back'); }
     if (ctlIn) controlsIntro();
+    if (vxIn){ if (fromCtl) voiceWaveIntro(); else voiceIntro(); }
+    if (gxIn) gestIntro();
     IP.cur = i;
     $$('.pagelinks button').forEach((b,k)=>b.setAttribute('aria-current', k===i));
     scrollTo({top:0});

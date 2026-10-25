@@ -1,5 +1,5 @@
 @echo off
-rem Opens the EYEable website (landing page and the live demo) in your browser. On the live demo page, click
+rem Opens the [eye]able website (landing page and the live demo) in your browser. On the live demo page, click
 rem "Allow camera" to start the engine: the page then shows your webcam and the simulated desktop obeys your head,
 rem blinks and voice. Close this window (or press Ctrl+C) to stop.
 cd /d "%~dp0"

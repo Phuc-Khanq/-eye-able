@@ -27,7 +27,7 @@ class FaceMesh:
         if not path.is_absolute():
             path = REPO_ROOT / path
         if not path.exists():
-            raise FileNotFoundError(f"Face model not found at {path}. Run scripts\\install.ps1 to download it.")
+            raise FileNotFoundError(f"Face model not found at {path}. Run Install EYEable.bat (or scripts\\install.ps1) to download it.")
 
         vision = mp.tasks.vision
         options = vision.FaceLandmarkerOptions(

@@ -1,4 +1,4 @@
-# Installs EYEable on this Windows PC. Double-click "Install EYEable.bat" in the folder, or run:
+# Installs [eye]able on this Windows PC. Double-click "Install EYEable.bat" in the folder, or run:
 #   powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 #   ... -Profile cpu        force a profile (auto, full, gpu12, gpu8, cpu); auto picks from the GPU
 #   ... -SkipModels         don't download the models now (the app downloads them on its first start)
@@ -20,8 +20,8 @@ Set-Location $root
 function Step($what) { Write-Host "`n== $what" -ForegroundColor Cyan }
 function Check($what) { if ($LASTEXITCODE -ne 0) { throw "Failed: $what (exit code $LASTEXITCODE). Run the installer again; if it fails twice, send this window's text to the team." } }
 
-Write-Host "EYEable setup in $root" -ForegroundColor Green
-if ($env:OS -ne "Windows_NT") { throw "EYEable runs on Windows 10 or 11 only." }
+Write-Host "[eye]able setup in $root" -ForegroundColor Green
+if ($env:OS -ne "Windows_NT") { throw "[eye]able runs on Windows 10 or 11 only." }
 
 # ---------------------------------------------------------------- 1. the GPU decides the profile
 Step "Checking this PC"
@@ -88,7 +88,7 @@ if ($useGpu) {
     Step "PyTorch, CPU only (small)"
     & $uv pip install --python $py torch torchvision --index-url https://download.pytorch.org/whl/cpu; Check "install PyTorch (CPU)"
 }
-Step "EYEable's packages (exact versions from the demo PC)"
+Step "[eye]able's packages (exact versions from the demo PC)"
 & $uv pip install --python $py -r requirements.lock.txt; Check "install packages"
 
 Step "MediaPipe face model"

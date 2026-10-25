@@ -8,18 +8,19 @@ APIs: HeadPointer (Hung's head cursor), PointSmoother (One Euro), GazeModel (cal
 Modes:
   head-nose the head mode, plus the nose as a second reading of the head's turn: in the outer part of a turn it carries
             the cursor on to the edge that turn points at (see NOSE_* below). For a cursor that stops short of an edge.
-  head-eyes the default when there is a gaze calibration: the head mode below, plus the eyes. While the head turns
+  head-eyes opt-in (--pointer head-eyes, needs a gaze calibration): the head mode below, plus the eyes. While the head turns
             toward where you look, the cursor is also pulled toward that spot, so a smaller head turn gets there;
             the pull stops at the edge of the gaze's error ellipse around that spot, and the last stretch is the
             head's own fine control. Resting the head, glancing or reading never moves the cursor (see EYE_* below).
             Webcam gaze can't be the precise part: on Khang's calibration it lands about 170 px from where he looks
             (median; about 100 px sideways, 135 up or down), while the head pointer is steady to a pixel or two.
-  head      the head moves the cursor like a mouse with acceleration (no eyes). Turning the head moves
+  head      THE DEFAULT. The head moves the cursor like a mouse with acceleration (no eyes). Turning the head moves
             the cursor by gain(speed) pixels per degree: a quick turn throws it far (a quick 10-degree turn
             moves about 400 px), a slow turn moves it precisely (10 px per degree). There is
             no fixed center, so leaning or shifting in the chair doesn't drift it: like lifting a mouse,
             a slow turn back re-centers the head without moving the cursor much.
-  head-push the head mode, but only a quick turn AWAY from where the head rests moves the cursor, and the way back
+  head-push PAUSED (Oct 25): kept as an opt-in (--pointer head-push), not tuned further; tests/test_head_push.py.
+            The head mode, but only a quick turn AWAY from where the head rests moves the cursor, and the way back
             never does: like lifting a mouse to put it back on the pad. Push right, come back to wherever is
             comfortable, push right again to go further. Three states (PUSH_* below):
               ready   the head rests (or drifts slowly); the start point follows it, so wherever the head settles

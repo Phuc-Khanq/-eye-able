@@ -1,5 +1,5 @@
 # Publishes the website (eyeable-frontend/eyeable-frontend) to GitHub Pages:
-#   https://phuc-khanq.github.io/eyeable/   (landing page)   ...#demo (the live demo page)
+#   https://phuc-khanq.github.io/-eye-able/   (landing page)   ...#demo (the live demo page)
 # One-time setup by a repo admin: GitHub -> Settings -> Pages -> Source: "GitHub Actions".
 # It runs on every push to the branches below, or by hand (Actions -> Publish website -> Run workflow).
 # Only the website folder is published: no engine code, no models.

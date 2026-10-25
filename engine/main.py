@@ -355,19 +355,19 @@ def main() -> None:
     p.add_argument("--no-eyes", action="store_true", help="no camera, cursor, clicks or typing (voice only)")
     p.add_argument("--pointer", choices=["head-eyes", "head", "head-nose", "head-push", "head-abs", "hybrid", "gaze"],
                    default=str(getattr(settings, "pointer_mode", "head")),
-                   help="head-eyes = the head moves the cursor and the eyes pull it toward where you look while the "
-                        "head turns that way (default, pointer_mode in settings; needs a gaze calibration, "
-                        "tests.gaze_dot, else it is head); head = head only, as a mouse with acceleration; head-abs = "
-                        "fixed head angle per screen spot; head-nose = head, plus the nose carries the cursor the last stretch to an "
-                        "edge when the head is turned that way; head-push = head, but only a turn away from your resting angle moves the "
-                        "cursor: turning back leaves it where it is (push, come back, push again; say \"recenter\" to "
-                        "reset the resting angle); hybrid and gaze need a gaze calibration")
+                   help="head = the default (pointer_mode in settings): the head alone moves the cursor, as a mouse "
+                        "with acceleration; head-eyes = head, plus the eyes pull it toward where you look while the head "
+                        "turns that way (needs a gaze calibration, tests.gaze_dot, else it is head); head-abs = fixed head "
+                        "angle per screen spot; head-nose = head, plus the nose carries the cursor the last stretch to an "
+                        "edge when the head is turned that way; head-push = paused experiment: head, but only a turn away "
+                        "from your resting angle moves the cursor (push, come back, push again); hybrid and gaze need a "
+                        "gaze calibration")
     p.add_argument("--dwell", action=argparse.BooleanOptionalAction, default=False,
                    help="resting the cursor dwell_ms (settings, 1 s) also left-clicks; off by default (the left click "
-                        "is an eyebrow raise or \"click\", snapped onto the nearest button by UI-Venus)")
+                        "is a long blink, or \"click\", snapped onto the nearest button by UI-Venus)")
     p.add_argument("--blink", action=argparse.BooleanOptionalAction, default=bool(getattr(settings, "blink_click", False)),
-                   help="a long, deliberate blink (0.4 to 1.2 s) is also a click, like an eyebrow raise; off by "
-                        "default until tests.blink_click_check passes on your face (blink_click in settings)")
+                   help="a long, deliberate blink (0.4 to 1.6 s) is the left click; on by default (blink_click in "
+                        "settings); --no-blink turns it off")
     p.add_argument("--stdin", action="store_true", help="typed lines count as heard speech (testing)")
     p.add_argument("--confirm", choices=["brow", "nod", "both"], default="brow",
                    help="what says yes besides your voice: eyebrow raise (default), nod, or either")

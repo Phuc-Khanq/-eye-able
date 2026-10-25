@@ -5,7 +5,7 @@
 ## Environment
 
 1. **Python 3.11 in the repo's `.venv`,** set up with `scripts\install.ps1`. Don't use features from Python 3.12 or newer.
-2. **Add a package everywhere or nowhere.** A new Python package goes into `requirements.txt` with an exact version (`name==1.2.3`), and a new npm package goes into `ui/package.json`, in the same commit as the code that needs it. Never rely on something installed only on your own laptop.
+2. **Add a package everywhere or nowhere.** A new Python package goes into `requirements.txt` with an exact version (`name==1.2.3`), in the same commit as the code that needs it. Never rely on something installed only on your own laptop.
 3. **Defaults are Khang's laptop.** Defaults in `engine/config.py` must work on the demo laptop (GPU on, Whisper large-v3-turbo, UI-Venus 2B). If your laptop differs, override it in `config.local.json` (git ignores it), never by changing a default.
 
 ## Code
@@ -30,7 +30,7 @@
 15. **Prove it starts.** On the latest `main` plus your changes:
     - `python -m compileall -q engine tests` shows no errors
     - `python -m engine.main` starts without a traceback
-    - `npm --prefix ui run build` succeeds, if you touched `ui/`
+    - `node --test tests/lite_core.test.js tests/lite_voice.test.js` passes, if you touched the website
 
 ## Khang's merge check
 

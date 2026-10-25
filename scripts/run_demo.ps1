@@ -1,4 +1,4 @@
-# Starts the EYEable engine for the demo. Run from anywhere:  .\scripts\run_demo.ps1
+# Starts the [eye]able engine for the demo. Run from anywhere:  .\scripts\run_demo.ps1
 #   .\scripts\run_demo.ps1                 normal run (head pointer, long-blink click, voice, dictation)
 #   .\scripts\run_demo.ps1 -Record         recording the demo video: the dictation card shows up in OBS
 #   .\scripts\run_demo.ps1 -GpuLog         also print the GPU memory in use, and the peak when you stop
@@ -17,7 +17,7 @@ Set-Location $root
 
 $py = Join-Path $root ".venv\Scripts\python.exe"
 if (-not (Test-Path $py)) {
-    throw "No .venv here. Run  .\scripts\install.ps1  first."
+    throw "No .venv here. Double-click  Install EYEable.bat  first (developers: .\scripts\install.ps1)."
 }
 
 # PyTorch's DLLs must come before any other copy on PATH, or Whisper/UI-Venus fail to load on Windows.

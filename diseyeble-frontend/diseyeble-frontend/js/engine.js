@@ -30,6 +30,7 @@
   q.innerHTML = '<b></b><small></small><button class="yes">Yes</button><button class="no">No</button>';
   $('#demoBar').before(q);
 
+  let starting = false;
   let ws = null, live = false, saved = null, qTimer = 0, qHide = 0, qId = null;
   const send = (type, fields) => { if (live && ws && ws.readyState === 1) ws.send(JSON.stringify({ type, ...fields })); };
   const setRead = t => { read.textContent = t || ''; };
@@ -38,8 +39,10 @@
   function setLive(on) {
     if (on === live) return;
     live = on; D.engineLive = on;   // app.js stops the fake natural blinks while live
+    if (on) starting = false;
+    $('#allowCamTxt').textContent = on ? 'Engine camera on ✓' : 'Allow camera'; $('#demoCamBtn').textContent = on ? 'Camera on' : 'Allow camera';
     pill.classList.toggle('off', !on);
-    $('#engTxt').textContent = on ? 'Engine live' : 'Simulated';
+    $('#engTxt').textContent = on ? 'Engine live' : (starting ? 'Starting engine…' : 'Simulated');
     if (on) {
       saved = { dwell: G.dwell, paused: G.paused };
       G.dwell = false; $('#swDwell').setAttribute('aria-checked', 'false');   // the engine decides about dwell clicks
@@ -183,10 +186,32 @@
   document.addEventListener('click', e => {
     if (!live) return;
     if (e.target.closest('#pauseBtn')) { e.stopImmediatePropagation(); e.preventDefault(); send('set_mode', { mode: G.paused ? 'pointer' : 'paused' }); }
-    else if (e.target.closest('#allowCam, #demoCamBtn')) { e.stopImmediatePropagation(); e.preventDefault(); toast('The engine is using the webcam. The page keeps its simulated face.'); }   // one app at a time can hold a webcam on Windows
     else if (e.target.closest('#calibBtn')) { e.stopImmediatePropagation(); e.preventDefault(); send('calibrate', { action: 'start' }); }
   }, true);
   $('#dwellMs').addEventListener('input', e => send('settings', { dwell_ms: +e.target.value }));
+
+  /* ---------- Allow camera = start the engine (needs serve_demo.py; the engine owns the webcam) ---------- */
+  async function startEngine() {
+    if (live) return toast('The engine is already running and using the webcam.');
+    if (!location.protocol.startsWith('http')) return toast('To start the engine from here, run serve_demo.py and open http://localhost:8000');
+    if (starting) return;
+    starting = true; $('#engTxt').textContent = 'Starting engine…';
+    log('sys', 'Starting the engine, a new window opens. The first start takes a minute.'); toast('Starting the engine…');
+    try {
+      const r = await fetch('/api/start-engine', { method: 'POST', headers: { 'X-Diseyeble': '1' } });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'refused');
+    } catch (err) {
+      starting = false; $('#engTxt').textContent = 'Simulated';
+      return toast('Could not start the engine: ' + err.message + '. Is serve_demo.py running?');
+    }
+    setTimeout(() => { if (starting && !live) { starting = false; $('#engTxt').textContent = 'Simulated'; toast('The engine did not come up. Check its window for errors.'); } }, 120000);
+  }
+  // capture phase: the page's own camera code never runs, because one app at a time can hold a webcam on Windows
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#allowCam, #demoCamBtn')) return;
+    e.stopImmediatePropagation(); e.preventDefault(); startEngine();
+  }, true);
 
   connect();
 })();

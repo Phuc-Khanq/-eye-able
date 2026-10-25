@@ -149,3 +149,6 @@ Link xem online (artifact, chỉ chủ project mở được trừ khi chia sẻ
 - Engine → trang: chế độ, cử chỉ, giọng nói (live + preview, nút Type it / Drop it), câu hỏi yes/no, UI-Venus, status, calibration, gaze thật.
 - Trang → engine: nút Pause (hoặc phím P), Calibrate, thanh Gaze hold time, Yes/No, Type it / Drop it.
 - Chưa nối: thanh Pointer steadiness (engine dùng `sensitivity`), bật/tắt dwell (chỉ có lệnh giọng nói "start clicking").
+
+### Allow camera khởi động engine (serve_demo.py)
+Trình duyệt không tự chạy được chương trình, nên có một server nhỏ chạy trên máy: `python serve_demo.py --engine-dir C:\path\to\diseyeble`, rồi mở `http://localhost:8000/#demo`. Bấm **Allow camera** thì server chạy `python -m engine.main` (cửa sổ mới); camera do engine giữ, trang không mở webcam của trình duyệt. Server chỉ nghe ở 127.0.0.1 và từ chối yêu cầu không đến từ chính trang này. Ctrl+C tắt cả server lẫn engine.

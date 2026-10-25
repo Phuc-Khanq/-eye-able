@@ -54,6 +54,14 @@
     [/^escape$/, 'Escape'], [/^volume up$/, 'Volume up'], [/^volume down$/, 'Volume down'], [/^mute$/, 'Mute'],
     [/^brightness up$/, 'Brightness up'], [/^brightness down$/, 'Brightness down'],
   ];
+  const APP_ALONE = /^(mail|e ?mail|g ?mail|inbox|chrome|google chrome|browser|youtube|you tube)$/;
+  function appOf(w) {
+    w = w.replace(/\b(the|my|app|application)\b/g, ' ').replace(/\s+/g, ' ').trim();
+    if (/^(mail|male|e ?mails?|g ?mail|inbox|outlook|my mail|messages?)$/.test(w)) return 'mail';
+    if (/^(chrome|google chrome|crome|chrome browser|browser|web browser|the web|internet|google|edge)$/.test(w)) return 'browser';
+    if (/^(youtube|you tube|u tube|youtube video|videos?)$/.test(w)) return 'youtube';
+    return null;
+  }
   const YES = /^(yes|yeah|yep|yup|confirm|do it|go ahead|write it|write that|type it|type that|insert it|put it in|keep it)$/;
   const NO = /^(no|nope|nah|drop it|discard( it)?|scrap (it|that)|throw it away|not that|never mind|cancel)$/;
 
@@ -98,8 +106,21 @@
     }
     if (/^(pause|stop listening|take a break)$/.test(t)) { $('#pauseBtn').click(); return; }
 
-    // open apps, search, play, write an email (the page's own command grammar)
-    if (D.tryIntent(raw)) return;
+    // open or close an app by name; tolerant of how speech recognition spells them ("male" for mail, "gmail", "google chrome")
+    if ((m = t.match(/^(?:please )?(open|launch|start|run|show|go to|check|close|exit|quit)(?: up)?(?: my| the| a)? (.+?)(?: app| application| window| program)?$/))) {
+      const app = appOf(m[2]);
+      if (app) {
+        const closing = /^(close|exit|quit)$/.test(m[1]), name = { mail: 'Mail', browser: 'Chrome', youtube: 'YouTube' }[app];
+        log('voice', '“' + raw + '” → ' + (closing ? 'close ' : 'open ') + name); understood((closing ? 'Close ' : 'Open ') + name);
+        if (closing) { if (app !== 'youtube') D.run('close:' + (app === 'mail' ? 'mail' : 'browser'), 'voice'); else D.run('close:browser', 'voice'); }
+        else D.run('open:' + app, 'voice');
+        return;
+      }
+    }
+    if (APP_ALONE.test(t)) { const app = appOf(t); log('voice', '“' + raw + '” → open ' + app); understood('Open ' + app); D.run('open:' + app, 'voice'); return; }
+
+    // search, play, write an email (the page's own command grammar)
+    if (D.tryIntent(t)) return;
 
     // anything else: dictated words in dictation mode; in Pointer mode it is ignored, like the engine
     if (mode === 'dictation') { addPreview(t, conf); understood(''); renderPreview(); return; }

@@ -174,6 +174,13 @@ class TestTargetServiceSnap(unittest.TestCase):
 
 
 class TestModeManagerSnap(Base):
+    """The snap click: the voice "click" always, and a blink with snap_gesture_clicks on (as here, so the blink
+    tests below still cover the snap; with it off a blink clicks the exact pixel, tests/test_blink_click.py)."""
+
+    def setUp(self):
+        super().setUp()
+        self.mm._snap_gestures = True
+
     def requests(self):
         return self.bus.of(topics.TARGET_REQUEST)
 
@@ -244,19 +251,17 @@ class TestModeManagerSnap(Base):
 
 
 class TestMeterSnap(unittest.TestCase):
-    def test_spinner_waits_for_the_screenshot_then_flashes_on_the_click(self):
-        from engine.eyes.dwell_meter import SEARCH_SHOW_S, DwellMeter
+    def test_no_ring_while_ui_venus_looks_or_on_the_click(self):
+        from engine.eyes.dwell_meter import DwellMeter
         from tests.test_dwell_clickable import Clock, FakeBus as QuietBus
         clock = Clock()
         m = DwellMeter(QuietBus(), read_cursor=lambda: None, clock=clock)
         m.on_ui(messages.make(messages.TARGET_SEARCHING, label="here", snap=True))
-        self.assertEqual(m.state()[0], "hidden")             # UI-Venus is taking its screenshot
-        clock.t += SEARCH_SHOW_S + 0.05
-        self.assertEqual(m.state()[0], "searching")
+        for _ in range(4):
+            clock.t += 0.2
+            self.assertEqual(m.state()[0], "hidden")         # no spinner (Oct 24 night)
         m.on_ui(messages.make(messages.TARGET_FOUND, x=1, y=2, label="here", snap=True))
-        self.assertEqual(m.state()[0], "done")
-        clock.t += 0.3
-        self.assertEqual(m.state()[0], "hidden")
+        self.assertEqual(m.state()[0], "hidden")             # the click flash shows it instead (click_feedback)
 
     def test_named_target_found_does_not_flash(self):
         from engine.eyes.dwell_meter import DwellMeter

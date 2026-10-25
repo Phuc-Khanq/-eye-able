@@ -43,18 +43,21 @@ class TestRaiseLeftClicks(Base):
         self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, found, x, y))
         return req
 
-    def test_a_raise_with_nothing_waiting_snap_clicks(self):
+    def test_a_blink_with_nothing_waiting_clicks_the_exact_pixel(self):
         self.blink()
+        self.assertEqual(self.bus.of(topics.TARGET_REQUEST), [])          # no UI-Venus for a blink
+        self.assertEqual(self.clicks(), [{"x": 500, "y": 300}])
+
+    def test_it_clicks_where_the_cursor_froze(self):
+        self.bus.publish(topics.GAZE, GazePoint(0, 612.7, 410.2, 0.9))   # the frozen spot during the blink
+        self.blink()
+        self.assertEqual(self.clicks(), [{"x": 612, "y": 410}])
+
+    def test_the_voice_click_snaps(self):
+        self.say("click")
         req = self.answer(True, 512, 296)
         self.assertEqual((req.gaze_x, req.gaze_y, req.snap), (500, 300, True))
         self.assertEqual(self.clicks(), [{"x": 512, "y": 296}])
-
-    def test_it_asks_from_where_the_cursor_froze(self):
-        self.bus.publish(topics.GAZE, GazePoint(0, 612.7, 410.2, 0.9))   # the frozen spot during the raise
-        self.blink()
-        req = self.answer(False)
-        self.assertEqual((req.gaze_x, req.gaze_y), (612, 410))
-        self.assertEqual(self.clicks(), [{"x": 612, "y": 410}])          # nothing to snap to: clicks there
 
     def test_no_cursor_yet_says_so_and_does_not_click(self):
         self.setUp(gaze=None)

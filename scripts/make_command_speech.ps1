@@ -1,4 +1,4 @@
-# Make synthetic speech clips of the 11 short commands, for python -m engine.voice.command_bench.
+# Make synthetic speech clips of the short commands, for python -m engine.voice.command_bench.
 # Same as make_test_speech.ps1 (Windows' built-in, offline text-to-speech; synthetic voices only, never a
 # real person), but reads tests\short_commands.csv and writes under data\voice\commands\ (git-ignored).
 #

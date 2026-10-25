@@ -1,12 +1,15 @@
-"""Stock vs fine-tuned Whisper on 11 short commands: exactly the same audio, decoded the way the app does.
+"""Stock vs fine-tuned Whisper on the short commands: exactly the same audio, decoded the way the app does.
 
-    .\\scripts\\make_command_speech.ps1                                    # the clips, once
+    .\\scripts\\make_command_speech.ps1                                    # the clips, once (again after new phrases)
     python -m engine.voice.command_bench --models large-v3-turbo models/whisper-elder-ct2
     python -m engine.voice.command_bench --models tiny.en --device cpu --compute-type int8 --limit 10
     python -m engine.voice.command_bench --models large-v3-turbo models/whisper-elder-ct2 --mic 1   # + you
+    python -m engine.voice.command_bench --models large-v3-turbo models/whisper-elder-ct2 --mic 1 --mic-only --takes 2
+    python -m engine.voice.command_bench --mic 1 --mic-only --hotwords "pause yes no"   # does a word hint help you?
 
-Phrases: tests/short_commands.csv (yes, no, click, right click, go back, escape, scroll, stop, send it, new tab,
-copy). Clips: data/voice/commands, every English Windows voice x normal / slow / quiet. The models run one at a
+Phrases: tests/short_commands.csv (yes, no, nope, write it, don't write it, pause, take a break, click, right click,
+go back, escape, scroll, stop, send it, new tab, copy). Mode "answer" scores a phrase the way the app hears it while
+something waits for an answer: "Know." is a no there (commands.answer). Clips: data/voice/commands, every English Windows voice x normal / slow / quiet. The models run one at a
 time (each is freed before the next loads) over the same clips. Each clip goes through the app's own path, like
 voice_check: audio_in (Silero VAD) -> Dictation.transcribe (the app's Whisper settings) -> commands.parse.
 Synthetic voices, not elderly speakers: it compares the models, it doesn't say how well an older user is heard.
@@ -61,7 +64,10 @@ def heard_command(heard: str, mode: str) -> str:
 
     if mode == "scroll" and commands.normalize(heard) in EXIT:
         return SCROLL_EXIT
-    return command_name(commands.parse(heard, allow_targets=mode == "pointer")) if heard.strip() else "empty"
+    if mode == "answer" and heard.strip() and commands.answer(heard):   # something waits for a yes or no:
+        return commands.answer(heard)                                    # "Know." is a no (the mode manager)
+    return (command_name(commands.parse(heard, allow_targets=mode in ("pointer", "answer"))) if heard.strip()
+            else "empty")
 
 
 def exact_words(text: str) -> list[str]:
@@ -150,7 +156,7 @@ def pct(right: int, total: int) -> str:
 
 
 def headline(items: list[dict], results: dict[str, list[dict]], what: str = "Short commands") -> str:
-    """"Short commands, 11 phrases x 6 clips: stock A 71% (47/66) vs fine-tuned B 88% (58/66), same audio"."""
+    """"Short commands, 16 phrases x 6 clips: stock A 71% (68/96) vs fine-tuned B 88% (84/96), same audio"."""
     n_phrases = len({it["phrase"] for it in items})
     per = len(items) // n_phrases if n_phrases and len(items) % n_phrases == 0 else 0
     size = f"{n_phrases} phrases x {per} clips" if per else f"{n_phrases} phrases, {len(items)} clips"
@@ -222,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     from engine.config import settings
     from engine.voice.dictation import Dictation
 
-    p = argparse.ArgumentParser(description="Stock vs fine-tuned Whisper on 11 short commands, same audio.")
+    p = argparse.ArgumentParser(description="Stock vs fine-tuned Whisper on the short commands, same audio.")
     p.add_argument("--models", nargs="+", default=["large-v3-turbo"],
                    help="Whisper names or CTranslate2 folders, e.g. large-v3-turbo models/whisper-elder-ct2")
     p.add_argument("--device", default=None, help="cuda or cpu (default: the config's)")
@@ -230,9 +236,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--limit", type=int, default=0, help="only the first N clips (a quick smoke test)")
     p.add_argument("--mic", type=int, default=None, help="also record live takes from this mic (in memory only)")
     p.add_argument("--takes", type=int, default=TAKES, help="--mic: takes per phrase")
+    p.add_argument("--mic-only", action="store_true", help="only your own takes (needs --mic N), no synthetic clips")
+    p.add_argument("--hotwords", default=None,
+                   help='lean Whisper toward these words, e.g. "pause yes no" (settings.whisper_hotwords)')
     p.add_argument("--report", type=Path, default=CLIPS / "report.md")
     args = p.parse_args(argv)
     changes = {}
+    if args.hotwords is not None:
+        changes["whisper_hotwords"] = args.hotwords
     if args.device:
         changes["whisper_device"] = args.device
     if args.compute_type:
@@ -241,14 +252,20 @@ def main(argv: list[str] | None = None) -> int:
 
     phrases = load_phrases()
     manifest = CLIPS / "manifest.csv"
-    if not manifest.exists():
-        print(f"No {manifest.relative_to(REPO)}: run .\\scripts\\make_command_speech.ps1 first")
-        return 1
-    items = clips(phrases, manifest)
-    missing = sorted({ph["text"] for ph in phrases} - {it["phrase"] for it in items})
-    if missing:
-        print(f"no clips for {missing}: run .\\scripts\\make_command_speech.ps1")
-        return 1
+    if args.mic_only:
+        if args.mic is None:
+            print("--mic-only needs --mic N (your microphone's number)")
+            return 1
+        items = []
+    else:
+        if not manifest.exists():
+            print(f"No {manifest.relative_to(REPO)}: run .\\scripts\\make_command_speech.ps1 first (or use --mic N --mic-only)")
+            return 1
+        items = clips(phrases, manifest)
+        missing = sorted({ph["text"] for ph in phrases} - {it["phrase"] for it in items})
+        if missing:
+            print(f"no clips for {missing}: run .\\scripts\\make_command_speech.ps1 (it makes only the missing ones)")
+            return 1
     if args.limit:
         items = items[:args.limit]
     takes = record_takes(phrases, args.mic, args.takes) if args.mic is not None else []
@@ -268,34 +285,40 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {len(items)} clips in {took:.0f} s ({took / max(1, len(items)):.1f} s a clip)")
         if takes:
             live[name] = run(takes, lambda it: hear(it["audio"], 16000, dictation, s, "mic take"))
-        out = REPO / "checkpoints" / f"command_bench_{Path(model).name}.json"
-        out.parent.mkdir(exist_ok=True)
-        rs = results[name]
-        out.write_text(json.dumps({"model": model, "device": s.whisper_device, "compute_type": s.whisper_compute_type,
-                                   "clips": len(rs), "command_right": sum(r["command"] for r in rs),
-                                   "exact_right": sum(r["text"] for r in rs),
-                                   "empty": sum(r["empty"] for r in rs)}, indent=2), encoding="utf-8")
+        if items:                                      # numbers for the synthetic clips (not for --mic-only)
+            out = REPO / "checkpoints" / f"command_bench_{Path(model).name}.json"
+            out.parent.mkdir(exist_ok=True)
+            rs = results[name]
+            out.write_text(json.dumps({"model": model, "device": s.whisper_device,
+                                       "compute_type": s.whisper_compute_type, "hotwords": s.whisper_hotwords,
+                                       "clips": len(rs), "command_right": sum(r["command"] for r in rs),
+                                       "exact_right": sum(r["text"] for r in rs),
+                                       "empty": sum(r["empty"] for r in rs)}, indent=2), encoding="utf-8")
         del dictation                                  # free this model before the next one loads
         gc.collect()
 
-    top = headline(items, results)
-    exact = "Exact text: " + " vs ".join(f"{n} {pct(sum(r['text'] for r in rs), len(rs))} "
-                                          f"({sum(r['text'] for r in rs)}/{len(rs)})" for n, rs in results.items())
-    rows, misses = table(items, results), wrong(items, results)
-    print("\n" + "\n".join(rows) + "\n\nWrong (what each model heard):\n" + "\n".join(misses))
-    print(f"\n{top}\n{exact}")
+    lines: list[str] = []
+    if items:
+        top = headline(items, results)
+        exact = "Exact text: " + " vs ".join(f"{n} {pct(sum(r['text'] for r in rs), len(rs))} "
+                                              f"({sum(r['text'] for r in rs)}/{len(rs)})" for n, rs in results.items())
+        rows, misses = table(items, results), wrong(items, results)
+        print("\n" + "\n".join(rows) + "\n\nWrong (what each model heard):\n" + "\n".join(misses))
+        print(f"\n{top}\n{exact}")
+        caveat = ("Synthetic Windows TTS voices (normal, slow, quiet), not real elderly speakers; "
+                  "the fine-tuning data was TORGO.")
+        lines += [f"# {top}", "", exact, "", f"Whisper on {settings.whisper_device} ({settings.whisper_compute_type}); "
+                  f"generated {time.strftime('%Y-%m-%d %H:%M')}. {caveat}", "",
+                  "## Per phrase and variant (right / clips)", "", *rows, "", "## Wrong clips", "", *misses, ""]
     if live:
-        print(headline(takes, live, "Live mic (one speaker, not elderly; a sanity check)"))
-        print("\n".join(wrong(takes, live)))
-    caveat = ("Synthetic Windows TTS voices (normal, slow, quiet), not real elderly speakers; "
-              "the fine-tuning data was TORGO.")
+        mine = headline(takes, live, "Your voice (one speaker; a sanity check)")
+        mine_rows, mine_wrong = table(takes, live), wrong(takes, live)
+        print("\n" + "\n".join(mine_rows) + "\n" + mine + "\n" + "\n".join(mine_wrong))
+        if args.hotwords is not None:
+            print(f"(hotwords: {args.hotwords!r})")
+        lines += [f"## {mine}", "", *mine_rows, "", *mine_wrong, ""]
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_text("\n".join([
-        f"# {top}", "", exact, "", f"Whisper on {settings.whisper_device} ({settings.whisper_compute_type}); "
-        f"generated {time.strftime('%Y-%m-%d %H:%M')}. {caveat}", "",
-        *([f"{headline(takes, live, 'Live mic (one speaker, not elderly; a sanity check)')}", ""] if live else []),
-        "## Per phrase and variant (right / clips)", "", *rows, "", "## Wrong clips", "", *misses, ""]),
-        encoding="utf-8")
+    args.report.write_text("\n".join(lines), encoding="utf-8")
     print(f"\nReport: {args.report.relative_to(REPO) if args.report.is_relative_to(REPO) else args.report}")
     return 0
 

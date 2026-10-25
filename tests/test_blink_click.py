@@ -79,6 +79,14 @@ class TestBlinkDetector(unittest.TestCase):
         self.assertIsNone(d.update(0, {}))
         self.assertFalse(d.held)
 
+    def test_an_ordinary_blink_never_holds_the_cursor(self):
+        d = BlinkDetector()
+        held = []
+        for i, s in enumerate(open_eyes(30) + shut(200) + open_eyes(10)):
+            d.update(i * FRAME_MS, {"eyeBlinkLeft": s, "eyeBlinkRight": s})
+            held.append(d.held)
+        self.assertFalse(any(held))
+
     def test_held_while_closed_for_the_cursor_freeze(self):
         d = BlinkDetector()
         feed(d, open_eyes(30) + shut(300))
@@ -151,9 +159,24 @@ class TestModeManagerBlink(Base):
     def requests(self):
         return self.bus.of(topics.TARGET_REQUEST)
 
-    def test_a_blink_with_nothing_waiting_is_the_snap_left_click(self):
+    def test_a_blink_with_nothing_waiting_clicks_the_exact_pixel(self):
         self.look(500, 300)
         self.gesture("blink")
+        self.assertEqual(self.requests(), [])                    # no UI-Venus: it moved clicks onto the wrong button
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 500, "y": 300})])
+
+    def test_snap_gesture_clicks_brings_back_the_snapped_blink(self):
+        self.mm._snap_gestures = True
+        self.look(500, 300)
+        self.gesture("blink")
+        req = self.requests()[-1]
+        self.assertTrue(req.snap)
+        self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 520, 310))
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 520, "y": 310})])
+
+    def test_the_voice_click_still_snaps(self):
+        self.look(500, 300)
+        self.say("click")
         req = self.requests()[-1]
         self.assertTrue(req.snap)
         self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 520, 310))
@@ -170,8 +193,7 @@ class TestModeManagerBlink(Base):
         self.mm._brow_click = "right"
         self.look(500, 300)
         self.gesture("blink")
-        self.assertTrue(self.requests())
-        self.assertEqual(self.os(), [])
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 500, "y": 300})])   # a left click
 
     def test_a_blink_leaves_scroll_mode(self):
         self.say("scroll")
@@ -216,9 +238,9 @@ class TestEyesServiceBlink(unittest.TestCase):
         self.blink_frames(18, True, yaw=7.0)                  # about 0.6 s shut; the head drifts meanwhile
         self.blink_frames(5, False, yaw=7.0)
         self.r.out.flush()
-        req = self.r.bus.of(topics.TARGET_REQUEST)[-1]
-        self.assertTrue(req.snap)
-        self.assertLess(math.hypot(req.gaze_x - start.x, req.gaze_y - start.y), 15)   # frozen, not where the head went
+        self.assertEqual(self.r.bus.of(topics.TARGET_REQUEST), [])     # the exact pixel: no UI-Venus
+        click = self.r.bus.of(topics.OS_CLICK)[-1]
+        self.assertLess(math.hypot(click["x"] - start.x, click["y"] - start.y), 15)   # frozen, not where the head went
         clicks = [c for c in self.r.os.clicks if len(c) == 2]
         self.assertEqual(len(clicks), 1)
 

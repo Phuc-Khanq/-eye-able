@@ -138,9 +138,11 @@ class Rig:
         self.frames(5)
         self.out.flush()
 
-    def brow_click_on(self, side="left"):
-        """Bring back the old eyebrow-raise click (settings.brow_click "left" / "right"; "off" by default)."""
+    def brow_click_on(self, side="left", snap=True):
+        """Bring back the old eyebrow-raise click (settings.brow_click "left" / "right"; "off" by default), snapped
+        by UI-Venus as it was (settings.snap_gesture_clicks; off by default: a gesture clicks the exact pixel)."""
         self.mm._brow_click = side
+        self.mm._snap_gestures = snap
         self.eyes.settings = SimpleNamespace(**{**vars(self.eyes.settings), "brow_click": side})
 
     def raise_brows(self, frames=12):

@@ -45,6 +45,11 @@ FLASH_S = 1.2             # a command's name ("Volume up") stays in the pill thi
 LEAVE_FLASH = {"dictation": "Dictation off", "scroll": "Scroll off", "paused": "Resumed", "menu": "Menu closed"}
 LISTEN_HOLD_S = 0.4       # the waveform stays a moment after the mic goes quiet, so it doesn't flicker
 SHAKY_CONF = 0.6          # a word under this confidence is drawn in amber, underlined
+# Ways to answer (all real commands; tests/test_answers_and_click_fx.py checks). The original card shows "yes" and "no"
+TYPE_IT = ("yes", "yeah", "write it")
+DROP_IT = ("no", "nope", "don't write it")
+YES_TO_QUESTION = ("yes", "yeah", "do it")
+NO_TO_QUESTION = ("no", "nope", "cancel")
 CHIP_MAX_CHARS = 70
 QUOTE_MAX_CHARS = 120     # the dictated text quoted inside a question is shortened to this
 PROMPT_MAX_CHARS = 180    # and the whole question to this, so the card never grows past the screen

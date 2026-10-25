@@ -46,3 +46,39 @@ class TestDictationSurvives(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestResumeWhilePaused(unittest.TestCase):
+    """A quiet "resume" while paused gets past the mouth gate (Khang's live test, Oct 24)."""
+
+    class Still:
+        def moving_fraction(self, start_ms, end_ms):
+            return 0.0                      # the camera sees a face whose mouth isn't moving
+
+    def worker(self):
+        bus = FakeBus()
+        w = DictationWorker(bus, Dictation(model=FakeWhisperModel()), mouth=self.Still(),
+                            settings=SimpleNamespace(), log=lambda s: None)
+        return bus, w
+
+    def say(self, w, text):
+        w.on_speech_span({"start_ms": 0.0, "end_ms": 1000.0})
+        w.process(text, {"start_ms": 0.0, "end_ms": 1000.0})
+
+    def test_resume_counts_while_paused(self):
+        bus, w = self.worker()
+        bus.publish(topics.TO_UI, messages.make(messages.MODE, mode="paused"))
+        self.say(w, "resume")
+        self.assertEqual([t["text"].lower().strip(". ") for t in bus.of(topics.TRANSCRIPT)], ["resume"])
+
+    def test_other_words_are_still_gated_while_paused(self):
+        bus, w = self.worker()
+        bus.publish(topics.TO_UI, messages.make(messages.MODE, mode="paused"))
+        self.say(w, "open chrome")
+        self.assertEqual(bus.of(topics.TRANSCRIPT), [])
+
+    def test_resume_is_gated_when_not_paused(self):
+        bus, w = self.worker()
+        bus.publish(topics.TO_UI, messages.make(messages.MODE, mode="pointer"))
+        self.say(w, "resume")
+        self.assertEqual(bus.of(topics.TRANSCRIPT), [])

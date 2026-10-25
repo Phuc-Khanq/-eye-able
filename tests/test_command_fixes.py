@@ -351,3 +351,12 @@ class TestDictateWithAPeriod(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOct24NightMishearings(unittest.TestCase):
+    def test_whisper_spellings_from_the_live_log(self):
+        from engine.voice import commands
+        for text, name in [("Dictation of.", "stop_dictation"), ("Dictate of.", "stop_dictation"),
+                           ("New tap.", "key_new_tab"), ("Poss.", "pause")]:
+            with self.subTest(text=text):
+                self.assertEqual(commands.parse(text, allow_targets=False).name, name)

@@ -55,19 +55,33 @@ class TestScore(unittest.TestCase):
         # "new tab" and "copy" aren't app commands: parse() says none for any text, so the words decide
         self.assertTrue(score("new tab", "pointer", ["New tab."])["command"])
         self.assertTrue(score("copy", "pointer", ["Copy."])["command"])
-        for heard in ["Knew tab.", "Coffee.", "New tap.", "Cop."]:
+        for heard in ["Coffee.", "Cop."]:
             with self.subTest(heard=heard):
-                phrase = "copy" if heard.lower().startswith("co") else "new tab"
-                self.assertEqual(score(phrase, "pointer", [heard])["command"], False)
+                self.assertEqual(score("copy", "pointer", [heard])["command"], False)
+        # Whisper's "New tap." (Khang's live test, Oct 24) is now a new-tab command, so the app does the right thing
+        for heard in ["Knew tab.", "New tap."]:
+            with self.subTest(heard=heard):
+                self.assertEqual(score("new tab", "pointer", [heard])["command"], True)
 
 
 class TestPhrasesAndClips(unittest.TestCase):
-    def test_the_eleven_phrases(self):
+    def test_the_phrases(self):
         phrases = load_phrases()
-        self.assertEqual([p["text"] for p in phrases], ["yes", "no", "click", "right click", "go back", "escape",
+        self.assertEqual([p["text"] for p in phrases], ["yes", "no", "nope", "write it", "don't write it", "pause",
+                                                         "take a break", "click", "right click", "go back", "escape",
                                                          "scroll", "stop", "send it", "new tab", "copy"])
-        self.assertEqual(len({p["id"] for p in phrases}), 11)
-        self.assertEqual({p["text"]: p["mode"] for p in phrases if p["mode"] != "pointer"}, {"stop": "scroll"})
+        self.assertEqual(len({p["id"] for p in phrases}), 16)
+        self.assertEqual({p["text"]: p["mode"] for p in phrases if p["mode"] != "pointer"},
+                         {"stop": "scroll", "yes": "answer", "no": "answer", "nope": "answer", "write it": "answer",
+                          "don't write it": "answer"})
+
+    def test_an_answer_is_scored_the_way_the_app_hears_it(self):
+        from engine.voice.command_bench import heard_command
+        self.assertEqual(heard_command("Know.", "answer"), "no")       # what Khang got for "no"
+        self.assertEqual(heard_command("Yeah.", "answer"), "yes")
+        self.assertEqual(heard_command("Don't write it.", "answer"), "no")
+        self.assertEqual(heard_command("Know.", "pointer"), "none")    # with nothing waiting it is just a word
+        self.assertEqual(heard_command("Pot.", "pointer"), "pause")
 
     def test_not_in_khois_voice_check_set(self):
         import csv

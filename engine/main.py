@@ -62,7 +62,7 @@ class Engine:
         #    the cursor, plus head_gestures; UI-Venus answers target requests; os_output carries out
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
         #    the cursor or the keyboard; run() turns it on.
-        self.eyes = self.targets = self.os_output = self.mouth = self.meter = self.card = None
+        self.eyes = self.targets = self.os_output = self.mouth = self.meter = self.card = self.click_fx = None
         if eyes:
             from engine.eyes.mouth import MouthTracker
             from engine.eyes.os_output import OsOutput
@@ -75,9 +75,17 @@ class Engine:
             self.mouth = MouthTracker(bus)
             self.mode_manager.mouth = self.mouth     # an eyebrow raise while talking is ignored
             card = bool(getattr(settings, "dictation_card", True))
-            if getattr(settings, "dwell_meter", True) or card:
+            flash = bool(getattr(settings, "click_flash", True))
+            from engine.eyes.click_feedback import ClickFeedback
+            self.click_fx = ClickFeedback(                # a flash where each click lands, and a tick
+                bus, flash=flash, sound=bool(getattr(settings, "click_sound", True)),
+                volume=float(getattr(settings, "click_sound_volume", 0.5)),
+                hide_from_capture=bool(getattr(settings, "card_hide_from_capture", True)))
+            if getattr(settings, "dwell_meter", True) or card or flash:
                 from engine.eyes.dwell_meter import DwellMeter
                 self.meter = DwellMeter(bus)         # the dwell ring at the cursor, without the Electron UI
+                if flash:
+                    self.meter.add_window(self.click_fx.attach)   # its Tk thread hosts the flash too
             if card:
                 from engine.eyes.dictation_card import DictationCard
                 self.card = DictationCard(bus, hide_from_capture=bool(getattr(settings, "card_hide_from_capture", True)),
@@ -317,9 +325,12 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Diseyeble engine")
     p.add_argument("--wav", help="use this recording instead of the mic")
     p.add_argument("--no-eyes", action="store_true", help="no camera, cursor, clicks or typing (voice only)")
-    p.add_argument("--pointer", choices=["head", "head-abs", "hybrid", "gaze"], default="head",
-                   help="head = head as a mouse with acceleration (default); head-abs = fixed head angle per "
-                        "screen spot; hybrid and gaze need a gaze calibration (tests.gaze_dot)")
+    p.add_argument("--pointer", choices=["head-eyes", "head", "head-abs", "hybrid", "gaze"],
+                   default=str(getattr(settings, "pointer_mode", "head-eyes")),
+                   help="head-eyes = the head moves the cursor and the eyes pull it toward where you look while the "
+                        "head turns that way (default, pointer_mode in settings; needs a gaze calibration, "
+                        "tests.gaze_dot, else it is head); head = head only, as a mouse with acceleration; head-abs = "
+                        "fixed head angle per screen spot; hybrid and gaze need a gaze calibration")
     p.add_argument("--dwell", action=argparse.BooleanOptionalAction, default=False,
                    help="resting the cursor dwell_ms (settings, 1 s) also left-clicks; off by default (the left click "
                         "is an eyebrow raise or \"click\", snapped onto the nearest button by UI-Venus)")

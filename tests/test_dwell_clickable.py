@@ -233,22 +233,20 @@ class FakeBus:
 
 class TestMeter(unittest.TestCase):
     def test_states(self):
-        self.assertEqual(ring_state(0.0, False, 0.0, 1.0), ("hidden", 0.0))
-        self.assertEqual(ring_state(0.0, True, 0.0, 1.0), ("ready", 0.0))
-        state, extent = ring_state(0.5, True, 0.0, 1.0)
+        self.assertEqual(ring_state(0.0, False), ("hidden", 0.0))
+        self.assertEqual(ring_state(0.0, True), ("ready", 0.0))
+        state, extent = ring_state(0.5, True)
         self.assertEqual(state, "filling")
         self.assertAlmostEqual(extent, -180, delta=1)       # half way, clockwise
-        self.assertEqual(ring_state(0.0, False, 2.0, 1.0)[0], "done")
 
-    def test_click_flashes_then_hides(self):
+    def test_no_ring_on_the_click(self):
         clock = Clock()
         m = DwellMeter(FakeBus(), read_cursor=lambda: None, clock=clock)
         m.on_ui(messages.make(messages.DWELL, progress=0.5, ready=True))
         self.assertEqual(m.state()[0], "filling")
         m.on_ui(messages.make(messages.DWELL, progress=1.0, ready=False))
+        self.assertEqual(m.state()[0], "hidden")            # the click flash (click_feedback) shows the click
         m.on_ui(messages.make(messages.DWELL, progress=0.0, ready=False))
-        self.assertEqual(m.state()[0], "done")
-        clock.t += 0.3
         self.assertEqual(m.state()[0], "hidden")
 
     def test_hides_while_ui_venus_searches(self):

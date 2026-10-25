@@ -1,6 +1,11 @@
 id,text,mode
-cmd_yes,yes,pointer
-cmd_no,no,pointer
+cmd_yes,yes,answer
+cmd_no,no,answer
+cmd_nope,nope,answer
+cmd_write_it,write it,answer
+cmd_dont_write_it,don't write it,answer
+cmd_pause,pause,pointer
+cmd_take_a_break,take a break,pointer
 cmd_click,click,pointer
 cmd_right_click,right click,pointer
 cmd_go_back,go back,pointer

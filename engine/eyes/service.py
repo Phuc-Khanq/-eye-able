@@ -113,8 +113,13 @@ class EyesService:
                 self.model = None
         except Exception as exc:   # no calibration yet, or an old file: head pointing still works
             model_note = f"no gaze model ({type(exc).__name__})"
-        if pointer in ("hybrid", "gaze") and self.model is None:
-            self._notes = [f"Pointer '{pointer}' needs a gaze model ({model_note}); using the head pointer."]
+        from engine.eyes.pointer import NEEDS_GAZE
+        if pointer in NEEDS_GAZE and self.model is None:
+            if pointer == "head-eyes":   # the default: the head pointer alone still works fine
+                self._notes = [f"The eyes don't help the pointer yet ({model_note}): calibrate with "
+                               f"python -m tests.gaze_dot. Using the head alone."]
+            else:
+                self._notes = [f"Pointer '{pointer}' needs a gaze model ({model_note}); using the head pointer."]
             pointer = "head"
         else:
             self._notes = []

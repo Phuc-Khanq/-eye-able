@@ -62,6 +62,8 @@ class Dictation:
 
     def __init__(self, settings=None, model=None, hotwords: str | None = None) -> None:
         self.settings = settings
+        if hotwords is None:      # settings.whisper_hotwords; "" = none
+            hotwords = str(getattr(settings, "whisper_hotwords", "") or "").strip() or None
         self.hotwords = hotwords  # e.g. names the user says often: "Khoa Nhi Gmail"
         self._model = model
 
@@ -171,6 +173,8 @@ class DictationWorker:
         self._last_ignored = float("-inf")    # clock time of the last "Ignored speech" status
         self._last_warning = float("-inf")    # ... and of the last "tracker failed" warning
         self._queue: queue.Queue = queue.Queue(maxsize=MAX_QUEUED)
+        self._mode = ""                       # the mode manager's mode, from the UI messages
+        bus.subscribe(topics.TO_UI, self.on_ui)
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         bus.subscribe(topics.SPEECH_SPAN, self.on_speech_span)
@@ -231,7 +235,8 @@ class DictationWorker:
             self._error(f"Transcription failed: {exc}")
             return
         ms = round((time.perf_counter() - t0) * 1000, 1)
-        if words and span is not None and self.mouth is not None and self.gate:
+        if (words and span is not None and self.mouth is not None and self.gate
+                and not self._resume_while_paused(words)):
             words = self._mouth_gate(words, span)
             if not words:
                 self._ignored()
@@ -245,6 +250,23 @@ class DictationWorker:
         })
 
     # ----------------------------------------------------------- mouth gate
+    def on_ui(self, msg: dict) -> None:
+        if msg.get("type") == "mode":
+            self._mode = str(msg.get("mode", ""))
+
+    def _resume_while_paused(self, words: list[dict]) -> bool:
+        """While paused, "resume" always gets through: everything else is ignored in that mode anyway, so
+        the worst case is someone else waking it. Without this, a quiet "resume" (mouth score 0.00 to 0.29
+        in Khang's live test, Oct 24) was dropped four times and he couldn't get out of Paused."""
+        if self._mode != "paused":
+            return False
+        from engine.voice import commands
+        cmd = commands.parse(words_to_text(words), allow_targets=False)
+        if cmd is not None and cmd.name == "resume":
+            self._log(f"[mouth] paused: \"{words_to_text(words)}\" always counts")
+            return True
+        return False
+
     def _fraction(self, start_ms: float, end_ms: float) -> float | None:
         """mouth.moving_fraction, or None (keep) if the tracker fails."""
         try:

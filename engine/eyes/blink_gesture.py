@@ -47,7 +47,9 @@ MIN_CLOSED_MS = 400       # a deliberate close; a normal blink is shorter...
 MAX_CLOSED_MS = 1200      # ...and anything longer is the user resting their eyes
 MAX_PITCH_SWING = 10.0    # degrees the head may move up or down during a close
 FREEZE_PITCH_SWING = 5.0  # ...and still enough for the cursor freeze
-FREEZE_AFTER_MS = 150     # shut this long: hold the cursor still
+FREEZE_AFTER_MS = 250     # shut this long: hold the cursor still. Was 150: ordinary blinks (100-250 ms) froze the
+                          # cursor and snapped it back to where it was before them, a hitch while moving. The
+                          # freeze still goes back to before the eyes closed, so the click spot is the same
 COOLDOWN_MS = 800
 MAX_GAP_MS = 500          # a webcam can slow to 8 fps in dim light; more than this drops the close
 PITCH_BIN_DEG = 4.0       # open levels are kept per band of head pitch this wide

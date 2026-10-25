@@ -92,10 +92,12 @@ class TestModeManagerFlashes(Base):
         self.say("search for cats")
         self.assertEqual(self.labels(), ["Open Chrome", "Search: cats"])
 
-    def test_chatter_and_clicks_never_flash(self):
+    def test_chatter_never_flashes_but_a_spoken_click_does(self):
         self.say("I think the weather is nice")
-        self.say("click")
         self.assertEqual(self.labels(), [])
+        self.look()
+        self.say("click")                       # no ring at the cursor any more: the pill says it was heard
+        self.assertEqual(self.labels(), ["Click"])
 
     def test_undo_on_a_preview_does_not_flash(self):
         self.say("start dictation")

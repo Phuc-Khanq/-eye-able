@@ -25,11 +25,14 @@ class Settings:
     blink_threshold: float = 0.5
 
     # Pointing and clicking
-    # Left click: a long blink (or "click") snaps onto the nearest button, link or box: at once when the
-    # cursor is already on one (the hand cursor or UI Automation), else UI-Venus looks near the cursor.
+    # Left click: a long blink clicks the exact pixel under the cursor (Oct 24 night: snapping moved blink clicks
+    # onto the wrong button). The voice "click" snaps onto the nearest button, link or box, for spots the cursor
+    # can't quite reach: at once when the cursor is already on one (the hand cursor or UI Automation), else UI-Venus
+    # looks near the cursor.
     # An eyebrow raise is NOT a click any more (Oct 24 evening): it answers a waiting question, preview or search
     # ("yes") and leaves Scroll mode. Put "left" here to bring the raise-click back.
-    brow_click: str = "off"        # "off": a raise with nothing waiting does nothing; "left": snap left click; "right": right click
+    brow_click: str = "off"        # "off": a raise with nothing waiting does nothing; "left": left click; "right": right click
+    snap_gesture_clicks: bool = False   # true: a blink click snaps with UI-Venus too, like the voice "click" (the old way)
     snap_trust_cursor: bool = True  # already on a link or button: click there without asking UI-Venus
     snap_max_px: int = 150         # UI-Venus may move a snap click at most this far
     blink_click: bool = True       # a long, deliberate blink (both eyes) is the left click (on since Khang's live
@@ -58,9 +61,16 @@ class Settings:
     card_heard_outside_dictation: bool = False  # the card shows what the mic hears only in Dictation mode
                                                 # (true: also in Pointer mode, as before Oct 24 evening)
     card_command_flash: bool = True   # the card's pill shows a command's name ("Volume up") for a moment when it runs
-    dwell_meter: bool = True       # the on-screen ring at the cursor (engine/eyes/dwell_meter.py): the snap click's
-                                   # spinner and flash, and the dwell fill; no Electron UI needed
+    dwell_meter: bool = True       # the on-screen dwell ring at the cursor (engine/eyes/dwell_meter.py), only with
+                                   # dwell clicking on; clicks no longer draw a ring (click_flash below)
+    click_flash: bool = True       # a bright dot pops and fades where each click lands (engine/eyes/click_feedback.py)
+    click_sound: bool = True       # ...and a short tick (a lower one for a right click)
+    click_sound_volume: float = 0.5   # 0 to 1
     sensitivity: float = 1.0
+    pointer_mode: str = "head-eyes"   # head-eyes: the head moves the cursor, the eyes pull it toward where you look
+                                      # while the head turns that way (engine/eyes/pointer.py; needs
+                                      # calibration/gaze_model.json, else it is "head"). "head": the head alone
+    eye_pull: float = 1.0             # head-eyes: how hard the eyes pull (0 = never, 0.5 = half as hard, 1.5 = harder)
     gpu_log_every_s: float = 10.0   # --gpu-log: print the GPU memory this often (engine/gpu_log.py)
     gpu_warn_mb: int = 14000        # ...and warn above this (the 5080 has 16 GB; the demo needs room to spare)
 
@@ -77,6 +87,8 @@ class Settings:
     whisper_model: str = "large-v3-turbo"
     whisper_device: str = "cuda"
     whisper_compute_type: str = "float16"  # use "int8" on CPU
+    whisper_hotwords: str = ""     # words Whisper should lean toward, e.g. "pause yes no": try them with
+                                   # python -m engine.voice.command_bench --hotwords "..." before setting them here
     # Only the user's voice: keep a word only if the camera saw the mouth moving as it was said
     mouth_gate: bool = True
     mouth_gate_mode: str = "utterance"  # "utterance": keep or drop the whole utterance; "word": each word on its own

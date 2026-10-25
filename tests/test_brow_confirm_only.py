@@ -27,13 +27,11 @@ class TestModeManager(Base):
         self.assertEqual(self.os(), [])
         self.assertEqual(self.bus.ui(messages.GESTURE), [])        # not shown as acted on either
 
-    def test_a_blink_with_nothing_waiting_is_the_snap_click(self):
+    def test_a_blink_with_nothing_waiting_clicks_the_exact_pixel(self):
         self.look(500, 300)
         self.gesture("blink")
-        req = self.bus.of(topics.TARGET_REQUEST)[-1]
-        self.assertTrue(req.snap)
-        self.bus.publish(topics.TARGET_RESULT, TargetResult(req.label, True, 512, 296))
-        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 512, "y": 296})])
+        self.assertEqual(self.bus.of(topics.TARGET_REQUEST), [])
+        self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 500, "y": 300})])
 
     def test_a_raise_still_answers_a_look_and_say_search(self):
         self.look()
@@ -78,7 +76,7 @@ class TestModeManager(Base):
                 self.look(500, 300)
                 self.gesture("brow_raise")
                 if side == "left":
-                    self.assertTrue(self.bus.of(topics.TARGET_REQUEST))
+                    self.assertEqual(self.os(), [(topics.OS_CLICK, {"x": 500, "y": 300})])   # the exact pixel
                 else:
                     self.assertEqual(self.os()[-1][1].get("button"), "right")
 

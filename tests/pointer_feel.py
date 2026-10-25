@@ -6,7 +6,8 @@ Run:  .\\.venv\\Scripts\\python.exe -m tests.pointer_feel
 
 A full-screen dark window; the real cursor follows your head.
 Keys (this window):
-  1 = head (new)   2 = head-abs (old)   C = recenter (face the screen center, then press)
+  1 = head   2 = head-abs (old)   3 = head-eyes (the head, plus the eyes pulling toward where you look while the head
+  turns that way; needs calibration/gaze_model.json)   C = recenter (face the screen center and look at it, then press)
   SPACE = reach test: 8 targets, one at a time, near the corners and edges. Move the cursor onto
           the ring and hold it there for 0.3 s; the time is recorded. Do it once per mode.
   E = edge test: push the cursor all the way to the lit edge (left, top, right, bottom, in a random order),
@@ -58,17 +59,26 @@ def main() -> None:
     cam = Camera(index=args.camera)
     cam.start()
     mesh, feats, head = FaceMesh(), EyeFeatureExtractor(), HeadPoseEstimator()
-    pointer = Pointer(W, H, "head")
+    try:
+        from engine.eyes.calibration import GazeModel
+        model = GazeModel.load()
+        if (model.screen_w, model.screen_h) != (W, H):
+            model = None
+    except Exception:
+        model = None                     # no gaze calibration: head-eyes (key 3) is not available
+    pointer = Pointer(W, H, "head", model)
     driver = CursorDriver(os_input.move, still_px=pointer.still_px).start()
+    from collections import deque
+    recent_gaze: deque = deque(maxlen=15)   # raw gaze of the last half second, for C (recenter the eyes too)
 
     cv2.namedWindow(WINDOW, cv2.WINDOW_NORMAL)
     cv2.setWindowProperty(WINDOW, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
     scale = min(1.0, 1280 / W)
     w, h = int(W * scale), int(H * scale)
 
-    results: dict[str, list[float]] = {"head": [], "head-abs": []}
-    firsts: dict[str, list[float]] = {"head": [], "head-abs": []}    # time until the cursor first touched the ring
-    entries: dict[str, list[int]] = {"head": [], "head-abs": []}     # times it entered the ring (1 = no overshoot)
+    results: dict[str, list[float]] = {"head": [], "head-abs": [], "head-eyes": []}
+    firsts: dict[str, list[float]] = {"head": [], "head-abs": [], "head-eyes": []}    # time until the cursor first touched the ring
+    entries: dict[str, list[int]] = {"head": [], "head-abs": [], "head-eyes": []}     # times it entered the ring (1 = no overshoot)
     test = None            # {"order": [...], "i": int, "t0": float, "inside_since": float | None}
     edge = None            # {"order": [...], "i": int, "t0": float, "best": px}
     edge_results: list[tuple[str, float | None, float]] = []   # (edge, seconds or None, closest px)
@@ -83,6 +93,9 @@ def main() -> None:
                 if face is not None:
                     pose = head.compute(face)
                     ef = feats.compute(face)
+                    g = pointer.raw_gaze(ef, pose)
+                    if g is not None:
+                        recent_gaze.append(g)
                     pt = pointer.update(face.t_ms, ef, pose)
                     driver.set_target(pt.x, pt.y)
                     log.append((face.t_ms, pointer.mode, round(pose.yaw, 3), round(pose.pitch, 3), round(pt.x, 1),
@@ -91,7 +104,7 @@ def main() -> None:
 
             img = np.full((h, w, 3), BG, np.uint8)
             mode = pointer.mode
-            cv2.putText(img, f"mode: {mode}   sensitivity {settings.sensitivity:.1f}   (1 head, 2 head-abs, C recenter, "
+            cv2.putText(img, f"mode: {mode}   sensitivity {settings.sensitivity:.1f}   (1 head, 2 head-abs, 3 head-eyes, C recenter, "
                              f"SPACE test, +/- speed, [ ] accel, , . aim, Q quit)", (20, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, TEXT, 1,
                         cv2.LINE_AA)
             cv2.putText(img, note, (20, 66), cv2.FONT_HERSHEY_SIMPLEX, 0.6, QUIET, 1, cv2.LINE_AA)
@@ -146,7 +159,7 @@ def main() -> None:
                     test["i"] += 1
                     if test["i"] == len(test["order"]):
                         r = results[mode][-len(test["order"]):]
-                        note = f"{mode}: median {statistics.median(r):.2f} s per target. Try the other mode (1 / 2)."
+                        note = f"{mode}: median {statistics.median(r):.2f} s per target. Try the other modes (1 / 2 / 3)."
                         print(f"  {mode} done: median {statistics.median(r):.2f} s")
                         test = None
                     else:
@@ -165,8 +178,17 @@ def main() -> None:
                 pointer.set_mode("head-abs")
                 driver.stable.still_px = pointer.still_px
                 note = "head-abs: each head angle is a fixed spot (about 15 degrees to a side edge)."
+            elif k == ord("3"):
+                if pointer.set_mode("head-eyes"):
+                    driver.stable.still_px = pointer.still_px
+                    note = "head-eyes: turn your head toward what you look at; the eyes pull it most of the way."
+                else:
+                    note = "head-eyes needs a gaze calibration first: python -m tests.gaze_dot"
             elif k == ord("c") and face is not None:
                 head.set_neutral(face)
+                if recent_gaze:                   # you were looking at the center: today's gaze shift
+                    xs, ys = sorted(g[0] for g in recent_gaze), sorted(g[1] for g in recent_gaze)
+                    pointer.gaze_shift = (W / 2 - xs[len(xs) // 2], H / 2 - ys[len(ys) // 2])
                 pointer.reset()
                 note = "Recentered."
             elif k in (ord("+"), ord("=")):
@@ -219,13 +241,15 @@ def main() -> None:
             if r:
                 print(f"  {m:<8} {len(r)} targets, median {statistics.median(r):.2f} s, "
                       f"timed out {sum(x >= TIMEOUT_S for x in r)}")
+        if pointer.model is not None:
+            print(f"  head-eyes: the eyes pulled the cursor {pointer.eye_pull_px:.0f} px in all")
         print(f"  values at the end: sensitivity {settings.sensitivity:.1f}, GAIN_SLOW {P.GAIN_SLOW:.0f}, "
               f"GAIN_FAST {P.GAIN_FAST:.0f}  (send these to Khang to make them the default)")
 
 
 def print_head_report(log, stats, edge_results) -> None:
     """Frame rate, the head's turning range in head mode, and what the head pointer dropped (H2)."""
-    rows = [r for r in log if r[1] == "head"]
+    rows = [r for r in log if r[1] in ("head", "head-eyes")]
     if len(rows) < 30:
         return
     dts = [b[0] - a[0] for a, b in zip(rows, rows[1:]) if 0 < b[0] - a[0] < 1000]

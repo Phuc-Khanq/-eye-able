@@ -45,17 +45,33 @@ FIXED_COMMANDS: dict[str, str] = {
     "done typing": "stop_dictation",
     "dictate off": "stop_dictation",
     "dictation off": "stop_dictation",
+    "dictation of": "stop_dictation",    # how Whisper writes "dictation off" (Khang's live test, Oct 24)
+    "dictate of": "stop_dictation",
     "stop dictating": "stop_dictation",
     "end dictation": "stop_dictation",
     "exit dictation": "stop_dictation",
     "close dictation": "stop_dictation",
     "turn off dictation": "stop_dictation",
     "pause": "pause",
-    "paws": "pause",  # common Whisper mishearing
+    # How Whisper writes a short "pause" (Khang's live test, Oct 24: "pot"). Said alone they mean nothing else
+    "paws": "pause",
+    "pot": "pause",
+    "poss": "pause",
+    "pots": "pause",
+    "paw": "pause",
+    "paused": "pause",
+    "pause it": "pause",
     "stop listening": "pause",
+    "pause listening": "pause",
+    "take a break": "pause",       # longer ways to say it: easier to hear than one short word
+    "go to sleep": "pause",
     "resume": "resume",
+    "resumed": "resume",
+    "resuming": "resume",
+    "unpause": "resume",
     "wake up": "resume",
     "start listening": "resume",
+    "continue": "resume",
     "menu": "menu",
     "open menu": "menu",
     "show menu": "menu",
@@ -71,12 +87,45 @@ FIXED_COMMANDS: dict[str, str] = {
     "undo that": "undo",
     "new line": "new_line",
     "next line": "new_line",
+    # Answers. The card lists a few of each. Many ways to say them, so a misheard one is never a dead end
+    # (Khang was stuck for 30 s when "no" kept coming out as "know"). "Okay" and "sure" are NOT yes: said in
+    # passing, they confirmed "send" and "delete my voice data"
     "yes": "yes",
     "yeah": "yes",
     "yep": "yes",
+    "yup": "yes",
+    "yes please": "yes",
     "confirm": "yes",
     "do it": "yes",
     "go ahead": "yes",
+    "write it": "yes",
+    "write that": "yes",
+    "type it": "yes",              # before this, "type it" was the one-shot "type <words>": it typed "it"
+    "type that": "yes",
+    "insert it": "yes",
+    "put it in": "yes",
+    "keep it": "yes",
+    "yes write it": "yes",
+    "yes type it": "yes",
+    "no": "no",
+    "nope": "no",
+    "nah": "no",
+    "no thanks": "no",
+    "no thank you": "no",
+    "don't write it": "no",
+    "don't write that": "no",
+    "don't type it": "no",
+    "don't type that": "no",
+    "do not write it": "no",
+    "do not type it": "no",
+    "drop it": "no",               # the card's own words for it
+    "scrap it": "no",
+    "scrap that": "no",
+    "throw it away": "no",
+    "discard": "no",
+    "discard it": "no",
+    "not that": "no",
+    "no don't": "no",
     # Answering "Click Send?" (the mode manager reads these as yes when something waits; without them,
     # "click it" started a new search for a button named "It"). With nothing waiting: the snap click,
     # the left click at the cursor, onto the nearest button (UI-Venus)
@@ -90,8 +139,6 @@ FIXED_COMMANDS: dict[str, str] = {
     "go back": "go_back",
     "escape": "escape",
     "press escape": "escape",
-    "no": "no",
-    "nope": "no",
     "calibrate": "calibrate",
     "delete my voice data": "delete_voice_data",
     # Scroll mode: tilt the head to scroll until "stop" (exact only: "scroll" used to fuzzy-match "scroll up")
@@ -132,6 +179,7 @@ FIXED_COMMANDS: dict[str, str] = {
     "save it": "key_save",
     "find": "key_find",
     "new tab": "key_new_tab",
+    "new tap": "key_new_tab",            # how Whisper writes it (Khang's live test, Oct 24)
     "open new tab": "key_new_tab",
     "new window": "key_new_window",
     "open new window": "key_new_window",
@@ -202,7 +250,8 @@ KEY_SHORTCUTS: dict[str, str] = {
 }
 
 # What the card flashes when a command runs ("Volume up"), so the user sees it was heard. Commands with their own
-# feedback (clicks: the ring; questions and dictation: the card's panel; modes: the pill) aren't here.
+# feedback (questions and dictation: the card's panel; modes: the pill) aren't here; the spoken "click" and "right
+# click" flash "Click" / "Right click" from the mode manager, and every click flashes where it lands (click_feedback).
 COMMAND_LABELS: dict[str, str] = {
     "volume_up": "Volume up", "volume_down": "Volume down", "mute": "Mute",
     "brightness_up": "Brightness up", "brightness_down": "Brightness down",
@@ -231,17 +280,22 @@ COMMAND_INFO: dict[str, tuple[str, str]] = {
     "new_line": ("Dictation", "Starts a new line in the preview"),
     "use_original": ("Dictation", "Types your own words instead of the cleaned-up text"),
     "clean_up": ("Dictation", "Types the cleaned-up text again"),
-    "yes": ("Answers", "Says yes to a waiting question, preview or search"),
-    "no": ("Answers", "Says no to a waiting question, preview or search"),
+    "yes": ("Answers", "Says yes to a waiting question, preview or search (types the preview). While one waits, "
+                       "\"yea\", \"ya\" and \"yah\" count too"),
+    "no": ("Answers", "Says no to a waiting question, preview or search (drops the preview). While one waits, "
+                      "\"know\", \"don't\" and \"do not\" count too"),
     "cancel": ("Answers", "Cancels a question or search, closes the menu, or drops the preview"),
-    "click_here": ("Click and mouse", "Left click at the cursor, snapped onto the nearest button or link (answers a question when one waits)"),
+    "click_here": ("Click and mouse", "Left click at the cursor, snapped onto the nearest button or link by UI-Venus, for a "
+                                      "spot the cursor can't quite reach (a long blink clicks the exact pixel instead; "
+                                      "answers a question when one waits)"),
     "right_click": ("Click and mouse", "Right click at the cursor"),
     "dwell_on": ("Click and mouse", "Turns on dwell clicking (rest the cursor to click)"),
     "dwell_off": ("Click and mouse", "Turns off dwell clicking"),
     "scroll_up": ("Scroll", "Scrolls up a little and stays in the current mode"),
     "scroll_down": ("Scroll", "Scrolls down a little and stays in the current mode"),
     "scroll_mode": ("Scroll", "Scroll mode: tilt your head chin up or down to scroll; say \"stop\" or \"done\" to leave"),
-    "pause": ("Modes", "Pauses the engine: it ignores everything except \"resume\""),
+    "pause": ("Modes", "Pauses the engine: it ignores everything except \"resume\". \"Take a break\" is easier to hear "
+                       "than \"pause\""),
     "resume": ("Modes", "Wakes the engine up again"),
     "menu": ("Modes", "Opens the menu (no menu screen yet; say \"cancel\" to close it)"),
     "calibrate": ("Setup", "Redoes the center calibration after you move your chair"),
@@ -288,9 +342,21 @@ COMMAND_INFO: dict[str, tuple[str, str]] = {
 DICTATION_EXIT = {"close", "off", "turn off", "turn it off", "exit", "stop", "done", "close it", "that's all",
                   "thats all", "i'm done", "im done"}
 
-# Answers Whisper mishears, read as the answer only while a question is open ("Click Send?" -> "Know."):
-# anywhere else "know" is just a word, and "I know" never matches
-ANSWER_MISHEARINGS: dict[str, str] = {"know": "no"}
+# Answers read as the answer ONLY while something waits for one (a question, a preview, a look-and-say search):
+# how Whisper writes a short "no" or "yes" ("Know.", "Now."), and replies that are ordinary words anywhere else
+# ("Don't."). With nothing waiting they are just words, and "I know" never matches (the whole utterance must be one).
+# Before Oct 24 night this only worked for a question, so "Know." while a dictation preview waited was typed into it.
+ANSWER_MISHEARINGS: dict[str, str] = {
+    "know": "no", "noh": "no", "naw": "no", "nop": "no",      # not "now": "now!" can mean "do it now"
+    "don't": "no", "dont": "no", "do not": "no",
+    "yea": "yes", "yah": "yes", "ya": "yes", "yas": "yes", "yess": "yes", "yesh": "yes", "ye": "yes",
+}
+
+
+def answer(text: str) -> str | None:
+    """"yes" / "no" if the whole utterance is one of ANSWER_MISHEARINGS, else None (the mode manager asks this
+    only while something waits for an answer)."""
+    return ANSWER_MISHEARINGS.get(_collapse(normalize(text)))
 
 # Verbs that start a look-and-say target request.
 TARGET_VERBS = ("click", "open", "select")
@@ -310,7 +376,11 @@ EXACT_ONLY = {"use original", "use the original", "clean it up", "stop clicking"
               # one word or close pairs: never fuzzy ("new tab" and "next tab", "louder" from "lower")
               "new tab", "new window", "next tab", "last tab", "louder", "quieter", "softer", "brighter", "dimmer", "darker",
               "refresh", "reload", "minimize", "maximize", "backspace", "go forward", "dictate on", "dictate off",
-              "dictation on", "dictation off"}
+              "dictation on", "dictation off",
+              # pause / resume and the answers: exact, so "passed" never pauses and "note that" never says no
+              "paused", "pause it", "pause listening", "take a break", "go to sleep", "resumed", "resuming",
+              "unpause", "continue", "yes please", "write that", "type that", "insert it", "put it in", "keep it",
+              "no thanks", "drop it", "scrap it", "scrap that", "discard", "discard it", "not that", "no don't"}
 SCROLL_WORDS = ("scroll", "scrolling")
 NOT_A_SCROLL_REQUEST = {"stop", "done", "don't", "dont", "no", "not", "never", "quit", "end"}
 MAX_COMMAND_WORDS = 5      # longer utterances are never fixed commands

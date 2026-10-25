@@ -11,11 +11,12 @@ APIs: plain Python (enum, threading)
 Only this module asks os_input to click or type, so stray signals can't act alone.
 
 What each input means (one table per mode: GESTURES below):
-  Pointer    a long blink = the LEFT click, snapped (below), and yes when a question, preview or search is
-             waiting; an eyebrow raise = yes when something waits, otherwise nothing (brow_click "left" /
-             "right" in settings brings back the raise-click); "click" / "click here" / "click this|that|it" =
-             the same snap click
-             (yes when something waits); open the mouth and close it = RIGHT click at the cursor, as is
+  Pointer    a long blink = the LEFT click on the exact pixel under the cursor (no UI-Venus), and yes when a
+             question, preview or search is waiting; an eyebrow raise = yes when something waits, otherwise
+             nothing (brow_click "left" / "right" in settings brings back the raise-click); "click" /
+             "click here" / "click this|that|it" = the SNAP click (below: UI-Venus moves it onto the nearest
+             button, for a spot the cursor can't quite reach) (yes when something waits); settings
+             snap_gesture_clicks true snaps the blink too; open the mouth and close it = RIGHT click at the cursor, as is
              "right click"; dwell (off by default) = left click at the cursor;
              tilt left/right = scroll up/down; "click/open/select <name>" = look-and-say,
              "type <words>" = one-shot dictation (the words go to the preview; "yes" types them);
@@ -54,7 +55,7 @@ Preview, then confirm:
 Look-and-say: command "click <name>" -> TargetRequest -> wait for TargetResult ->
 target_found to the UI -> nod clicks, shake cancels.
 
-Snap click (no name): TargetRequest(snap=True) at the cursor -> the eyes route answers with the cursor
+Snap click (the voice "click", no name): TargetRequest(snap=True) at the cursor -> the eyes route answers with the cursor
 itself when it is already on a link or button, else UI-Venus's nearest clickable thing -> target_found
 (snap: true) and the click, no question: the user already pointed and asked. "Not found" clicks at the
 cursor anyway. A snap that gets no answer within SNAP_TIMEOUT_S doesn't click.
@@ -111,7 +112,7 @@ class Mode(Enum):
 
 # Gesture -> intent, per mode. Change the controls here, in one place.
 GESTURES: dict[Mode, dict[str, str]] = {
-    # blink (a long blink) = "gesture_yes": yes if something waits, else the snap left click (Pointer only).
+    # blink (a long blink) = "gesture_yes": yes if something waits, else the left click at the cursor (Pointer only).
     # brow_raise = the same, but with nothing waiting it does nothing unless settings.brow_click says otherwise
     Mode.POINTER:   {"tilt_left": "scroll_up", "tilt_right": "scroll_down", "brow_raise": "gesture_yes",
                      "blink": "gesture_yes", "mouth_open": "right_click"},
@@ -168,7 +169,10 @@ class ModeManager:
         self._settings = settings           # launch.match reads launch_apps / launch_aliases from it
         self._scroll_idle_s = float(getattr(settings, "scroll_idle_s", 10.0))
         self._scroll_seen = 0.0             # clock time scroll mode started or the head last scrolled
-        self._brow_click = str(getattr(settings, "brow_click", "off"))   # "off" (default), "left" (snap) or "right"
+        self._brow_click = str(getattr(settings, "brow_click", "off"))   # "off" (default), "left" or "right"
+        # A blink (or a raise with brow_click "left") clicks the exact pixel under the cursor; only the voice
+        # "click" asks UI-Venus to snap it onto the nearest button. True brings back snapped gesture clicks.
+        self._snap_gestures = bool(getattr(settings, "snap_gesture_clicks", False))
         self._heard_speech = float("-inf")  # clock time the mic last said it heard speech
         self.mode = Mode.POINTER
         self._return_mode = Mode.POINTER   # where Menu and Paused go back to
@@ -246,9 +250,9 @@ class ModeManager:
                 # An eyebrow raise answers whatever is waiting (a preview, a look-and-say search). With nothing
                 # waiting it does nothing, unless brow_click is "left" / "right" (off by default since Oct 24
                 # evening: only a long blink clicks). A long blink with nothing waiting is the LEFT click in
-                # Pointer mode, snapped onto the nearest button, at the cursor: the eyes service freezes the
-                # cursor while the eyes are shut, so the last gaze is where it froze. A raise while talking
-                # never gets here.
+                # Pointer mode on the exact pixel under the cursor (Oct 24 night: UI-Venus moved blink clicks onto
+                # the wrong button); the eyes service freezes the cursor while the eyes are shut, so the last gaze
+                # is where it froze. A raise while talking never gets here.
                 brow_off = gesture.type == "brow_raise" and self._brow_click == "off"
                 if self.preview or self.search or (self.mode == Mode.POINTER and not brow_off):
                     self._ui(messages.GESTURE, gesture=gesture.type)
@@ -259,7 +263,12 @@ class ModeManager:
                         self.search.preconfirmed = True
                         self._status("info", f"Will click {self.search.label} as soon as it's found")
                 elif self.mode == Mode.POINTER and not brow_off:
-                    self._right_click() if (self._brow_click == "right" and gesture.type == "brow_raise") else self._snap_click()
+                    if self._brow_click == "right" and gesture.type == "brow_raise":
+                        self._right_click()
+                    elif self._snap_gestures:
+                        self._snap_click()        # the old way: UI-Venus moves it onto the nearest button
+                    else:
+                        self._cursor_click()      # exactly where the cursor is (Oct 24 night)
             elif intent:
                 self._ui(messages.GESTURE, gesture=gesture.type)
                 self._do(Command(name=intent))
@@ -296,9 +305,11 @@ class ModeManager:
             self.tick()
             words = transcript.get("words") or [{"text": w, "conf": 1.0} for w in transcript["text"].split()]
             clauses = commands.split_clauses(words)
-            heard = commands.ANSWER_MISHEARINGS.get(commands.normalize(transcript["text"]))
-            if heard and self.question:
-                self._answer(heard == "yes")   # "Know." answering "Click Send?" is a no
+            heard = commands.answer(transcript["text"])
+            if heard and (self.question or self.preview or self.search) and self.mode != Mode.PAUSED:
+                # "Know." answering "Click Send?", or said while a dictation preview waits, is a no (it used to
+                # be typed into the preview); "Don't." / "Ya." likewise. With nothing waiting they're just words.
+                self._do(Command(name=heard))
                 return
             if self.mode == Mode.SCROLL:
                 self._scroll_transcript(transcript, clauses)
@@ -506,6 +517,7 @@ class ModeManager:
             if self.question or self.preview or self.search:
                 name = "yes"                          # "click it" answers "Click Send?"
             elif m in (Mode.POINTER, Mode.DICTATION):
+                self._ui(messages.COMMAND, label="Click")   # heard at once; the flash shows where it lands
                 self._snap_click()
                 return
             else:
@@ -591,6 +603,8 @@ class ModeManager:
                 self._leave_scroll()
         elif name == "right_click":
             if m == Mode.POINTER:
+                if self.last_gaze is not None:
+                    self._ui(messages.COMMAND, label="Right click")
                 self._right_click()
         elif name == "go_back":
             self._os(topics.OS_KEY, key="alt+left")
@@ -671,8 +685,18 @@ class ModeManager:
             return
         self._os(topics.OS_CLICK, x=int(g.x), y=int(g.y), button="right")
 
+    def _cursor_click(self) -> None:
+        """Left click on the exact pixel under the cursor, no UI-Venus: the blink click. The eyes service froze the
+        cursor while the eyes were shut, so the last gaze is where it was before they closed."""
+        g = self.last_gaze
+        if g is None:
+            self._status("info", "Can't click yet: the cursor position isn't known")
+            return
+        self._os(topics.OS_CLICK, x=int(g.x), y=int(g.y))
+
     def _snap_click(self) -> None:
-        """Left click at the cursor, snapped onto the clickable thing there (see the module notes)."""
+        """Left click at the cursor, snapped onto the clickable thing there (see the module notes): the voice
+        "click" / "click here" / "click it" (and gesture clicks with snap_gesture_clicks on)."""
         g = self.last_gaze
         if g is None:
             self._status("info", "Can't click yet: the cursor position isn't known")

@@ -1,4 +1,4 @@
-# disEYEble – website (English note on the engine connection, Oct 25)
+# EYEable – website (English note on the engine connection, Oct 25)
 
 **Run it with the real engine:** double-click `Diseyeble Website.bat` in the repo root (or `python diseyeble-frontend/diseyeble-frontend/serve_demo.py`). It opens `http://localhost:8000/#demo`. Click **Allow camera**: the engine starts in its own window and the page switches from "Simulated" to "Engine live". Keep the page full screen (F11) so every real click lands on the page.
 
@@ -6,7 +6,7 @@
 - The pointer on the simulated screen is the real mouse. The engine moves the real mouse with your head; a long blink is a real click, exactly where the pointer is.
 - Typing, keys, scrolling, undo and "open Chrome / go to YouTube / search for ..." are sent to the page as `page_action` messages instead of to Windows, and the simulated desktop acts them out (dictated text goes into the focused text box; "send it" sends the fake email).
 - The camera box shows the real webcam picture (`debug_frame` messages, about 12 per second, mirrored, never saved).
-- The Diseyeble card (mode, what the mic hears, the words that will be typed with Type it / Drop it / Use original, yes/no questions) is drawn on the simulated screen. The desktop card and click flash stay hidden.
+- The EYEable card (mode, what the mic hears, the words that will be typed with Type it / Drop it / Use original, yes/no questions) is drawn on the simulated screen. The desktop card and click flash stay hidden.
 - The page sends `page_mode` every second while the demo screen is showing. If it stops (tab closed, page left), the engine goes back to the real computer within 6 s.
 - Only pages from `localhost:8000`, `localhost:5500` and the hosted site may connect to the engine (`settings.ws_allowed_origins`): another website can't read the webcam picture. A page opened as a file (`file://`) can't connect; use `serve_demo.py`.
 
@@ -16,9 +16,9 @@
 
 ---
 
-# disEYEble – Frontend (bàn giao)
+# EYEable – Frontend (bàn giao)
 
-Frontend demo cho **disEYEble**: phần mềm giúp **người già và người khuyết tật** điều khiển máy tính **không cần dùng tay**, bằng **mắt, mặt, đầu và giọng nói** (chỉ cần webcam và micro thường).
+Frontend demo cho **EYEable**: phần mềm giúp **người già và người khuyết tật** điều khiển máy tính **không cần dùng tay**, bằng **mắt, mặt, đầu và giọng nói** (chỉ cần webcam và micro thường).
 
 > ⚠️ Đây **chỉ là frontend / prototype giao diện**. Chưa có model nhận diện thật: ánh mắt được **mô phỏng bằng con trỏ chuột**, còn nháy mắt, gật đầu và lắc đầu được **mô phỏng bằng phím hoặc nút**.
 
@@ -56,7 +56,7 @@ Frontend demo cho **disEYEble**: phần mềm giúp **người già và người
 ## 2. Cấu trúc màn hình
 
 ### Màn 1 – Introduction (5 trang, mỗi trang full màn hình)
-Chuyển trang bằng **thanh menu bo góc nổi phía trên**: logo disEYEble bên trái, bên phải là các nút Home · How it works · Controls · Voice · Gestures · **Live demo** (nút trắng). Phím **← / →** (cả PageUp/PageDown) cũng chuyển trang. Có hiệu ứng trượt khi chuyển trang. Code nằm ở khối `intro pages` trong `js/app.js` (hàm `showPage`), class `.ipage`, `.top` và `.pagelinks` trong `css/style.css`.
+Chuyển trang bằng **thanh menu bo góc nổi phía trên**: logo EYEable bên trái, bên phải là các nút Home · How it works · Controls · Voice · Gestures · **Live demo** (nút trắng). Phím **← / →** (cả PageUp/PageDown) cũng chuyển trang. Có hiệu ứng trượt khi chuyển trang. Code nằm ở khối `intro pages` trong `js/app.js` (hàm `showPage`), class `.ipage`, `.top` và `.pagelinks` trong `css/style.css`.
 
 | # | Trang | Nội dung |
 |---|---|---|
@@ -103,7 +103,7 @@ Chuyển trang bằng **thanh menu bo góc nổi phía trên**: logo disEYEble b
 - **Luôn nền tối:** đã khóa, không bị đổi theo chế độ sáng/tối của trình duyệt. Bản sáng chỉ bật khi bấm ◐ (class `.page-light` trên `<html>`).
 - **Nền:** 3 ảnh vân sáng xám-đen (do chủ project gửi, đã xoay ngang) **chồng lên nhau, mờ dần sang nhau, trôi và zoom chậm**, vòng lặp 15 s. Ảnh đã giảm sáng (`brightness(.72)`) và có lớp phủ tối để chữ dễ đọc. Xem class `.bgimg` và `@keyframes bgflow`.
 - **Màu:** trắng / đen / xám. Panel kiểu **kính mờ** (`backdrop-filter`), nút dạng viên thuốc, nút chính trắng chữ đen.
-- **Font:** **Inter** cho toàn trang, **Rubik 800** riêng cho chữ disEYEble (đậm, hơi tròn nhẹ, thẳng hàng).
+- **Font:** **Inter** cho toàn trang, **Rubik 800** riêng cho chữ EYEable (đậm, hơi tròn nhẹ, thẳng hàng).
 - **Điểm màu duy nhất:** con mắt Peep giữ màu tròng mắt thật (xám xanh rêu + vòng hổ phách).
 
 ---
@@ -159,7 +159,7 @@ Ghi chú: khối `(unused) wavy halftone dot field` là nền chấm cũ, **khô
 - Thêm mô phỏng cử chỉ + biểu đồ tín hiệu, thêm nghiêng đầu trái/phải để click trái/phải, quay lại kiểu **nhìn giữ để click**.
 - Mascot: từ SVG, qua mắt đốm, khuôn mặt lưới, tròng mắt vẽ, rồi **nhãn cầu 3D đốm tụ/tản theo vòng lặp** (bản hiện tại).
 - Thử nhiều phong cách (Warm kem, kính tối, kẹo pastel, kính trắng), rồi chốt **trắng–đen, nền vân sáng chuyển động**.
-- Tên: thử logo vẽ tay, Fontdiner, Black Ops One, rồi chốt **disEYEble – Rubik 800**, chữ thẳng hàng.
+- Tên: thử logo vẽ tay, Fontdiner, Black Ops One, rồi chốt **EYEable – Rubik 800**, chữ thẳng hàng.
 
 Link xem online (artifact, chỉ chủ project mở được trừ khi chia sẻ): https://claude.ai/artifact/9MSaXb4iyvFQ33C3w9fErV
 
@@ -174,4 +174,4 @@ Link xem online (artifact, chỉ chủ project mở được trừ khi chia sẻ
 - Chưa nối: thanh Pointer steadiness (engine dùng `sensitivity`), bật/tắt dwell (chỉ có lệnh giọng nói "start clicking").
 
 ### Allow camera khởi động engine (serve_demo.py)
-Trình duyệt không tự chạy được chương trình, nên có một server nhỏ chạy trên máy: `python serve_demo.py --engine-dir C:\path\to\diseyeble`, rồi mở `http://localhost:8000/#demo`. Bấm **Allow camera** thì server chạy `python -m engine.main` (cửa sổ mới); camera do engine giữ, trang không mở webcam của trình duyệt. Server chỉ nghe ở 127.0.0.1 và từ chối yêu cầu không đến từ chính trang này. Ctrl+C tắt cả server lẫn engine.
+Trình duyệt không tự chạy được chương trình, nên có một server nhỏ chạy trên máy: `python serve_demo.py --engine-dir C:\path\to\eyeable`, rồi mở `http://localhost:8000/#demo`. Bấm **Allow camera** thì server chạy `python -m engine.main` (cửa sổ mới); camera do engine giữ, trang không mở webcam của trình duyệt. Server chỉ nghe ở 127.0.0.1 và từ chối yêu cầu không đến từ chính trang này. Ctrl+C tắt cả server lẫn engine.

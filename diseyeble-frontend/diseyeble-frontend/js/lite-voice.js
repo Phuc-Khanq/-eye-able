@@ -1,7 +1,7 @@
 /* js/lite-voice.js: voice for the hosted website, with no install: commands ("volume up", "open YouTube", "click Send",
    "scroll down", ...) and dictation ("hi Dizzy" ... "yes") on the SIMULATED desktop.
 
-   It is NOT the Diseyeble engine's voice. Differences you should say out loud:
+   It is NOT the EYEable engine's voice. Differences you should say out loud:
    - recognition is your browser's (Chrome or Edge): the engine uses Whisper large-v3-turbo on your own GPU, with the
      dysarthria fine-tune. In Chrome the browser's speech service may send audio to Google (we ask for on-device
      recognition first and tell you when it falls back).
@@ -269,7 +269,7 @@
   const vstat = document.createElement('div');                                    // what the microphone is doing, in words (errors are never silent)
   vstat.className = 'lite-stat'; vstat.id = 'liteVoiceStat'; vstat.setAttribute('aria-live', 'polite');
   const note = document.createElement('p');
-  note.textContent = 'Voice uses your browser’s speech recognition (Chrome or Edge); on Chrome it may send audio to Google unless on-device recognition is available. The Diseyeble app uses Whisper on your own PC. Try: “volume up”, “brightness down”, “open YouTube”, “search for cats”, “click Mail”, “hi Dizzy”, then speak, then “yes”.';
+  note.textContent = 'Voice uses your browser’s speech recognition (Chrome or Edge); on Chrome it may send audio to Google unless on-device recognition is available. The EYEable app uses Whisper on your own PC. Try: “volume up”, “brightness down”, “open YouTube”, “search for cats”, “click Mail”, “hi Dizzy”, then speak, then “yes”.';
   const host = document.querySelector('.lite') || $('#camBox').parentElement;
   const anchor = host.querySelector('.lite-stat') || null;
   host.insertBefore(btn, anchor); host.insertBefore(vstat, anchor); host.append(note);
@@ -281,7 +281,7 @@
   const ERR = {
     'not-allowed': 'The microphone is blocked for this page. Click the microphone or lock icon in the address bar, allow the microphone, then turn voice on again.',
     'service-not-allowed': 'This browser does not allow its speech service here. Use Google Chrome or Microsoft Edge (Brave, Opera and Firefox do not support it).',
-    'audio-capture': 'No microphone was found, or Windows is blocking it. Check Settings › Privacy › Microphone, and close other apps that use it (the Diseyeble app).',
+    'audio-capture': 'No microphone was found, or Windows is blocking it. Check Settings › Privacy › Microphone, and close other apps that use it (the EYEable app).',
     'network': 'The browser’s speech service could not be reached. Online recognition needs internet.',
   };
   const FATAL = new Set(['not-allowed', 'service-not-allowed', 'audio-capture']);
@@ -331,7 +331,7 @@
   }
   async function start() {
     if (on || starting || !SR) return;
-    if (engineUp()) return toast('Diseyeble is running on this PC and already listens. Lite voice is not needed.');
+    if (engineUp()) return toast('EYEable is running on this PC and already listens. Lite voice is not needed.');
     starting = true; btn.disabled = true; setV('Asking for the microphone…');
     const bad = await micCheck();
     if (bad) { starting = false; btn.disabled = false; setV(ERR[bad]); log('sys', 'Lite voice: microphone ' + bad); return; }
@@ -351,5 +351,5 @@
   }
   btn.addEventListener('click', () => (on ? stop() : start()));
   // the engine took over: this page is now the real thing
-  setInterval(() => { if (on && engineUp()) { stop('Diseyeble connected: using the real engine instead.'); toast('Diseyeble connected: using the real engine instead.'); } }, 1000);
+  setInterval(() => { if (on && engineUp()) { stop('EYEable connected: using the real engine instead.'); toast('EYEable connected: using the real engine instead.'); } }, 1000);
 })();

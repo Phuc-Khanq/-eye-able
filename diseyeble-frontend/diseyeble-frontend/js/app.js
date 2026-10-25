@@ -5,13 +5,15 @@
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
   /* ---------------- icons ---------------- */
-  const ICON = {
-    br:'<svg viewBox="0 0 24 24" fill="none" stroke="#2F6FD6" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
-    ml:'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
-    vt:'<svg viewBox="0 0 24 24"><path d="M9 7l8 5-8 5z" fill="#fff"/></svg>',
-    fx:'<svg viewBox="0 0 24 24" fill="#fff"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" opacity=".95"/></svg>'
+  const ICON = {   // original app glyphs (not real brand logos)
+    br:'<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.2"/><path d="M3.8 12h16.4M12 3.8c2.6 2.4 3.6 5.2 3.6 8.2s-1 5.8-3.6 8.2M12 3.8C9.4 6.2 8.4 9 8.4 12s1 5.8 3.6 8.2"/><circle cx="18.6" cy="5.6" r="2.2" fill="#B7F59B" stroke="none"/></svg>',
+    ml:'<svg viewBox="0 0 24 24" fill="none" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2.6" fill="#fff"/><path d="M3.6 7.2l8.4 6.1 8.4-6.1" stroke="#4F46E5" stroke-width="1.9" stroke-linecap="round"/><path d="M3.6 17.4l6-5M20.4 17.4l-6-5" stroke="#A5B4FC" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    vt:'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="#fff" stroke-width="1.8" opacity=".9"/><path d="M10.2 8.6c0-.7.8-1.1 1.4-.7l4.6 3.2c.5.4.5 1.1 0 1.5l-4.6 3.2c-.6.4-1.4 0-1.4-.7z" fill="#fff"/></svg>',
+    fx:'<svg viewBox="0 0 24 24"><path d="M3 7.4A2.4 2.4 0 0 1 5.4 5h3.7l2.1 2.1h7.4A2.4 2.4 0 0 1 21 9.5v1H3z" fill="#FFF3C9"/><path d="M3 9.6h18v7.6a2.4 2.4 0 0 1-2.4 2.4H5.4A2.4 2.4 0 0 1 3 17.2z" fill="#fff" opacity=".96"/><path d="M6.5 13h11" stroke="#F2A93B" stroke-width="1.6" stroke-linecap="round"/></svg>'
   };
-  $$('.ai').forEach(el => { for (const k of ['br','ml','vt','fx']) if (el.classList.contains(k) && !el.innerHTML) el.innerHTML = ICON[k]; });
+  ICON.rb = '<svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 7.5h13l-1.1 12a1.8 1.8 0 0 1-1.8 1.6H8.4a1.8 1.8 0 0 1-1.8-1.6z" fill="rgba(255,255,255,.92)"/><path d="M4 7.5h16M9.5 7.5V5.4c0-.5.4-.9.9-.9h3.2c.5 0 .9.4.9.9v2.1" stroke="#fff" stroke-width="1.8"/><path d="M10 11v6.5M14 11v6.5" stroke="#7C8BA6" stroke-width="1.5"/></svg>';
+  $$('.wbtns').forEach(g => { const b = g.children, G = ['<svg viewBox="0 0 12 12"><path d="M1.5 6h9" stroke="currentColor" stroke-width="1"/></svg>','<svg viewBox="0 0 12 12"><rect x="1.8" y="1.8" width="8.4" height="8.4" rx="1.4" fill="none" stroke="currentColor" stroke-width="1"/></svg>','<svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1"/></svg>']; [...b].forEach((x,i) => { if (G[i]) x.innerHTML = G[i]; }); });
+  $$('.ai').forEach(el => { for (const k of ['br','ml','vt','fx','rb']) if (el.classList.contains(k) && !el.innerHTML) el.innerHTML = ICON[k]; });
 
   /* ---------------- mascot ---------------- */
   const tpl = $('#mascot-tpl').innerHTML;
@@ -55,7 +57,9 @@
     (function frame(now){
       requestAnimationFrame(frame);
       const dt = Math.min(50, now - last)/1000; last = now;
-      if (page.hidden || $('#intro').hidden) return;
+      const on = (!$('#intro').hidden && $('#pg-home').hidden) || !$('#demo').hidden;   // every page except Home (it has its own star field)
+      if (cv.classList.contains('on') !== on) cv.classList.toggle('on', on);
+      if (!on && getComputedStyle(cv).opacity < .01) return;
       x.clearRect(0, 0, W, H); const t = now/1000;
       for (const d of D){
         if (!reduce){ d.x += d.vx*dt; d.y += d.vy*dt; if (d.x < -5) d.x = W+5; if (d.x > W+5) d.x = -5; if (d.y < -5) d.y = H+5; if (d.y > H+5) d.y = -5; }
@@ -202,7 +206,7 @@
       return true;
     } catch(e){
       S.camState = 'blocked'; setCamUI();
-      toast('The browser did not give this page the webcam, so the demo is driven by your mouse. To use your head, eyes and voice, start Diseyeble on your PC: this page connects to it by itself.');
+      toast('The browser did not give this page the webcam, so the demo is driven by your mouse. To use your head, eyes and voice, start EYEable on your PC: this page connects to it by itself.');
       return false;
     }
   }
@@ -774,12 +778,12 @@
     const ease = 'cubic-bezier(.22,.9,.24,1)', slide = 'cubic-bezier(.3,.7,.3,1)';
     head.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateX(-70px)'},{opacity:1, transform:'none'}], {duration:620, delay:k*90, easing:ease, fill:'backwards'}));
     const T0 = 420;
-    rows.forEach((c, k) => { const r = c.getBoundingClientRect(), dx = innerWidth - r.left + 40, at = T0 + k*110, D = 520;
-      c.animate([{transform:`translateX(${dx}px)`},{transform:'none'}], {duration:D, delay:at, easing:slide, fill:'backwards', composite:'add'});
-      c.animate([{filter:'blur(2px) brightness(1.3) drop-shadow(34px 0 6px rgba(255,255,255,.4)) drop-shadow(90px 0 18px rgba(143,227,106,.32))', skew:'-6deg 0deg'},
-                 {filter:'blur(0px) brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)) drop-shadow(0 0 0 rgba(143,227,106,0))', skew:'0deg 0deg'}], {duration:D, delay:at, easing:slide, fill:'backwards'});
+    rows.forEach((c, k) => { const r = c.getBoundingClientRect(), dy = innerHeight - r.top + 40, at = T0 + k*90, D = 560;   // 01 first, each flies up from below the screen
+      c.animate([{transform:`translateY(${dy}px)`},{transform:'none'}], {duration:D, delay:at, easing:slide, fill:'backwards', composite:'add'});
+      c.animate([{filter:'blur(2px) brightness(1.3) drop-shadow(0 26px 6px rgba(255,255,255,.4)) drop-shadow(0 70px 18px rgba(143,227,106,.32))', opacity:.6},
+                 {filter:'blur(0px) brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)) drop-shadow(0 0 0 rgba(143,227,106,0))', opacity:1}], {duration:D, delay:at, easing:slide, fill:'backwards'});
     });
-    const P = T0 + 6*110 + 300;
+    const P = T0 + (rows.length - 1)*90 + 420;
     panel.animate([{opacity:0, scale:'.96', filter:'blur(8px) brightness(1.5)'},{opacity:1, scale:'1', filter:'blur(0) brightness(1)'}], {duration:650, delay:P, easing:ease, fill:'backwards'});
     rest.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateY(16px)'},{opacity:1, transform:'none'}], {duration:500, delay:P + 350 + k*140, easing:ease, fill:'backwards'}));
   }
@@ -932,6 +936,7 @@
   function renderOSK(){
     const o = $('#osk');
     screen.classList.toggle('kb', !!W.focus);
+    if (W.focus) requestAnimationFrame(() => { const o = $('#osk'); if (!o.hidden && o.offsetHeight) screen.style.setProperty('--kb-gap', (screen.clientHeight - o.offsetTop + 8) + 'px'); });
     if (!W.focus){ o.hidden = true; return; }
     o.hidden = false;
     const rows = 'qwertyuiopasdfghjkl@zxcvbnm.,?';
@@ -969,7 +974,7 @@
     if (!a) return;
     const [k, ...rest] = a.split(':'); const v = rest.join(':');
     const b = W.browser, m = W.mail;
-    if (ACTIONS[k]){ ACTIONS[k](v, src); return; }   // actions that js/engine.js registers (the Diseyeble card's buttons)
+    if (ACTIONS[k]){ ACTIONS[k](v, src); return; }   // actions that js/engine.js registers (the EYEable card's buttons)
     $('#ctx').hidden = true;
     switch(k){
       case 'open':
@@ -1053,7 +1058,7 @@
     $('#ctx').hidden = true;
     if (v==='back') run('back', src);
     else if (v==='reload') run('reload', src);
-    else if (v==='copy'){ clip = W.focus ? W.f[W.focus] : (W.browser.watchData?.[0] || 'diseyeble'); toast('Copied'); }
+    else if (v==='copy'){ clip = W.focus ? W.f[W.focus] : (W.browser.watchData?.[0] || 'eyeable'); toast('Copied'); }
     else if (v==='paste'){ if (W.focus){ insertText(clip,true); renderAll(); } else toast('Select a text box first'); }
     else if (v==='close'){ const t = W.top || (W.browser.open?'browser':W.mail.open?'mail':null); if (t) run('close:'+t, src); }
   }
@@ -1154,7 +1159,7 @@
       if (kind==='mouth'){ ripple('shake', pos); glabel('MOUTH OPEN · RIGHT CLICK'); log('eye','Mouth open 0.5 s → right click'); openCtx(pos.x+6, pos.y+6); return; }
       if (kind==='tiltL' || kind==='tiltR'){ const d = kind==='tiltL' ? -1 : 1; glabel(d<0 ? 'HEAD UP · SCROLL UP' : 'HEAD DOWN · SCROLL DOWN'); log('head', `Head ${d<0?'up':'down'} (pitch held) → scroll ${d<0?'up':'down'}`); scrollBy(d); return; }
       if (kind==='shake'){ glabel('SHAKE · NO'); log('head','Head shake → no / cancel'); if (!$('#ctx').hidden){ $('#ctx').hidden = true; log('sys','Menu closed'); } return; }
-      if (kind==='nod'){ glabel('NOD · YES'); log('head','Nod → yes (only answers a question; not a click)'); toast('A nod means "yes" when diseyeble asks. It is not a click.'); return; }
+      if (kind==='nod'){ glabel('NOD · YES'); log('head','Nod → yes (only answers a question; not a click)'); toast('A nod means "yes" when eyeable asks. It is not a click.'); return; }
     }, DUR[kind]);
   }
 
@@ -1428,7 +1433,7 @@
       await step('Raise your brows to select it'); await g('brow', tok);
       await step('Dictating the message'); await say('hi my, see yoo sun-day at sick','hi mai, see you sunday at six', tok);
       await step('Picking a word suggestion'); await gazeTo('[data-act="sug:Love, Grandma"]', 600, tok); await g('brow', tok);
-      await step('Saying "send it": diseyeble asks first'); await say('seh-n it','send it', tok);
+      await step('Saying "send it": eyeable asks first'); await say('seh-n it','send it', tok);
       await step('Raise your brows to say yes'); await wait(500); await g('brow', tok);
       await step('Done: email written and sent with voice, a brow raise and a confirm.');
     },

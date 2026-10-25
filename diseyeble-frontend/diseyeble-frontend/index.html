@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>diseyeble</title>
+<title>eyeable</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -43,7 +43,7 @@
 <div class="bgimg" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#intro" data-go="intro" aria-label="Diseyeble home"><span class="wordmark wm2" role="img" aria-label="diseyeble"><span class="wm2-a">dis</span><span class="wm2-eye"><i class="wc wc-tl"></i><i class="wc wc-tr"></i><i class="wc wc-bl"></i><i class="wc wc-br"></i><b>eye</b></span><span class="wm2-a">ble</span></span></a>
+    <a class="brand" href="#intro" data-go="intro" aria-label="Eyeable home"><span class="wordmark wm2" role="img" aria-label="eyeable"><span class="wm2-eye"><i class="wc wc-tl"></i><i class="wc wc-tr"></i><i class="wc wc-bl"></i><i class="wc wc-br"></i><b>eye</b></span><span class="wm2-a">able</span></span></a>
     <nav class="pagelinks" aria-label="Pages">
       <button data-page-go="0">Home</button><button data-page-go="1">How it works</button><button data-page-go="2">Controls</button><button data-page-go="3">Voice</button><button data-page-go="4">Gestures</button>
       <button class="nav-demo" id="tab-demo" data-go="demo" aria-selected="false">Live demo</button>
@@ -53,6 +53,7 @@
 </header>
 
 <!-- ======================= SCREEN 1: INTRODUCTION ======================= -->
+<canvas id="howDots" aria-hidden="true"></canvas>
 <main id="intro">
   <section class="hero-band ipage" id="pg-home" data-page="0" aria-label="Home">
   <canvas id="peepCanvas" aria-hidden="true"></canvas>
@@ -61,7 +62,7 @@
       <div>
         <div class="eyebrow">Hands-free computing for older adults and people with disabilities</div>
         <h1>Your eyes, face and voice are the <em>mouse</em>.</h1>
-        <p class="lead lead-lines"><span class="lead-name">&ldquo;dis<b>EYE</b>ble&rdquo;</span> turns an ordinary webcam and microphone into a full computer controller.<br>
+        <p class="lead lead-lines"><span class="lead-name">&ldquo;<b>EYE</b>able&rdquo;</span> turns an ordinary webcam and microphone into a full computer controller.<br>
           It tracks your eyes, head and nose: your head steers the pointer, your eyes click.<br>
           Hold a long blink to click. Say &ldquo;right click&rdquo; for the menu.<br>
           Say what you want. Our speech model was fine-tuned on slurred speech.</p>
@@ -79,13 +80,12 @@
         </div>
       </div>
 
-      <div class="hero-eye" id="heroEye" aria-label="Peep, the diseyeble mascot: an iris made of coloured dots that follows your pointer"></div>
+      <div class="hero-eye" id="heroEye" aria-label="Peep, the eyeable mascot: an iris made of coloured dots that follows your pointer"></div>
     </div>
   </div>
   </section>
 
   <section class="ipage" id="pg-how" data-page="1" aria-label="How it works" hidden>
-    <canvas id="howDots" aria-hidden="true"></canvas>
     <div class="wrap ipage-in">
       <span class="ipage-num label">02 / 05 · How it works</span>
 
@@ -93,7 +93,7 @@
       <div class="how-left">
         <div class="sec-head">
           <h2>How eye tracking works with a normal webcam</h2>
-          <p>No special hardware. In every webcam frame diseyeble tracks your eyes, head and nose. Your head steers the pointer like a mouse, your eyes click and confirm, and optional eye-pull and nose-assist modes help it travel. A long, deliberate blink clicks; ordinary blinks are ignored.</p>
+          <p>No special hardware. In every webcam frame eyeable tracks your eyes, head and nose. Your head steers the pointer like a mouse, your eyes click and confirm, and optional eye-pull and nose-assist modes help it travel. A long, deliberate blink clicks; ordinary blinks are ignored.</p>
         </div>
         <div class="lab-viz" id="howLab">
           <span class="label" style="color:inherit;opacity:.7">Try it · move your mouse over this panel</span>
@@ -145,8 +145,8 @@
         <div class="steps" id="howSteps">
           <div class="step"><span class="n">01</span><div><h3>Find the face</h3><p>Each webcam frame is scanned for a face and 478 landmark points, including the eyes, nose and mouth.</p></div></div>
           <div class="step"><span class="n">02</span><div><h3>Measure eyes, head and nose</h3><p>The iris centre is compared with the eye corners. The turn of your head and the tip of your nose are compared with your own resting face.</p></div></div>
-          <div class="step"><span class="n">03</span><div><h3>Calibrate in 2 seconds</h3><p>When the camera first sees you, the pointer jumps to the middle of the screen: look at it for a moment. diseyeble learns where &ldquo;straight ahead&rdquo; is for your head and eyes. Say &ldquo;calibrate&rdquo; to do it again.</p></div></div>
-          <div class="step"><span class="n">04</span><div><h3>Point, blink and act</h3><p>Your head steers the pointer: small turns aim finely, quick turns go far. Optional modes let your eyes pull it toward where you look, or your nose carry it to the screen edges. A filter smooths jitter and small wobbles, and diseyeble moves the real mouse. A long blink clicks exactly where the pointer is.</p></div></div>
+          <div class="step"><span class="n">03</span><div><h3>Calibrate in 2 seconds</h3><p>When the camera first sees you, the pointer jumps to the middle of the screen: look at it for a moment. eyeable learns where &ldquo;straight ahead&rdquo; is for your head and eyes. Say &ldquo;calibrate&rdquo; to do it again.</p></div></div>
+          <div class="step"><span class="n">04</span><div><h3>Point, blink and act</h3><p>Your head steers the pointer: small turns aim finely, quick turns go far. Optional modes let your eyes pull it toward where you look, or your nose carry it to the screen edges. A filter smooths jitter and small wobbles, and eyeable moves the real mouse. A long blink clicks exactly where the pointer is.</p></div></div>
         </div>
         <div class="how-next"><button class="btn btn-ghost" data-page-go="2">Controls →</button></div>
       </div>
@@ -180,7 +180,7 @@
 
     <div class="sec-head">
       <h2>Speech others find hard to follow.<br>Understood.</h2>
-      <p>Standard speech recognition struggles with slurred speech. On recordings of people with dysarthria (speech affected by cerebral palsy or ALS), the standard Whisper model got 41% of words wrong, and 71% for the most severely affected speaker. So we taught it to listen better.</p>
+      <p>Standard Whisper gets 41% of words wrong on slurred (dysarthric) speech. So we taught it to listen better.</p>
     </div>
     <div class="vx">
       <div class="vx-live" id="vxLive">
@@ -195,12 +195,12 @@
         <div class="vx-ask" id="vxAsk"><span>Real mishearing from our testing</span><em>fixed</em></div>
       </div>
       <div class="vx-feats">
-        <div class="vf"><span class="vf-n">01</span><div><h3>Fine-tuned on dysarthric speech</h3><p>Whisper large-v3-turbo (LoRA) on TORGO: 5 speakers to train, 1 to choose settings, 2 kept apart for testing. LibriSpeech mixed in so it doesn&rsquo;t forget ordinary voices.</p></div></div>
-        <div class="vf"><span class="vf-n">02</span><div><h3>Errors cut by more than half</h3><p>On 2 test speakers it never heard: <b>41.4% &rarr; 19.4%</b> of words wrong. Severely affected <b>71.3% &rarr; 37.4%</b>. Typical speech unchanged, about 0.1 s per 5 s clip.</p></div></div>
-        <div class="vf"><span class="vf-n">03</span><div><h3>Time to speak</h3><p>Sentence pause adjustable 1&ndash;4 s, questions wait 12 s, nothing is typed until you say yes or blink. &ldquo;Use original&rdquo; brings back your exact words.</p></div></div>
-        <div class="vf"><span class="vf-n">04</span><div><h3>Forgiving commands</h3><p>About 60 commands, several ways to say each. Filler words dropped, near-misses still match, known mishearings count only when an answer is expected.</p></div></div>
-        <div class="vf"><span class="vf-n">05</span><div><h3>Only your voice</h3><p>Speech counts only when the camera saw your mouth moving as it was said, so other people talking don&rsquo;t trigger commands.</p></div></div>
-        <div class="vf"><span class="vf-n">06</span><div><h3>Your own voice, optionally</h3><p>Record about 150 everyday phrases to adapt it (experimental). Needs your consent, stays on your PC; &ldquo;delete my voice data&rdquo; removes it.</p></div></div>
+        <div class="vf"><span class="vf-n">01</span><div><h3>Fine-tuned on dysarthric speech</h3><p>Whisper large-v3-turbo, trained on the TORGO database.</p></div></div>
+        <div class="vf"><span class="vf-n">02</span><div><h3>Errors cut by more than half</h3><p><b>41.4% &rarr; 19.4%</b> word errors on 2 unseen speakers.</p></div></div>
+        <div class="vf"><span class="vf-n">03</span><div><h3>Time to speak</h3><p>Pause up to 4 s. Nothing is typed until you say yes or blink.</p></div></div>
+        <div class="vf"><span class="vf-n">04</span><div><h3>Forgiving commands</h3><p>About 60 commands, many ways to say each.</p></div></div>
+        <div class="vf"><span class="vf-n">05</span><div><h3>Only your voice</h3><p>Counts only when the camera sees your mouth move.</p></div></div>
+        <div class="vf"><span class="vf-n">06</span><div><h3>Your own voice, optionally</h3><p>Record about 150 phrases to adapt it. Stays on your PC.</p></div></div>
       </div>
     </div>
     <p class="gnote vx-note"><b>Details and limits:</b> sentences 27.3% &rarr; 13.8%, single words 74.8% &rarr; 32.6%, mildly affected speaker 15.3% &rarr; 3.6%; typical speech 1.98% &rarr; 2.01%. A research result on 2 test speakers, not a clinical claim: TORGO speakers read the same prompts, so the sentence wording (not the voices) appeared in training, and the check on brand-new sentences had only 5 sentences, too few to judge. TORGO&rsquo;s licence keeps the tuned model on our PC, so the public download uses standard Whisper. English only for now; Vietnamese is a future goal.</p>
@@ -214,20 +214,20 @@
 
     <div class="sec-head">
       <h2>Gesture map.<br>One move, one action.</h2>
-      <p>The default mapping. Everything runs on the laptop: frames, audio and screenshots stay in memory and are never saved (the only exception is the voice pack you choose to record).</p>
+      <p>Everything runs on your laptop. Nothing is saved, except a voice pack you choose to record.</p>
     </div>
     <div class="gx">
       <div class="gx-list" role="tablist" aria-label="Gestures">
         <button class="gr on" type="button" data-g="0" aria-selected="true"><span class="gr-n">01</span><span class="gr-do">Turn your head</span><span class="gr-tag">Move pointer</span><template>Like a mouse: small turns aim finely, quick turns go far. Optional eye pull and nose assist. Set by a one-look calibration.</template></button>
-        <button class="gr" type="button" data-g="1" aria-selected="false"><span class="gr-n">02</span><span class="gr-do">Hold a long blink</span><span class="gr-tag">Left click · exact spot</span><template>Both eyes shut <b>0.4 – 1.6 s</b>; also answers yes. Ordinary blinks and winks never click; the pointer freezes while your eyes are shut.</template></button>
-        <button class="gr" type="button" data-g="2" aria-selected="false"><span class="gr-n">03</span><span class="gr-do">Raise your eyebrows</span><span class="gr-tag">Yes</span><template>Answers a waiting question or text. Not a click; ignored while you are talking.</template></button>
-        <button class="gr" type="button" data-g="3" aria-selected="false"><span class="gr-n">04</span><span class="gr-do">Shake your head</span><span class="gr-tag">No · cancel</span><template>Two quick swings of about <b>14°</b>. Cancels a question or drops waiting text.</template></button>
-        <button class="gr" type="button" data-g="4" aria-selected="false"><span class="gr-n">05</span><span class="gr-do">Tilt toward a shoulder</span><span class="gr-tag">Scroll · one step</span><template>About <b>18°</b>, held <b>0.4 s</b>: left scrolls up, right scrolls down.</template></button>
-        <button class="gr" type="button" data-g="5" aria-selected="false"><span class="gr-n">06</span><span class="gr-do">Say &ldquo;scroll&rdquo;, then chin up / down</span><span class="gr-tag">Scroll · smooth</span><template>The further you move, the faster. &ldquo;Stop&rdquo;, a blink or a raise ends it; it also stops after <b>10 s</b>.</template></button>
-        <button class="gr" type="button" data-g="6" aria-selected="false"><span class="gr-n">07</span><span class="gr-do">Say &ldquo;click&rdquo;</span><span class="gr-tag">Left click · snaps</span><template><b>UI-Venus 1.5</b> moves the click onto the nearest button within <b>150 px</b>; at once if you&rsquo;re already on a link.</template></button>
-        <button class="gr" type="button" data-g="7" aria-selected="false"><span class="gr-n">08</span><span class="gr-do">Say &ldquo;click Send&rdquo;</span><span class="gr-tag">Find &amp; click · asks first</span><template><b>UI-Venus 1.5</b> finds the button on screen, then you confirm.</template></button>
-        <button class="gr" type="button" data-g="8" aria-selected="false"><span class="gr-n">09</span><span class="gr-do">Say &ldquo;right click&rdquo;</span><span class="gr-tag">Right click</span><template>Opening and closing your mouth can do it too (optional, off by default).</template></button>
-        <button class="gr" type="button" data-g="9" aria-selected="false"><span class="gr-n">10</span><span class="gr-do">Rest the pointer on a button</span><span class="gr-tag">Left click · optional</span><template>Dwell of <b>1.0 s</b>, off by default; say &ldquo;start clicking&rdquo;. Buttons and links only.</template></button>
+        <button class="gr" type="button" data-g="1" aria-selected="false"><span class="gr-n">02</span><span class="gr-do">Hold a long blink</span><span class="gr-tag">Left click · exact spot</span><template>Eyes shut <b>0.4 – 1.6 s</b>. Normal blinks never click.</template></button>
+        <button class="gr" type="button" data-g="2" aria-selected="false"><span class="gr-n">03</span><span class="gr-do">Raise your eyebrows</span><span class="gr-tag">Yes</span><template>Answers a waiting question. Not a click.</template></button>
+        <button class="gr" type="button" data-g="3" aria-selected="false"><span class="gr-n">04</span><span class="gr-do">Shake your head</span><span class="gr-tag">No · cancel</span><template>Two quick swings of about <b>14°</b>. Cancels a question.</template></button>
+        <button class="gr" type="button" data-g="4" aria-selected="false"><span class="gr-n">05</span><span class="gr-do">Tilt toward a shoulder</span><span class="gr-tag">Scroll · one step</span><template>About <b>18°</b>, held <b>0.4 s</b>. Left scrolls up, right scrolls down.</template></button>
+        <button class="gr" type="button" data-g="5" aria-selected="false"><span class="gr-n">06</span><span class="gr-do">Say &ldquo;scroll&rdquo;, then chin up / down</span><span class="gr-tag">Scroll · smooth</span><template>Move further to scroll faster. Say &ldquo;stop&rdquo; to end.</template></button>
+        <button class="gr" type="button" data-g="6" aria-selected="false"><span class="gr-n">07</span><span class="gr-do">Say &ldquo;click&rdquo;</span><span class="gr-tag">Left click · snaps</span><template><b>UI-Venus 1.5</b> snaps the click to the nearest button within <b>150 px</b>.</template></button>
+        <button class="gr" type="button" data-g="7" aria-selected="false"><span class="gr-n">08</span><span class="gr-do">Say &ldquo;click Send&rdquo;</span><span class="gr-tag">Find &amp; click · asks first</span><template><b>UI-Venus 1.5</b> finds the button, then you confirm.</template></button>
+        <button class="gr" type="button" data-g="8" aria-selected="false"><span class="gr-n">09</span><span class="gr-do">Say &ldquo;right click&rdquo;</span><span class="gr-tag">Right click</span><template>Opening and closing your mouth works too (off by default).</template></button>
+        <button class="gr" type="button" data-g="9" aria-selected="false"><span class="gr-n">10</span><span class="gr-do">Rest the pointer on a button</span><span class="gr-tag">Left click · optional</span><template>Dwell of <b>1.0 s</b>, off by default.</template></button>
         <button class="gr" type="button" data-g="10" aria-selected="false"><span class="gr-n">11</span><span class="gr-do">Say &ldquo;pause&rdquo; / &ldquo;resume&rdquo;</span><span class="gr-tag">Stop · restart</span><template>While paused, only &ldquo;resume&rdquo; and &ldquo;quit&rdquo; work.</template></button>
       </div>
       <div class="gx-panel" role="tabpanel">
@@ -289,7 +289,7 @@
           </div>
           <div class="running" id="runBar" hidden><span class="label" style="color:inherit;opacity:.7">Demo</span><span class="stepTxt" id="stepTxt">Starting…</span><button id="stopDemo">Stop</button></div>
           <div class="plot-wrap"><canvas id="plot" width="660" height="420" aria-label="Live signal chart for brow, mouth, pitch and yaw"></canvas></div>
-          <div class="sim-row">
+          <div class="sim-row rail-off">
             <span class="label">Simulate</span>
             <button id="sBrow" title="Eyebrows up 0.3 → left click, snapped to the nearest button">⌒ Brow</button>
             <button id="sMouth" title="Mouth open 0.5 s → right click">◯ Mouth</button>
@@ -299,13 +299,13 @@
             <button id="sNod" title="Nod 12° → yes (while dictating)">↧ Nod</button>
             <button id="sNat" title="Normal blink → ignored, never clicks">Blink (ignored)</button>
           </div>
-          <dl class="cam-legend">
+          <dl class="cam-legend rail-off">
             <div><dt>brow</dt><dd>eyebrow raise above your resting face. Over 0.25 = click</dd></div>
             <div><dt>mouth</dt><dd>mouth opening. Open 0.3 – 1.5 s, then close = right click</dd></div>
             <div><dt>pitch</dt><dd>head up / down. Held = scroll, a quick small nod = yes</dd></div>
             <div><dt>yaw</dt><dd>head turn left / right. A big swing = shake (no)</dd></div>
           </dl>
-<section class="card">
+<section class="card rail-off">
           <div class="card-h"><h3>Detected signals</h3><span class="label" id="clock">00:00</span></div>
           <div class="signals">
             <div class="sig" id="sigGaze"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/><circle cx="13.2" cy="10.8" r=".9" fill="currentColor" stroke="none"/></svg><b>Gaze</b><small id="gazeXY">0, 0</small></div>
@@ -339,7 +339,7 @@
           <div class="chips" id="chips"></div>
         </section>
 
-        <section class="card set">
+        <section class="card set rail-off">
           <div class="card-h" style="margin:0"><h3>Settings</h3><button class="mini-btn" id="calibBtn">Calibrate · 1 look</button></div>
           <div class="tg"><span id="l1">Eyebrow raise to click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l1" id="swBrow"></button></div>
           <div class="tg"><span id="l3">Open mouth for right click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l3" id="swMouth"></button></div>
@@ -354,7 +354,7 @@
       <section class="main">
         <div class="statusbar">
           <span class="pill" id="trackPill"><span class="dot"></span><span id="trackTxt">Tracking</span></span>
-          <span class="pill">Pointer <b id="accTxt" style="font-family:var(--f-mono)">eyes</b></span>
+          <span class="pill">Pointer <b id="accTxt" style="font-family:var(--f-mono)">simulated</b></span>
           <span class="grow"></span>
           <button class="mini-btn" id="pauseBtn">Pause <span class="kbd">P</span></button>
         </div>
@@ -367,18 +367,19 @@
                 <button class="dicon" data-act="open:youtube"><span class="ai vt"></span>YouTube</button>
                 <button class="dicon" data-act="open:mail"><span class="ai ml"></span>Mail</button>
                 <button class="dicon" data-act="toast:This PC"><span class="ai fx"></span>This PC</button>
+                <button class="dicon" data-act="toast:Recycle Bin is empty"><span class="ai rb"></span>Recycle Bin</button>
               </div>
 
               <div class="win" id="winBrowser" hidden>
                 <div class="titlebar">
-                  <div class="tabs-row"><div class="wtab"><span class="fav" id="tabFav"></span><span id="tabTitle">New Tab</span></div></div>
+                  <div class="tabs-row"><div class="wtab"><span class="fav" id="tabFav"></span><span id="tabTitle">New Tab</span><i class="wtab-x" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M7 7l10 10M17 7L7 17"/></svg></i></div><i class="wtab-new" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 6v12M6 12h12"/></svg></i></div>
                   <div class="wbtns"><button class="wbtn" data-act="min:browser">—</button><button class="wbtn">▢</button><button class="wbtn x" data-act="close:browser">✕</button></div>
                 </div>
                 <div class="toolbar">
                   <button class="nb" data-act="back" aria-label="Back">←</button>
                   <button class="nb" data-act="fwd" aria-label="Forward">→</button>
                   <button class="nb" data-act="reload" aria-label="Reload">↻</button>
-                  <div class="omni"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="omni">google.com</span></div>
+                  <div class="omni"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span id="omni">google.com</span><i class="omni-star" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/></svg></i></div><span class="tb-prof" aria-hidden="true">A</span><i class="tb-dots" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="5.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="18.5" r="1.2" fill="currentColor"/></svg></i>
                 </div>
                 <div class="wbody"><div class="page"><div class="page-inner" id="bPage"></div></div></div>
               </div>
@@ -390,13 +391,22 @@
               </div>
 
               <div class="startmenu" id="startMenu" hidden>
-                <h4>Pinned</h4>
+                <div class="sm-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><span>Search for apps, settings, and documents</span></div>
+                <div class="sm-h"><h4>Pinned</h4><span class="sm-all">All ›</span></div>
                 <div class="sm-grid">
                   <button class="sm-app" data-act="open:browser"><span class="ai br"></span>Chrome</button>
                   <button class="sm-app" data-act="open:youtube"><span class="ai vt"></span>YouTube</button>
                   <button class="sm-app" data-act="open:mail"><span class="ai ml"></span>Mail</button>
                   <button class="sm-app" data-act="toast:Settings"><span class="ai fx"></span>Settings</button>
                 </div>
+                <div class="sm-h"><h4>Recommended</h4><span class="sm-all">More ›</span></div>
+                <div class="sm-rec">
+                  <div><span class="doc d1"></span><b>Grocery list</b><small>Yesterday at 5:12 PM</small></div>
+                  <div><span class="doc d2"></span><b>Family photos</b><small>Mon at 9:40 AM</small></div>
+                  <div><span class="doc d3"></span><b>Doctor appointments</b><small>Oct 20</small></div>
+                  <div><span class="doc d1"></span><b>Bus timetable</b><small>Oct 18</small></div>
+                </div>
+                <div class="sm-foot"><span class="sm-user"><i>A</i>Alex</span><i class="sm-pow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 3v8"/><path d="M6.4 6.6a8 8 0 1 0 11.2 0"/></svg></i></div>
               </div>
 
               <div class="osk" id="osk" hidden></div>
@@ -404,15 +414,16 @@
               <div id="wtoastSlot"></div>
 
               <div class="taskbar">
+                <div class="tb-weather" aria-hidden="true"><span class="sun"></span><span><b>72°F</b><small>Sunny</small></span></div>
                 <button class="tb" data-act="start" id="tbStart" aria-label="Start"><svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="2" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="12.5" y="2" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="2" y="12.5" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/><rect x="12.5" y="12.5" width="9.5" height="9.5" rx="1.5" fill="#2F7FE0"/></svg></button>
                 <div class="tb-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>Search</div>
                 <button class="tb" data-act="open:browser" id="tbBrowser" aria-label="Chrome"><span class="ai br"></span></button>
                 <button class="tb" data-act="open:mail" id="tbMail" aria-label="Mail"><span class="ai ml"></span></button>
                 <button class="tb" data-act="toast:File Explorer" aria-label="File Explorer"><span class="ai fx"></span></button>
-                <div class="tray"><span>ENG</span><span>📶 <span id="trayVol" title="Volume">🔊</span> 🔋</span><span class="clock" id="trayClock">9:41 AM<br>24/10/2026</span></div>
+                <div class="tray"><i class="tray-chev" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M7 14l5-5 5 5"/></svg></i><span>ENG</span><span class="tray-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.6 16a5 5 0 0 1 6.8 0"/><circle cx="12" cy="19.3" r="1.2" fill="currentColor" stroke="none"/></svg><svg id="trayVol" role="img" aria-label="Volume" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z" fill="currentColor"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.3 6.6a7.6 7.6 0 0 1 0 10.8"/></svg><svg viewBox="0 0 26 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="19" height="10" rx="2.6"/><rect x="4.4" y="9.4" width="11.5" height="5.2" rx="1.2" fill="currentColor" stroke="none"/><path d="M23.4 10.4v3.2" stroke-linecap="round" stroke-width="2.2"/></svg></span><span class="clock" id="trayClock">9:41 AM<br>24/10/2026</span><i class="tray-bell" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></i></div>
               </div>
 
-              <div class="gaze" id="gaze"><svg viewBox="0 0 58 58"><circle class="track" cx="29" cy="29" r="25" fill="none" stroke-width="4"/><circle class="prog" id="prog" cx="29" cy="29" r="25" fill="none" stroke-width="4" stroke-dasharray="157.1" stroke-dashoffset="157.1"/></svg><div class="core"></div><span class="glabel" id="glabel">BLINK · CLICK</span></div>
+              <div class="gaze" id="gaze"><svg viewBox="0 0 58 58"><circle class="track" cx="29" cy="29" r="25" fill="none" stroke-width="4"/><circle class="prog" id="prog" cx="29" cy="29" r="25" fill="none" stroke-width="4" stroke-dasharray="157.1" stroke-dashoffset="157.1"/></svg><div class="core"></div><svg class="arrow" viewBox="0 0 20 28" aria-hidden="true"><path d="M2 1.5v21.2l5.3-5.1 3.4 8 3.4-1.5-3.4-7.8h7.3z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="glabel" id="glabel">BLINK · CLICK</span></div>
               <div class="calib" id="calib" hidden><div class="msg" id="calibMsg"></div><div class="pt" id="calibPt" hidden></div></div>
             </div>
           </div>

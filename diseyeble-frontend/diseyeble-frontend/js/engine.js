@@ -1,4 +1,4 @@
-/* js/engine.js: connects this page to the real Diseyeble engine (python -m engine.main) over WebSocket.
+/* js/engine.js: connects this page to the real EYEable engine (python -m engine.main) over WebSocket.
    Messages are the ones in engine/core/messages.py. With no engine running the page keeps its simulation.
    Needs window.DZ, which js/app.js exposes just before its boot block.
    Open the page with ?engine=ws://host:port to use another address (default ws://127.0.0.1:8765).
@@ -7,7 +7,7 @@
    - the pointer is the real mouse (the engine moves it with your head); a real click is a click on the simulated desktop
    - typing, keys, scrolling and "open ..." arrive as page_action messages and happen on the simulated desktop
    - the webcam picture arrives as debug_frame and shows in the camera box
-   - the Diseyeble card (mode, what you are saying, what will be typed, questions) is drawn here on the simulated screen
+   - the EYEable card (mode, what you are saying, what will be typed, questions) is drawn here on the simulated screen
    Every 2 s this page tells the engine "page_mode on"; if it stops, the engine goes back to the real computer. */
 (() => {
   const D = window.DZ; if (!D) return;
@@ -27,13 +27,13 @@
   bar.insertBefore(pill, bar.firstChild); bar.insertBefore(read, pill.nextSibling);
   const setRead = t => { read.textContent = t || ''; };
 
-  /* ---------- the Diseyeble card, on the simulated screen ---------- */
-  const MODES = { pointer: ['Diseyeble', ''], dictation: ['Dictation', 'say “dictate off” to stop'], scroll: ['Scroll', 'tilt your head · say “stop”'],
+  /* ---------- the EYEable card, on the simulated screen ---------- */
+  const MODES = { pointer: ['EYEable', ''], dictation: ['Dictation', 'say “dictate off” to stop'], scroll: ['Scroll', 'tilt your head · say “stop”'],
                   menu: ['Menu', ''], paused: ['Paused', 'say “resume”'] };
   const screenEl = D.screen;
   const card = document.createElement('div');
   card.className = 'dz-card'; card.hidden = true;
-  card.innerHTML = `<div class="dz-pill"><i class="dz-dot"></i><span class="dz-pt">Diseyeble</span><small class="dz-ph"></small>
+  card.innerHTML = `<div class="dz-pill"><i class="dz-dot"></i><span class="dz-pt">EYEable</span><small class="dz-ph"></small>
       <span class="dz-wave">${'<i></i>'.repeat(7)}</span></div>
     <div class="dz-panel" hidden><div class="dz-label"><span class="dz-lab"></span></div><span class="dz-chip" hidden></span>
       <div class="dz-body"></div><div class="dz-bar" hidden><i></i></div><div class="dz-actions"></div><div class="dz-hint"></div></div>`;
@@ -69,7 +69,7 @@
     chip.hidden = true; barEl.hidden = true; acts.innerHTML = ''; hintEl.innerHTML = ''; body.innerHTML = '';
     const q = S.q && S.q.state === 'open' ? S.q : null;
     if (q) {                                                           // 1. a yes/no question
-      panel.hidden = false; lab.textContent = 'Diseyeble asks';
+      panel.hidden = false; lab.textContent = 'EYEable asks';
       body.textContent = q.prompt;
       barEl.hidden = false; barEl.firstElementChild.style.width = Math.max(0, Math.min(100, 100 * q.left / q.total)) + '%';
       acts.innerHTML = '<button class="main" data-act="dz:yes">Yes</button><button data-act="dz:no">No</button>';
@@ -120,7 +120,7 @@
     pill.classList.toggle('off', !on);
     $('#engTxt').textContent = on ? 'Engine live' : (starting ? 'Starting engine…' : 'Simulated');
     screenEl.classList.toggle('dz-live', on);
-    $('#accTxt').textContent = on ? 'head' : 'eyes';
+    $('#accTxt').textContent = on ? 'head' : 'simulated';
     if (on) {
       saved = { dwell: G.dwell, paused: G.paused };
       G.dwell = false;   // the engine decides about dwell clicks
@@ -246,7 +246,7 @@
   function onConfirm(m) {
     if (m.state === 'open') {
       S.q = { id: m.id, prompt: m.prompt, state: 'open', total: m.expires_in_s || 12, left: m.expires_in_s || 12, t0: performance.now() };
-      tip('Diseyeble asks: ' + m.prompt + ' Blink or say yes. Say no to cancel.');
+      tip('EYEable asks: ' + m.prompt + ' Blink or say yes. Say no to cancel.');
       render();
     } else {
       S.q = null; clearInterval(qTick);
@@ -371,7 +371,7 @@
   }
   function applySys() {
     dim.style.opacity = ((100 - SYS.bright) / 100 * 0.75).toFixed(3);   // 10% brightness = 68% black over the screen
-    const tv = $('#trayVol'); if (tv) tv.textContent = SYS.muted || !SYS.vol ? '🔇' : (SYS.vol < 34 ? '🔈' : SYS.vol < 67 ? '🔉' : '🔊');
+    const tv = $('#trayVol'); if (tv) tv.style.opacity = SYS.muted || !SYS.vol ? .3 : (SYS.vol < 34 ? .55 : SYS.vol < 67 ? .8 : 1);   // the tray volume glyph fades with the level
   }
   function actSystem(name) {
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -465,11 +465,11 @@
   }
   // capture phase: the page's own camera code never runs, because one app at a time can hold a webcam on Windows.
   // On the hosted website (GitHub Pages) there is no launcher: with no engine, the button shows the browser's own
-  // webcam as before, and the page connects by itself whenever Diseyeble is running on this PC.
+  // webcam as before, and the page connects by itself whenever EYEable is running on this PC.
   const LOCAL = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   document.addEventListener('click', e => {
     if (!e.target.closest('#allowCam, #demoCamBtn')) return;
-    if (!LOCAL && !live) { toast('Showing your webcam. To control this page with your head, eyes and voice, start Diseyeble on your PC: the page connects by itself.'); return; }
+    if (!LOCAL && !live) { toast('Showing your webcam. To control this page with your head, eyes and voice, start EYEable on your PC: the page connects by itself.'); return; }
     e.stopImmediatePropagation(); e.preventDefault(); startEngine();
   }, true);
 

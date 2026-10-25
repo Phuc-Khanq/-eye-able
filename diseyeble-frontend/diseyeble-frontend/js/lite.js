@@ -1,6 +1,6 @@
 /* js/lite.js: "lite mode", hands-free control of the SIMULATED desktop with no install.
    The webcam stays in this browser tab. MediaPipe Face Landmarker (Google, Apache 2.0) runs here in WebAssembly;
-   nothing is recorded or uploaded. It is NOT the Diseyeble engine: less accurate, no dysarthria-tuned dictation,
+   nothing is recorded or uploaded. It is NOT the EYEable engine: less accurate, no dysarthria-tuned dictation,
    no "click <name>" look-and-say, and it never touches the real computer, only the simulator on this page.
 
    What it does (the same gestures as the engine):
@@ -9,7 +9,7 @@
    - a long blink (0.4 to 1.2 s, both eyes) clicks where the pointer is; quick natural blinks are ignored
    - optional: mouth open for 0.6 s = right click (off by default: talking opens the mouth)
    - voice: the page's own microphone button (browser speech recognition) still works as before
-   The engine wins: if Diseyeble is running on this PC, this mode switches itself off.
+   The engine wins: if EYEable is running on this PC, this mode switches itself off.
 
    The tracking maths lives in createCore() with no browser calls, so tests/lite_core.test.js can run it in node. */
 (() => {
@@ -248,7 +248,7 @@
       <label><input type="checkbox" id="liteMouth"> Mouth open 0.6 s = right click</label>
       <button class="mini-btn" id="liteRecenter" type="button">Put the pointer in the middle</button>
     </details>
-    <p>Runs in this tab only: your camera is not recorded or sent anywhere. Lite mode is a simulation and less accurate than the Diseyeble app, which also types by voice with the tuned model.</p>`;
+    <p>Runs in this tab only: your camera is not recorded or sent anywhere. Lite mode is a simulation and less accurate than the EYEable app, which also types by voice with the tuned model.</p>`;
   camBox.parentElement.append(panel);
   const el = id => document.getElementById(id);
   const setStat = t => { el('liteStat').textContent = t; };
@@ -314,7 +314,7 @@
   async function start() {
     if (on || starting) return;
     const pill = document.getElementById('engPill');                // the real engine is connected (D.engineLive is also set by lite mode itself)
-    if (pill && !pill.classList.contains('off')) return toast('Diseyeble is running on this PC and already controls this page. Lite mode is not needed.');
+    if (pill && !pill.classList.contains('off')) return toast('EYEable is running on this PC and already controls this page. Lite mode is not needed.');
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return toast('This browser can’t give the page a webcam. Use Chrome or Edge on https.');
     starting = true; el('liteBtn').disabled = true; setStat('Loading the face tracker (about 10 MB the first time)…');
     try {
@@ -335,7 +335,7 @@
     el('liteBtn').disabled = false; el('liteBtn').textContent = 'Stop lite mode';
     log('sys', 'Lite mode on: the head moves the pointer, a long blink clicks (simulation, runs in this tab)');
     tip('Lite mode: turn your head to move the pointer like a mouse (small turns aim, quick turns throw it). Hold a long blink, about half a second, to click.');
-    guard = setInterval(() => { const p = document.getElementById('engPill'); if (p && !p.classList.contains('off')) stop('Diseyeble connected: using the real engine instead.', true); }, 1000);
+    guard = setInterval(() => { const p = document.getElementById('engPill'); if (p && !p.classList.contains('off')) stop('EYEable connected: using the real engine instead.', true); }, 1000);
     raf = requestAnimationFrame(loop);
   }
 

@@ -37,7 +37,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   ok(await p.evaluate(() => /hello world/.test(Object.values(window.DZ.W.f).join('|'))), '"yes" typed the words into a text box');
   await say('hi dizzy'); await say('drop me'); await p.click('.dz-actions button:nth-child(2)'); await p.waitForTimeout(150);
   ok((await p.textContent('.dz-body')) === '' || !(await p.textContent('.dz-body')).includes('drop me'), 'the Drop it button on the card drops the words');
-  await say('bye'); await p.waitForTimeout(1200); ok(/Dictation off|Diseyeble/.test(await p.textContent('.dz-pt')) && (await p.evaluate(() => window.DZVoice.voice.state.mode)) === 'pointer', '"bye" ends dictation');
+  await say('bye'); await p.waitForTimeout(1200); ok(/Dictation off|EYEable/.test(await p.textContent('.dz-pt')) && (await p.evaluate(() => window.DZVoice.voice.state.mode)) === 'pointer', '"bye" ends dictation');
   await say('click banana'); await p.waitForTimeout(100);
   await say('click mail'); await p.waitForTimeout(150);
   ok(/Click/.test(await p.textContent('.dz-body')) , 'click <name> asks first on the card: ' + JSON.stringify(await p.textContent('.dz-body')));

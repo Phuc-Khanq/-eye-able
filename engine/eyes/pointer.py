@@ -19,12 +19,28 @@ Modes:
             moves about 400 px), a slow turn moves it precisely (10 px per degree). There is
             no fixed center, so leaning or shifting in the chair doesn't drift it: like lifting a mouse,
             a slow turn back re-centers the head without moving the cursor much.
-  head-push the head mode, but only a turn AWAY from your resting head angle (home) moves the cursor. Turning back
-            toward home leaves the cursor where it is, like lifting a mouse to put it back in the middle of the pad:
-            push right, come back to the middle, push right again to go further. To go the other way, turn past
-            home to that side. Home is the angle the head had when the pointer started or "recenter" was said, and
-            it follows a resting head very slowly (HOME_FOLLOW_S) so a change of posture doesn't build up.
-            (Oct 25, Khang: "push the cursor left or right, recenter, push it where you want".)
+  head-push the head mode, but only a quick turn AWAY from where the head rests moves the cursor, and the way back
+            never does: like lifting a mouse to put it back on the pad. Push right, come back to wherever is
+            comfortable, push right again to go further. Three states (PUSH_* below):
+              ready   the head rests (or drifts slowly); the start point follows it, so wherever the head settles
+                      is where the next push is measured from. A turn at least PUSH_START_SPEED quick starts a push.
+              push    the part of the turn that goes away from the start point moves the cursor, as in the head mode.
+                      Holding the head still out there and then turning further out quickly pushes again.
+              return  the head has come back PUSH_RETURN_DEG from the furthest point of the push: the cursor is frozen,
+                      so the way back, an overshoot past the start and any wobble count for nothing. As soon as the head
+                      has come back (PUSH_BACK_SHARE of the way, or past the start) and rests for PUSH_REST_MS (a
+                      split second), that spot is the new start point: anywhere comfortable, not a fixed center.
+            A quick push out to the SAME side again, once the head is back near the start, is taken at once (push,
+            back, push: no pause). Two guards keep the end of a return from counting: settling back from an overshoot
+            (resting just past the start, then back toward it within PUSH_GUARD_MS) only counts beyond the start
+            (PUSH_SIDE_DEG past it); and a head that rests out there without coming back is ready after PUSH_STUCK_MS,
+            but its way back only counts beyond PUSH_BAND_DEG past the old start (so a held push, then the way back,
+            never moves the cursor).
+            (Oct 25, Khang: "push the cursor left or right, recenter, push it where you want"; "don't count the
+            recentering"; then "the pause is too much, and the rest point is wherever they're comfortable, not the
+            center". Replaying pushes with returns that overshoot 0-3 degrees and wobble: the way back moved the
+            cursor 40 px (median, up to 146) in the first version, 0 px now; ready again about 0.12 s after the head
+            stops, anywhere, where the second version waited 0.25 s near the old center or 0.7 s elsewhere.)
   head-abs  head angles map to fixed spots: about 15 degrees reaches a side edge, 10 the top or bottom.
             Predictable, but reaching edges is tiring and the center drifts as posture changes.
   hybrid  gaze jumps the cursor when it lands more than jump_px away; small head turns fine-tune it.
@@ -99,10 +115,20 @@ GAZE_BETA = 4.0
 STILL_PX = {"head": 2.0, "head-eyes": 2.0, "head-nose": 2.0, "head-push": 2.0, "head-abs": 8.0, "hybrid": 20.0,
             "gaze": 20.0}
 
-# head-push: only a turn away from home moves the cursor (see the docstring).
-HOME_FOLLOW_S = 20.0    # while the head rests, home drifts toward its angle with this time constant: slow enough that
-                        # holding a push for a few seconds doesn't make the way back count, quick enough that a new
-                        # sitting posture becomes the new home within a minute ("recenter" sets it at once)
+# head-push (see the docstring). Speeds are of the filtered head angle, frame to frame. Measured on Khang's two
+# pointer_feel logs (32 fps): a resting head stays under 4 deg/s in every 250 ms window (median 0.8), and a
+# deliberate turn peaks well above 6 deg/s (median 19-72).
+PUSH_START_SPEED = 6.0      # deg/s: from rest, a turn at least this quick starts a push (slower drifting moves nothing)
+PUSH_RETURN_DEG = 1.0       # coming back this far from the push's furthest point ends the push: the cursor freezes
+PUSH_REST_SPEED = 4.0       # deg/s: under this, frame after frame, the head is resting
+PUSH_REST_MS = 100          # after coming back, resting this long makes that spot the new start point
+PUSH_BACK_SHARE = 0.5       # "came back" = undone this share of the push, or within PUSH_NEAR_DEG of its start, or past it
+PUSH_STUCK_MS = 500         # resting this long without coming back: ready there too (the way back still never counts)
+PUSH_NEAR_DEG = 2.0         # this close to the start counts as back (and arms the quick same-side push)...
+PUSH_SIDE_DEG = 0.5         # ...which starts once the head is this far past the start on the push's side
+PUSH_GUARD_MS = 600         # settled just past the start (an overshoot): moving back toward it this soon is the return
+PUSH_OVERSHOOT_DEG = 5.0    # (settling further past the start than this isn't an overshoot: no guard)
+PUSH_BAND_DEG = 2.5         # coming back from a push held out there: only this far past the old start does it count
 
 # head-eyes: how the eyes pull (Oct 24 night, Khang: "head as the macro control, the iris as an add-on")
 EYE_RADIUS_PX = (110.0, 140.0)  # the gaze's error ellipse (x, y) around where the model says you look: no pull inside
@@ -156,14 +182,30 @@ class HeadRelPointer:
         self.step = (0.0, 0.0)     # how far the cursor moved on the last frame (head-eyes: which way the head goes)
         self.rest_gate = True
         self.push = False          # head-push: only turns away from home move the cursor
-        self.home: tuple[float, float] | None = None   # head-push: resting yaw and pitch (filtered), degrees
+        self.home: tuple[float, float] | None = None   # head-push: the start point (yaw, pitch, filtered), degrees
+        self.push_state = "ready"  # head-push: "ready", "push" or "return" (see the module docstring)
+        self.pushes = 0            # head-push: pushes so far (tuning and tests)
+        self._peak = 0.0           # head-push: furthest the head got from the start point in this push, degrees
+        self._dir = (0.0, 0.0)     # head-push: which way from the start point the last push went (unit vector)
+        self._came_back = False    # head-push: this return undid PUSH_BACK_SHARE of the push
+        self._near = False         # head-push: this return got within PUSH_NEAR_DEG of the start point
+        self._held = False         # head-push: the head stopped out there; only a quick turn pushes again
+        self._resume = None        # head-push: (old start, band, until t_ms): a quick move back toward the start of the
+                                   # last push counts only beyond it (the end of a return, not a push)
+        self._clip = None          # head-push: this push counts only beyond its start by a band: (sign, band) per axis
+        self._rest_since: int | None = None
         self.stats = PointerStats()
         self.center()
 
     def center(self) -> None:
         """Cursor to the screen center; the next frame starts a new relative movement."""
         self.cursor = ((self.W - 1) / 2, (self.H - 1) / 2)
-        self.home = None           # head-push: the next frame's angle is the new home
+        self.home = None           # head-push: the next frame's angle is the new start point
+        self.push_state = "ready"
+        self._peak = 0.0
+        self._came_back = self._near = self._held = False
+        self._resume = self._clip = None
+        self._rest_since = None
         self.rebase()
 
     def rebase(self) -> None:
@@ -200,6 +242,102 @@ class HeadRelPointer:
         """1 for a frame of a 25+ fps camera; more for a longer frame (see FRAME_S)."""
         return min(max(dt / FRAME_S, 1.0), MAX_FRAME_SCALE)
 
+    def _eff(self, oy: float, op: float) -> tuple[float, float]:
+        """head-push: offsets from the start point as this push counts them: unchanged, or for a guarded push clipped
+        one-sided per axis, so nothing behind the start or inside the band counts."""
+        if self._clip is None:
+            return oy, op
+        (sy, by), (sp, bp) = self._clip
+        if sy:
+            oy = sy * max(sy * oy - by, 0.0)
+        if sp:
+            op = sp * max(sp * op - bp, 0.0)
+        return oy, op
+
+    def _push_part(self, t_ms: int, dt: float, yaw: float, pitch: float) -> tuple[float, float]:
+        """head-push: the (yaw, pitch) degrees of this frame's head move that move the cursor, after stepping the
+        ready / push / return states. The way back, overshoot and wobble give (0, 0)."""
+        ly, lp = self._last[1], self._last[2]
+        dy, dp = yaw - ly, pitch - lp
+        step = math.hypot(dy, dp)
+        inst = step / dt
+        if inst < PUSH_REST_SPEED:
+            if self._rest_since is None:
+                self._rest_since = t_ms
+        else:
+            self._rest_since = None
+        rested = 0 if self._rest_since is None else t_ms - self._rest_since
+        if self.push_state == "ready":
+            if inst < PUSH_START_SPEED:
+                self.home = (yaw, pitch)        # the start point follows the resting head: wherever it settles
+                return 0.0, 0.0
+            self._begin(t_ms, dy, dp, step)     # a quick turn: a new push from where the head was resting
+        elif self.push_state == "return":
+            hy, hp = self.home
+            ry, rp = yaw - hy, pitch - hp
+            oy, op = self._eff(ry, rp)
+            dist = math.hypot(oy, op)
+            d = self._dir
+            along = ry * d[0] + rp * d[1]       # where the head is along the push: under 0 = past its start
+            if dist <= max(PUSH_NEAR_DEG, (1.0 - PUSH_BACK_SHARE) * self._peak) or along <= 0:
+                self._came_back = True
+            if dist <= PUSH_NEAR_DEG:
+                self._near = True
+            if self._came_back and rested >= PUSH_REST_MS:
+                overshoot = -PUSH_OVERSHOOT_DEG <= along <= -0.3
+                self._resume = ((hy, hp), PUSH_SIDE_DEG, t_ms + PUSH_GUARD_MS) if overshoot else None
+                self.home, self.push_state, self._clip = (yaw, pitch), "ready", None   # settled: start here next
+            elif rested >= PUSH_STUCK_MS:
+                self._resume = ((hy, hp), PUSH_BAND_DEG, math.inf)   # resting out there: ready, but its way back
+                self.home, self.push_state, self._clip = (yaw, pitch), "ready", None   # still doesn't count
+            elif (self._near and inst >= PUSH_START_SPEED and oy * d[0] + op * d[1] > PUSH_SIDE_DEG
+                  and dy * d[0] + dp * d[1] > 0.7 * step):
+                self.push_state, self._held = "push", False             # back, and straight out the same side
+                self._peak = math.hypot(*self._eff(ly - hy, lp - hp))   # again: no pause needed
+                self.pushes += 1
+            if self.push_state != "push":
+                return 0.0, 0.0
+        # push
+        hy, hp = self.home
+        oy, op = self._eff(yaw - hy, pitch - hp)
+        by, bp = self._eff(ly - hy, lp - hp)
+        dist = math.hypot(oy, op)
+        self._peak = max(self._peak, dist)
+        if dist > 1e-6 and dist >= self._peak:
+            self._dir = (oy / dist, op / dist)
+        if dist < self._peak - PUSH_RETURN_DEG:
+            self.push_state = "return"          # coming back: nothing counts from here
+            self._came_back = self._near = False
+            return 0.0, 0.0
+        if rested >= PUSH_REST_MS:
+            self._held = True                   # stopped out there: slow drifting from here doesn't push
+        if self._held:
+            if inst < PUSH_START_SPEED:
+                return 0.0, 0.0
+            self._held = False
+        return _away(by, oy), _away(bp, op)
+
+    def _begin(self, t_ms: int, dy: float, dp: float, step: float) -> None:
+        """head-push, from ready on a quick turn: a new push from the start point (self.home, where the head was
+        resting). Heading back toward where the last push started, within a guard, it counts only beyond that start."""
+        self.push_state, self._held, self._clip = "push", False, None
+        self._peak = 0.0
+        self.pushes += 1
+        resume, self._resume = self._resume, None
+        if resume is None or t_ms > resume[2]:
+            return
+        (ay, ap), band, _ = resume
+        hy, hp = self.home
+        ty, tp = ay - hy, ap - hp               # from here back to the old start
+        gap = math.hypot(ty, tp)
+        if gap < 0.3 or dy * ty + dp * tp <= 0.7 * step * gap:
+            return                              # not heading back there: an ordinary push from here
+        gy, gp = ty / gap, tp / gap
+        sy = (1.0 if gy > 0 else -1.0) if abs(gy) >= 0.3 else 0.0
+        sp = (1.0 if gp > 0 else -1.0) if abs(gp) >= 0.3 else 0.0
+        self.home = (ay if sy else hy, ap if sp else hp)
+        self._clip = ((sy, band * abs(gy)), (sp, band * abs(gp)))
+
     def update(self, pose: HeadPose) -> GazePoint:
         self.step = (0.0, 0.0)
         if self._raw is not None:
@@ -222,10 +360,8 @@ class HeadRelPointer:
         if self._last is not None:
             dt = max((pose.t_ms - self._last[0]) / 1000.0, 1e-3)
             dyaw, dpitch = yaw - self._last[1], pitch - self._last[2]
-            if self.push:                                    # only the part of the move that goes away from home
-                hy, hp = self.home
-                pyaw = _away(self._last[1] - hy, yaw - hy)
-                ppitch = _away(self._last[2] - hp, pitch - hp)
+            if self.push:                                    # only a push moves it, never the way back
+                pyaw, ppitch = self._push_part(pose.t_ms, dt, yaw, pitch) if dt < 0.5 else (0.0, 0.0)
             else:
                 pyaw, ppitch = dyaw, dpitch
             if dt < 0.5:
@@ -270,9 +406,6 @@ class HeadRelPointer:
                 self._carry = (cx, cy)
                 self.step = (nx - self.cursor[0], ny - self.cursor[1])
                 self.cursor = (nx, ny)
-                if self.push and self.speed < SPEED_SLOW:    # resting: home slowly follows the head (posture)
-                    a = 1.0 - math.exp(-dt / HOME_FOLLOW_S)
-                    self.home = (self.home[0] + a * (yaw - self.home[0]), self.home[1] + a * (pitch - self.home[1]))
         else:
             self.gate(pose.t_ms, yaw, pitch)     # the first frame starts the rest gate's window
         self._last = (pose.t_ms, yaw, pitch)

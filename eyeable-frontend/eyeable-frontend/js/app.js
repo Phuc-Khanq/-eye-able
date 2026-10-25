@@ -975,6 +975,19 @@
   function scrollBy(dir){
     const t = topScroller(); if (!t) return;
     if (t==='browser'){ const inner=$('#bPage'), max=Math.max(0, inner.scrollHeight - inner.parentElement.clientHeight); W.browser.scroll = clamp(W.browser.scroll + dir*180, 0, max); inner.style.transform=`translateY(${-W.browser.scroll}px)`; }
+    else { const p=$('#mPage'); if (p) p.scrollBy({ top: dir*180, behavior:'smooth' }); }                  // Mail: the inbox, a message or the form
+  }
+  /* continuous scrolling for the head (lite mode): px > 0 scrolls down; returns how far the page really moved */
+  function scrollPx(px){
+    const t = topScroller(); if (!t || !px) return 0;
+    if (t==='browser'){
+      const inner=$('#bPage'), max=Math.max(0, inner.scrollHeight - inner.parentElement.clientHeight), before=W.browser.scroll;
+      W.browser.scroll = clamp(before + px, 0, max);
+      inner.style.transition='none'; inner.style.transform=`translateY(${-W.browser.scroll}px)`;     // no easing: the head already sets the speed smoothly
+      clearTimeout(scrollPx.t); scrollPx.t = setTimeout(() => { inner.style.transition=''; }, 200);
+      return W.browser.scroll - before;
+    }
+    const p=$('#mPage'); if (!p) return 0; const before=p.scrollTop; p.scrollTop = before + px; return p.scrollTop - before;
   }
 
   const ACTIONS = {};
@@ -1679,7 +1692,7 @@
 
   /* ---------------- hooks for js/engine.js (the real engine over WebSocket) ---------------- */
   window.DZ = { $, esc, log, toast, tip, flashSig, glabel, mascotDo, setCaption, addEvent, FACE, DUR, G, screen, mic,
-    W, run, clickAt, openWin, nav, renderAll, insertText, typeKey, scrollBy, ctxAction, openCtx, ripple, hitTest, wtoast, ACTIONS, bringTop,
+    W, run, clickAt, openWin, nav, renderAll, insertText, typeKey, scrollBy, scrollPx, ctxAction, openCtx, ripple, hitTest, wtoast, ACTIONS, bringTop,
     get micLive(){ return micLive; }, set micLive(v){ micLive = v; mic.classList.toggle('live', v); } };
 
   /* ---------------- boot ---------------- */

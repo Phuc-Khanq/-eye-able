@@ -127,6 +127,35 @@ test('the card shows the tidied words and "yes" types exactly those, for the mes
   assert.deepStrictEqual(out.acts.at(-1), { action: 'type', text: 'Hello.\nBye now. ' });
 });
 
+function scrollRig(canScroll = true) {
+  const r = rig(); const calls = []; r.calls = calls;
+  const hooks = {
+    emit: m => r.msgs.push(m), act: m => r.acts.push(m), pointerClick: (b, s) => r.clicks.push([b, s]), find: () => null, recenter: () => r.msgs.push({ type: 'recenter' }), quit: () => {},
+    scroll: on => { calls.push(on); return on ? canScroll : false },
+  };
+  r.v = createVoice(hooks, { setTimeout: (fn, ms) => 1, clearTimeout: () => {} }); return r;
+}
+test('"scroll" starts head scrolling when lite mode can, and the card goes to Scroll', () => {
+  const r = scrollRig(); r.v.heard('scroll');
+  assert.deepStrictEqual(r.calls, [true]); assert.strictEqual(r.v.state.mode, 'scroll'); assert.strictEqual(r.last('mode').mode, 'scroll');
+});
+test('"scroll" without the camera says what to do and stays in pointer mode', () => {
+  const r = scrollRig(false); r.v.heard('scroll');
+  assert.strictEqual(r.v.state.mode, 'pointer'); assert(/Try hands-free/.test(r.last('status').text), JSON.stringify(r.last('status')));
+});
+test('scroll mode: "stop", "done" and "stop scrolling" leave it; other speech is ignored', () => {
+  for (const word of ['stop', 'done', 'Stop scrolling.']) { const r = scrollRig(); r.v.heard('scroll'); r.v.heard('hello there my friend'); assert.strictEqual(r.v.state.mode, 'scroll'); r.v.heard(word); assert.strictEqual(r.v.state.mode, 'pointer', word); assert.strictEqual(r.calls[r.calls.length - 1], false); }
+});
+test('scroll mode: "scroll up/down" still glide and stay; another command leaves first and then runs', () => {
+  const r = scrollRig(); r.v.heard('scroll'); r.v.heard('scroll down'); assert.strictEqual(r.v.state.mode, 'scroll'); assert(r.acts.some(a => a.action === 'scroll' && a.direction === 'down'));
+  r.v.heard('volume up'); assert.strictEqual(r.v.state.mode, 'pointer'); assert(r.acts.some(a => a.action === 'system' && a.name === 'volume_up'));
+});
+test('"scroll" is just a word while dictating, and leaveScroll() (blink, timeout, camera off) puts the card back', () => {
+  const d = scrollRig(); d.v.heard('hi dizzy'); d.v.heard('scroll'); assert.strictEqual(d.v.state.mode, 'dictation'); assert.deepStrictEqual(d.calls, []);
+  const r = scrollRig(); r.v.heard('scroll'); r.v.leaveScroll('Scroll off'); assert.strictEqual(r.v.state.mode, 'pointer'); assert.strictEqual(r.last('mode').mode, 'pointer');
+  r.v.enterScroll(); assert.strictEqual(r.v.state.mode, 'scroll');
+});
+
 let failed = 0;
 for (const [n, f] of tests) { try { f(); console.log('ok   ' + n); } catch (e) { failed++; console.log('FAIL ' + n + ' :: ' + e.message); } }
 console.log(`${tests.length - failed}/${tests.length} passed`); process.exit(failed ? 1 : 0);

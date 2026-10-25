@@ -151,6 +151,22 @@
       return false;
     }
 
+    /* Scroll mode (head scrolling), like the engine's: "scroll" starts it (never from dictation), the pointer stays and the head sets
+       the speed; "stop", "done" or "stop scrolling" end it; "scroll up/down" still glide; any other command ends it and then runs;
+       other speech is ignored. It needs lite mode's camera (hooks.scroll says yes or no). */
+    function enterScroll() {
+      if (S.mode === 'dictation') return false;
+      if (S.mode === 'scroll') return true;
+      if (!hooks.scroll || !hooks.scroll(true)) { status('Head scrolling needs lite mode: press “Try hands-free in your browser (lite)”. Say “scroll up” or “scroll down” for now.'); return false; }
+      setMode('scroll'); flash('Scroll'); return true;
+    }
+    function leaveScroll(label) {
+      if (S.mode !== 'scroll') return;
+      if (hooks.scroll) hooks.scroll(false);
+      setMode('pointer'); if (label) flash(label);
+    }
+    const SCROLL_EXIT = ['stop', 'done', 'stop scrolling'];
+
     function run(cmd, raw) {
       const n = cmd.name, say = l => flash(l);
       switch (n) {
@@ -175,7 +191,7 @@
         case 'dwell_on': case 'dwell_off': status('Dwell clicking is not in lite mode.'); return;
         case 'scroll_up': hooks.act({ action: 'scroll', direction: 'up' }); say('Scroll up'); return;
         case 'scroll_down': hooks.act({ action: 'scroll', direction: 'down' }); say('Scroll down'); return;
-        case 'scroll_mode': status('Say “scroll up” or “scroll down” in lite mode.'); return;
+        case 'scroll_mode': enterScroll(); return;
         case 'pause': setMode('paused'); say('Paused'); return;
         case 'resume': setMode('pointer'); say('Resume'); return;
         case 'menu': status('There is no menu screen yet.'); return;
@@ -213,6 +229,13 @@
       const waiting = S.q || S.chunks.length;
       const ans = waiting ? answerOf(t) : null;                           // "know" is a no, but only while something waits
       if (ans) { answer(ans === 'yes'); return; }
+      if (S.mode === 'scroll') {
+        if (SCROLL_EXIT.includes(clean)) { leaveScroll('Scroll off'); return; }
+        const c = parse(t, false);
+        if (c && (c.name === 'scroll_up' || c.name === 'scroll_down')) { run(c, t); return; }
+        if (c && c.name !== 'type_text' && c.name !== 'scroll_mode') { leaveScroll(); run(c, t); return; }
+        return;                                                           // anything else is not for us while scrolling
+      }
       if (S.mode === 'dictation' && !forced) {
         if (P.DICTATION_EXIT.includes(clean)) { run({ name: 'stop_dictation' }, t); return; }
         const c = parse(t, false);                                        // fixed commands win; "click ..." works while dictating
@@ -229,8 +252,8 @@
       if (cmd) { run(cmd, t); return; }
       status(`Heard “${t}”. Not a command: say “hi Dizzy” to dictate.`);
     }
-    return { heard, answer, live, insert, dropPreview, state: S, parse, launch, ask,
-             pending: () => !!S.q, reset() { closeQ('cancelled'); S.chunks = []; S.mode = 'pointer'; } };
+    return { heard, answer, live, insert, dropPreview, state: S, parse, launch, ask, enterScroll, leaveScroll,
+             pending: () => !!S.q, reset() { closeQ('cancelled'); S.chunks = []; if (S.mode === 'scroll' && hooks.scroll) hooks.scroll(false); S.mode = 'pointer'; } };
   }
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {            // node (the unit tests)
@@ -286,6 +309,7 @@
     pointerClick, find,
     kindFor: text => { const f = B.fieldFor && B.fieldFor(text); return f === 'body' ? 'body' : f === 'subj' ? 'subj' : 'plain'; },
     recenter: () => { if (window.DZLite) window.DZLite.core.recenter(); },
+    scroll: on => !!(window.DZLite && window.DZLite.scroll && window.DZLite.scroll(on)),
     quit: () => { stop(); if (window.DZLite) window.DZLite.stop('Voice and lite mode are off.'); },
   });
   B.setSend((type, f) => {                                                    // the card's buttons: Yes / No / Type it / Drop it / Use original

@@ -6,8 +6,10 @@
    What it does (the same gestures as the engine):
    - turning or nodding your head moves the pointer like a mouse (the engine's head pointer, ported: true head angles from
      MediaPipe's face matrix, acceleration, filtering); the eyes are not used to aim, only to click
-   - a long blink (0.4 to 1.2 s, both eyes) clicks where the pointer is; quick natural blinks are ignored
+   - a long blink (0.4 to 1.6 s, both eyes) clicks where the pointer is; quick natural blinks are ignored
    - optional: mouth open for 0.6 s = right click (off by default: talking opens the mouth)
+   - scroll mode (say "scroll", or the Scroll button): the pointer holds still and tilting the chin down or up scrolls the page,
+     faster the further you tilt, like the engine's engine/eyes/scroll.py; "stop" or a long blink ends it
    - voice: the page's own microphone button (browser speech recognition) still works as before
    The engine wins: if EYEable is running on this PC, this mode switches itself off.
 
@@ -189,8 +191,53 @@
     return { step, recenter, set, cfg, state: st };
   }
 
+  /* Scrolling with the head (engine/eyes/scroll.py, ported). The head works like a joystick: the first 0.4 s sets "straight
+     ahead" (the median pitch), then chin down scrolls down and chin up scrolls up: nothing inside a 2 degree dead zone, a gentle
+     crawl just outside it for reading, faster the further you tilt, at most 25 notches a second at about 10 degrees. Speed, not
+     position: hold a small tilt to keep going, come back to straight to stop. Rates are notches per second, positive = up. */
+  const SCROLL = { dead: 2, gain: 1.5, power: 1.3, max: 25, settleMs: 400, maxStepDeg: 10, cutoff: 1, beta: 0.3, tauUp: 0.15, tauDown: 0.3 };
+  function createHeadScroll(over = {}) {
+    const c = { ...SCROLL, ...over }, f = new OneEuro(c.cutoff, c.beta, 1);
+    let t0 = null, samples = [], raw = null, wild = 0, anchor = null;
+    const me = { rate: 0, offset: 0,
+      get settled() { return anchor !== null; },
+      start() { f.reset(); t0 = null; samples = []; raw = null; wild = 0; anchor = null; me.rate = 0; me.offset = 0; },
+      update(tMs, pitch) {                                                       // one camera frame -> the speed the head asks for
+        if (!Number.isFinite(pitch)) return me.rate;
+        if (raw !== null && Math.abs(pitch - raw) > c.maxStepDeg) { if (++wild < 2) return me.rate; }   // one wild frame: keep the last speed
+        wild = 0; raw = pitch;
+        const p = f.f(tMs / 1000, pitch);
+        if (t0 === null) t0 = tMs;
+        if (anchor === null) {
+          samples.push(p);
+          if (tMs - t0 < c.settleMs) return 0;
+          const a = samples.slice().sort((x, y) => x - y), n = a.length; anchor = n % 2 ? a[n >> 1] : (a[n / 2 - 1] + a[n / 2]) / 2;
+        }
+        me.offset = p - anchor;
+        const mag = Math.min(c.max, c.gain * Math.pow(Math.max(0, Math.abs(me.offset) - c.dead), c.power));
+        me.rate = mag > 0 ? -Math.sign(me.offset) * mag : 0;
+        return me.rate;
+      } };
+    me.start();
+    return me;
+  }
+  /* The speed eases toward what the head asks for (0.15 s to speed up, 0.3 s to slow down), so it never jumps and it coasts to a
+     stop when you leave the mode or lose the face. step(dtSeconds) returns how many notches to scroll in that time. */
+  function createScroller(over = {}) {
+    const c = { ...SCROLL, ...over }; let target = 0;
+    const me = { rate: 0,
+      set(r) { target = r; },
+      step(dt) {
+        const tau = Math.abs(target) > Math.abs(me.rate) ? c.tauUp : c.tauDown;
+        me.rate += (target - me.rate) * (1 - Math.exp(-Math.max(dt, 0) / tau));
+        if (Math.abs(me.rate) < 0.02 && target === 0) me.rate = 0;
+        return me.rate * dt;
+      } };
+    return me;
+  }
+
   if (typeof window === 'undefined' || typeof document === 'undefined') {            // node (the unit tests)
-    if (typeof module !== 'undefined') module.exports = { createCore, CFG, anglesFromMatrix, anglesFromLandmarks };
+    if (typeof module !== 'undefined') module.exports = { createCore, createHeadScroll, createScroller, CFG, SCROLL, anglesFromMatrix, anglesFromLandmarks };
     return;
   }
   const D = window.DZ; if (!D) return;
@@ -231,6 +278,7 @@
     border:3px solid #fff;box-shadow:0 0 0 2px #111,0 0 14px rgba(0,0,0,.5);background:rgba(17,17,17,.25);transition:transform .08s,border-color .1s}
   .lite-cur::after{content:"";position:absolute;inset:10px;border-radius:50%;background:#111}
   .lite-cur.shut{border-color:#F0A94B}.lite-cur.ready{border-color:#4ADE80;transform:scale(1.25)}
+  .lite-cur.scrolling{border-style:dashed;border-color:#7aa7ff;opacity:.75}
   #liteCanvas{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:3;border-radius:inherit}`;
   document.head.append(css);
 
@@ -239,6 +287,7 @@
   panel.className = 'lite';
   panel.innerHTML = `
     <button class="mini-btn" id="liteBtn" type="button">Try hands-free in your browser (lite)</button>
+    <button class="mini-btn" id="liteScrollBtn" type="button" disabled title="Needs lite mode on. Chin down scrolls down, chin up scrolls up.">Scroll with my head</button>
     <div class="lite-stat" id="liteStat" aria-live="polite"></div>
     <details id="liteSet"><summary>Lite settings</summary>
       <label>Pointer <select id="liteMode"><option value="rel">Mouse-style, reaches the edges (best)</option><option value="abs">Face map: where you face is where it points</option></select></label>
@@ -266,6 +315,46 @@
   let on = false, starting = false, lm = null, stream = null, video = null, cursor = null, canvas = null, badge = null,
       raf = 0, guard = 0, lastVideoT = -1, lastClickAt = 0;
 
+  /* ---------------- scroll mode: the head scrolls, the pointer stays ---------------- */
+  const SCROLL_IDLE_MS = 10000;                                      // engine/config.py scroll_idle_s
+  const hs = createHeadScroll(), scroller = createScroller();
+  let scrolling = false, hold = null, lastFrameT = 0, lastActiveAt = 0, lastUiAt = 0;
+  const scrollBtn = () => el('liteScrollBtn');
+  function scrollMode(want) {                                        // returns true while head scrolling is on
+    if (!want) { if (scrolling) endScroll(); return false; }
+    if (!on) return false;
+    if (scrolling) return true;
+    scrolling = true; hs.start(); scroller.set(0); scroller.rate = 0;
+    hold = { x: core.state.nx, y: core.state.ny }; lastFrameT = lastActiveAt = performance.now(); lastUiAt = 0;
+    if (cursor) cursor.classList.add('scrolling');
+    scrollBtn().textContent = 'Stop scrolling';
+    log('sys', 'Lite: scroll mode on (chin down scrolls down, chin up scrolls up)');
+    tip('Scroll mode: hold your head straight for a moment, then tilt your chin down to scroll down or up to scroll up (further = faster). Say “stop” or hold a long blink to finish.');
+    return true;
+  }
+  function endScroll(why) {
+    if (!scrolling) return;
+    scrolling = false; scroller.set(0); scroller.rate = 0;
+    if (hold) { core.state.nx = hold.x; core.state.ny = hold.y; core.state.needRebase = true; }       // the pointer picks up from where it stayed
+    if (cursor) cursor.classList.remove('scrolling');
+    scrollBtn().textContent = 'Scroll with my head';
+    if (D.bridge) D.bridge.handle({ type: 'scroll', rate: 0, ready: false });
+    if (why) { setStat(why); log('sys', why); }
+    if (window.DZVoice) window.DZVoice.voice.leaveScroll();           // the card goes back to the pointer mode
+  }
+  function scrollFrame(s, o, t) {                                     // one camera frame in scroll mode
+    scroller.set(o.status === 'noface' || !s ? 0 : hs.update(s.t, s.pitch));
+    const dt = clamp((t - lastFrameT) / 1000, 0, 0.1); lastFrameT = t;
+    const notches = scroller.step(dt);
+    if (notches) { const ppn = clamp(screen.clientHeight * 0.1, 30, 90); D.scrollPx(-notches * ppn); }   // rate > 0 = up
+    if (Math.abs(scroller.rate) > 0.5) lastActiveAt = t;
+    if (t - lastActiveAt > SCROLL_IDLE_MS) { endScroll('Scroll mode ended: no scrolling for 10 seconds.'); return; }
+    if (D.bridge && t - lastUiAt > 100) { lastUiAt = t; D.bridge.handle({ type: 'scroll', rate: +scroller.rate.toFixed(1), ready: hs.settled }); }
+    const r = Math.abs(scroller.rate) > 0.5 ? (scroller.rate > 0 ? '↑ ' : '↓ ') + Math.abs(scroller.rate).toFixed(1) + ' notches/s' : 'still';
+    setStat(o.status === 'noface' ? 'No face found. Scrolling has stopped.' : !hs.settled ? 'Scroll mode: hold your head straight for a moment…'
+      : 'Scroll mode (' + r + '): chin down scrolls down, chin up scrolls up. Say “stop” or hold a long blink to finish.');
+  }
+
   function sample(res, t) {
     const f = res && res.faceLandmarks && res.faceLandmarks[0];
     if (!f) return null;
@@ -288,14 +377,20 @@
     try { s = sample(lm.detect(video, t), t); } catch (e) { setStat('Tracker error: ' + e.message); return; }
     const o = core.step(s);
     draw(s, o);
-    if (o.status === 'noface') { setStat('No face found. Move into view and face the screen.'); return; }
+    if (scrolling) { o.x = hold.x; o.y = hold.y; core.state.nx = hold.x; core.state.ny = hold.y; }   // the pointer stays where it was
+    if (o.status === 'noface') { if (scrolling) scrollFrame(s, o, t); else setStat('No face found. Move into view and face the screen.'); return; }
 
     const r = screen.getBoundingClientRect();
     const px = o.x * r.width, py = o.y * r.height;
     if (!G.paused && !G.scripted) { G.target.x = G.pos.x = px; G.target.y = G.pos.y = py; }
     cursor.style.transform = `translate(${px}px,${py}px)`;
     cursor.className = 'lite-cur' + (o.status === 'closed' ? (o.blinkMs >= core.cfg.blinkMinMs ? ' ready' : ' shut') : '');
-    setStat(o.status === 'closed'
+    if (scrolling) {
+      if (o.events.some(ev => ev.type === 'click')) { endScroll('Scroll mode ended: long blink.'); o.events.length = 0; }   // like the engine: a blink leaves scroll mode, it does not click
+      else scrollFrame(s, o, t);
+      o.events = o.events.filter(ev => ev.type !== 'rightclick' || !scrolling);
+    }
+    if (!scrolling) setStat(o.status === 'closed'
       ? (o.blinkMs >= core.cfg.blinkMinMs ? 'Eyes shut ' + (o.blinkMs / 1000).toFixed(1) + ' s: open them to click' : 'Eyes shut… keep them closed a bit longer to click')
       : 'Tracking. Turn your head to move (small turns aim, fast turns throw). Hold a long blink to click.');
 
@@ -340,7 +435,7 @@
     badge = document.createElement('div'); badge.className = 'sim-badge'; badge.textContent = 'SIMULATION · LITE MODE'; screen.append(badge);
     $('#camSrc').textContent = 'source: your webcam (lite, in this tab)';
     core.recenter(); on = true; starting = false; D.engineLive = true;
-    el('liteBtn').disabled = false; el('liteBtn').textContent = 'Stop lite mode';
+    el('liteBtn').disabled = false; el('liteBtn').textContent = 'Stop lite mode'; scrollBtn().disabled = false;
     log('sys', 'Lite mode on: the head moves the pointer, a long blink clicks (simulation, runs in this tab)');
     tip('Lite mode: turn your head to move the pointer like a mouse (small turns aim, quick turns throw it). Hold a long blink, about half a second, to click.');
     guard = setInterval(() => { const p = document.getElementById('engPill'); if (p && !p.classList.contains('off')) stop('EYEable connected: using the real engine instead.', true); }, 1000);
@@ -355,7 +450,8 @@
   }
   function stop(why, engineTook) {
     if (!on) return;
-    on = false; cancelAnimationFrame(raf); clearInterval(guard); cleanup();
+    if (scrolling) endScroll();
+    on = false; cancelAnimationFrame(raf); clearInterval(guard); cleanup(); scrollBtn().disabled = true;
     if (!engineTook) D.engineLive = false;
     el('liteBtn').textContent = 'Try hands-free in your browser (lite)';
     $('#camSrc').textContent = 'source: simulated face';
@@ -369,5 +465,9 @@
   el('liteFx').addEventListener('change', e => core.set('flipX', e.target.checked));
   el('liteFy').addEventListener('change', e => core.set('flipY', e.target.checked));
   el('liteMouth').addEventListener('change', e => core.set('mouthClick', e.target.checked));
-  window.DZLite = { start, stop, core };
+  scrollBtn().addEventListener('click', () => {
+    const V = window.DZVoice && window.DZVoice.voice;
+    if (scrolling) { if (V) V.leaveScroll('Scroll off'); else endScroll(); } else if (V) V.enterScroll(); else scrollMode(true);
+  });
+  window.DZLite = { start, stop, core, scroll: scrollMode, isScrolling: () => scrolling };
 })();

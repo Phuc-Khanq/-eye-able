@@ -1,7 +1,7 @@
 // Unit tests for the lite-mode head pointer and blink click (eyeable-frontend/eyeable-frontend/js/lite.js).
 // Run: node tests/lite_core.test.js
 const assert = require('assert');
-const { createCore, anglesFromMatrix } = require('../eyeable-frontend/eyeable-frontend/js/lite.js');
+const { createCore, createHeadScroll, createScroller, anglesFromMatrix } = require('../eyeable-frontend/eyeable-frontend/js/lite.js');
 
 let T = 0;
 const face = (t, o = {}) => ({ yaw: o.yaw || 0, pitch: o.pitch || 0, blinkL: o.b || 0, blinkR: o.b || 0, jaw: o.jaw || 0, t });
@@ -102,6 +102,40 @@ test('head angles from the face matrix: yaw > 0 turned right, pitch > 0 chin dow
     assert(Math.abs(a.pitch - rx) < 1e-6 && Math.abs(a.yaw + ry) < 1e-6, `${colMajor} ${rx},${ry}: ${JSON.stringify(a)}`);
   }
   assert.strictEqual(anglesFromMatrix(null), null);
+});
+
+// ---- scroll mode: the head scrolls (engine/eyes/scroll.py, ported). Rates are notches per second, positive = up.
+const settle = (h, pitch = 0, n = 40, t0 = 0, dt = 33) => { let r = 0; for (let i = 0; i < n; i++) r = h.update(t0 + i * dt, pitch); return r; };
+test('head scroll: straight ahead and a small tilt (inside the 2 degree dead zone) do nothing', () => {
+  const h = createHeadScroll(); assert.strictEqual(settle(h, 3), 0); assert(h.settled);          // the first 0.4 s sets "straight ahead", whatever the pitch is
+  assert.strictEqual(settle(h, 4.5, 30, 2000), 0);                                               // 1.5 degrees off: nothing
+});
+test('head scroll: chin down scrolls down (negative), chin up scrolls up (positive), further = faster', () => {
+  const h = createHeadScroll(); settle(h, 0);
+  const down = settle(h, 5, 40, 2000), farther = settle(h, 9, 40, 4000), up = settle(h, -5, 80, 6000);
+  assert(down < -1 && farther < down, `${down} ${farther}`); assert(up > 1, 'up=' + up);
+});
+test('head scroll: gentle crawl just outside the dead zone, capped at 25 notches a second', () => {
+  const h = createHeadScroll(); settle(h, 0);
+  const crawl = settle(h, 3, 40, 2000); assert(crawl < 0 && crawl > -3, 'crawl=' + crawl);
+  const fast = settle(h, 9.5, 40, 4000); assert(fast >= -25 - 1e-9, 'fast=' + fast);
+  const top = createHeadScroll({ max: 25 }); settle(top, 0); let r = 0, p = 0; for (let i = 0; i < 400; i++) { p = Math.min(40, p + 0.5); r = top.update(2000 + i * 33, p); } assert(Math.abs(r) <= 25 + 1e-9 && Math.abs(r) > 24, 'r=' + r);
+});
+test('head scroll: coming back to straight stops it; one wild frame is skipped', () => {
+  const h = createHeadScroll(); settle(h, 0); const moving = settle(h, 6, 40, 2000); assert(moving < -2);
+  assert.strictEqual(settle(h, 0, 120, 4000), 0);
+  const g = createHeadScroll(); settle(g, 0); settle(g, 4, 30, 2000); const before = g.rate; assert.strictEqual(g.update(3500, 40), before);   // a 36 degree jump in one frame
+});
+test('head scroll: start() forgets the old straight-ahead', () => {
+  const h = createHeadScroll(); settle(h, 0); settle(h, 6, 40, 2000); h.start(); assert(!h.settled && h.rate === 0);
+  assert.strictEqual(settle(h, 6, 60, 5000), 0);                                                 // 6 degrees is the new "straight ahead"
+});
+test('scroller: eases up in about 0.15 s and down in 0.3 s, coasts to a stop, never jumps', () => {
+  const sc = createScroller(); sc.set(20); const first = sc.step(1 / 60); assert(first > 0 && sc.rate < 5, 'rate=' + sc.rate);
+  let total = first; for (let i = 0; i < 60; i++) total += sc.step(1 / 60); assert(sc.rate > 19.5, 'rate=' + sc.rate); assert(total > 15 && total < 21, 'total=' + total);   // about 1 s at 20/s minus the ramp
+  sc.set(0); for (let i = 0; i < 12; i++) sc.step(1 / 60); assert(sc.rate > 1 && sc.rate < 12, 'coasting: ' + sc.rate);        // not stopped dead after 0.2 s
+  for (let i = 0; i < 180; i++) sc.step(1 / 60); assert.strictEqual(sc.rate, 0);
+  sc.set(-10); sc.step(0.5); assert(sc.rate < 0 && sc.step(0.1) < 0);                            // negative = down
 });
 
 let failed = 0;

@@ -57,7 +57,9 @@
     (function frame(now){
       requestAnimationFrame(frame);
       const dt = Math.min(50, now - last)/1000; last = now;
-      if (page.hidden || $('#intro').hidden) return;
+      const on = (!$('#intro').hidden && $('#pg-home').hidden) || !$('#demo').hidden;   // every page except Home (it has its own star field)
+      if (cv.classList.contains('on') !== on) cv.classList.toggle('on', on);
+      if (!on && getComputedStyle(cv).opacity < .01) return;
       x.clearRect(0, 0, W, H); const t = now/1000;
       for (const d of D){
         if (!reduce){ d.x += d.vx*dt; d.y += d.vy*dt; if (d.x < -5) d.x = W+5; if (d.x > W+5) d.x = -5; if (d.y < -5) d.y = H+5; if (d.y > H+5) d.y = -5; }

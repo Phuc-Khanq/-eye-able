@@ -745,7 +745,8 @@ header.top{border:1px solid rgba(255,255,255,.85)!important;box-shadow:0 0 6px r
 
 /* How it works: soft twinkling dots in Peep's colours */
 #howDots{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none;opacity:0;transition:opacity 1.2s ease}
-#pg-how:not([hidden]) #howDots{opacity:1}
+#howDots.on{opacity:1}
+main#intro,main#demo{position:relative}
 #pg-how > .wrap{position:relative;z-index:1}
 .gnote{margin:10px 2px 0;font-size:13px;color:var(--muted)}
 .gnote b{color:var(--ink);font-weight:600}
@@ -1075,3 +1076,11 @@ header.top{border:1px solid rgba(255,255,255,.85)!important;box-shadow:0 0 6px r
 .tray{gap:7px}
 .tray-chev{width:18px}
 @media (max-width:1500px){.tb-weather small{display:none}}
+
+/* ===== Live demo: white glow borders ===== */
+#demo .monitor{box-shadow:0 0 0 1px rgba(255,255,255,.62),0 0 14px rgba(255,255,255,.38),0 0 34px rgba(255,255,255,.12),inset 0 0 0 1px rgba(255,255,255,.06),0 30px 60px -30px rgba(0,0,0,.9)}
+#demo .card{border-color:rgba(255,255,255,.55)!important;box-shadow:0 0 6px rgba(255,255,255,.3),0 0 20px rgba(255,255,255,.1),inset 0 0 12px rgba(255,255,255,.05)!important}
+#demo .pill,#demo .demo-btn,#demo .mini-btn,#demo .lower .btn{border-color:rgba(255,255,255,.45)!important;box-shadow:0 0 6px rgba(255,255,255,.22),inset 0 0 8px rgba(255,255,255,.04)}
+#demo .demo-btn:hover,#demo .mini-btn:hover{border-color:rgba(255,255,255,.85)!important;box-shadow:0 0 10px rgba(255,255,255,.45),inset 0 0 10px rgba(255,255,255,.06)}
+#demo .plot-wrap,#demo .cam{border:1px solid rgba(255,255,255,.28);box-shadow:0 0 8px rgba(255,255,255,.12)}
+@media (min-width:1101px){#demo .monitor-scroll{overflow:visible}}

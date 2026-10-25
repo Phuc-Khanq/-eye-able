@@ -84,10 +84,11 @@ class EyesService:
     def __init__(self, bus, settings=default_settings, pointer: str = "head", dwell: bool = False,
                  model_path: str | None = None, os_api=None, camera_factory=None, mesh_factory=None,
                  features=None, head_pose=None, clock=time.monotonic, confirm: str = "brow",
-                 probe=None) -> None:
+                 probe=None, preview=None) -> None:
         if confirm not in CONFIRMS:
             raise ValueError(f"confirm must be one of {CONFIRMS}")
         self.confirm = confirm
+        self.preview = preview           # engine/eyes/preview.py PreviewStream: the webcam picture for the demo page
         real_os = os_api is None
         if os_api is None:
             from engine.eyes import os_input as os_api
@@ -240,6 +241,8 @@ class EyesService:
                 if frame is None or new_id == frame_id:
                     continue
                 frame_id = new_id
+                if self.preview is not None:
+                    self.preview.offer(frame)
                 self.process(mesh.process(frame, t_ms), self.clock())
         except Exception as exc:   # report it; the voice side keeps running
             self._status("error", f"Eyes stopped: {type(exc).__name__}: {exc}")

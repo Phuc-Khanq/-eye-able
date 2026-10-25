@@ -156,6 +156,19 @@ class Settings:
     # Engine <-> UI
     ws_host: str = "127.0.0.1"
     ws_port: int = 8765
+    # Only pages from these addresses may connect to the engine (a browser page on any other site could otherwise
+    # read the webcam picture and press yes for you). serve_demo.py uses port 8000. Programs that send no Origin
+    # (the tests, the fake engine) are always fine. Add your own page's address here if you serve it elsewhere.
+    ws_allowed_origins: list = field(default_factory=lambda: [
+        "http://localhost:8000", "http://127.0.0.1:8000",
+        "http://localhost:5500", "http://127.0.0.1:5500",     # VS Code Live Server
+        "https://phuc-khanq.github.io",                       # the hosted website (it falls back to its simulation)
+    ])
+    # The demo page (website/): the engine acts inside its simulated desktop and streams the webcam picture to it
+    preview_stream: bool = True    # send the webcam picture to the demo page while it is open (never saved)
+    preview_fps: int = 12
+    preview_width: int = 480
+    preview_quality: int = 65      # JPEG quality 1 to 100
 
 
 def load() -> Settings:

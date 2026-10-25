@@ -33,6 +33,7 @@ from engine.config import settings
 from engine.core import messages, topics
 from engine.core.events import EventBus, WebSocketRelay
 from engine.core.mode_manager import CONFIRM_TIMEOUT_S, ModeManager
+from engine.core.page_mode import PageMode
 from engine.voice.audio_in import AudioIn
 from engine.voice.dictation import Dictation, DictationWorker
 from engine.voice.voice_data import VoiceData
@@ -65,14 +66,22 @@ class Engine:
         #    topics.OS_* on Windows. Off by default (eyes=False), so tests never touch the camera,
         #    the cursor or the keyboard; run() turns it on.
         self.eyes = self.targets = self.os_output = self.mouth = self.meter = self.card = self.click_fx = None
+        self.preview = None
+        # The website's demo page: while it is open it gets typing, keys, scrolling and "open ..." instead of Windows,
+        # and the webcam picture (engine/core/page_mode.py, engine/eyes/preview.py)
+        self.page = PageMode(bus)
         if eyes:
             from engine.eyes.mouth import MouthTracker
             from engine.eyes.os_output import OsOutput
             from engine.eyes.service import EyesService
             from engine.eyes.target_service import TargetService
-            self.eyes = EyesService(bus, settings, pointer=pointer, dwell=dwell, confirm=confirm)
+            if getattr(settings, "preview_stream", True):
+                from engine.eyes.preview import PreviewStream
+                self.preview = PreviewStream(bus, settings, self.page)
+            self.eyes = EyesService(bus, settings, pointer=pointer, dwell=dwell, confirm=confirm,
+                                    preview=self.preview)
             self.targets = TargetService(bus, settings, probe=self.eyes.probe)   # snap: on a link already?
-            self.os_output = OsOutput(bus, driver=self.eyes.driver, scroller=self.eyes.scroller)
+            self.os_output = OsOutput(bus, driver=self.eyes.driver, scroller=self.eyes.scroller, page=self.page)
             # Was the user's mouth moving? For the voice route's "only the user's voice" gate.
             self.mouth = MouthTracker(bus)
             self.mode_manager.mouth = self.mouth     # an eyebrow raise while talking is ignored
@@ -83,6 +92,7 @@ class Engine:
                 bus, flash=flash, sound=bool(getattr(settings, "click_sound", True)),
                 volume=float(getattr(settings, "click_sound_volume", 0.5)),
                 hide_from_capture=bool(getattr(settings, "card_hide_from_capture", True)))
+            self.click_fx.page = self.page
             if getattr(settings, "dwell_meter", True) or card or flash:
                 from engine.eyes.dwell_meter import DwellMeter
                 self.meter = DwellMeter(bus)         # the dwell ring at the cursor, without the Electron UI
@@ -96,6 +106,7 @@ class Engine:
                                           heard_outside_dictation=bool(getattr(settings, "card_heard_outside_dictation",
                                                                                False)),
                                           command_flash=bool(getattr(settings, "card_command_flash", True)))
+                self.card.page = self.page
                 self.meter.add_window(self.card.attach)   # what was heard and what will be typed, on screen
         # 3. voice: audio_in -> dictation -> transcripts for the mode manager
         #    (without eyes, mouth is None: no gate, every word counts)
@@ -112,6 +123,8 @@ class Engine:
         if self.eyes:
             self.targets.start()                     # UI-Venus loads on its own worker thread
             self.eyes.start()                        # camera thread and the cursor glide
+            if self.preview:
+                self.preview.start()                 # the webcam picture for the demo page, when it is open
             if self.meter:
                 self.meter.start()                   # its own Tk thread (Windows only)
         self.dictation.start(warm_up=self.warm_up)   # Whisper loads on its own thread
@@ -130,6 +143,8 @@ class Engine:
             self.rewrite.stop()
         self.mode_manager.stop()
         if self.eyes:
+            if self.preview:
+                self.preview.stop()
             self.eyes.stop()
             self.targets.stop()
             self.os_output.stop()
@@ -284,7 +299,7 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
               stdin: bool = False, confirm: str = "brow", rewrite: bool = False, gpu_log: bool = False) -> None:
     bus = EventBus()
     relay = WebSocketRelay(bus)
-    await relay.start(settings.ws_host, settings.ws_port)
+    await relay.start(settings.ws_host, settings.ws_port, origins=list(settings.ws_allowed_origins))
     log_to_console(bus)
     if getattr(settings, "stt_backend", "whisper") == "whisper":
         use_cpu_without_gpu(settings)

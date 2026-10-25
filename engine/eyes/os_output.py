@@ -2,6 +2,8 @@
 
 Route: Khang and Hung (Hung leads os_input; this is the bus side of it)
 Publishes: status (to the UI) when opening something, or when an action fails
+Page mode (engine/core/page_mode.py): while the website's demo page is open, type, key, scroll, undo and launch go to it
+as a page_action message instead of to Windows. Clicks, volume and brightness stay real.
 Subscribes: topics.OS_CLICK {"x", "y", "button": "left" | "right" (optional, left)}, OS_TYPE {"text"}, OS_KEY {"key": "enter" | "shift+enter" | ...},
             OS_SCROLL {"direction": "up" | "down"}, OS_UNDO {},
             OS_LAUNCH {"app": a key of settings.launch_apps} or {"url": "https://..."},
@@ -41,13 +43,14 @@ def start(kind: str, target: str) -> None:
 
 class OsOutput:
     def __init__(self, bus, driver=None, os_api=None, scroller=None, settings=None, launcher=None,
-                 system=None) -> None:
+                 system=None, page=None) -> None:
         if os_api is None:
             from engine.eyes import os_input as os_api
         if settings is None:
             from engine.config import settings
         self.bus, self.driver, self.os, self.scroller = bus, driver, os_api, scroller
         self.settings, self.launcher = settings, launcher or start
+        self.page = page     # engine.core.page_mode.PageMode: while it is active, the demo page gets the actions
         if system is None:
             from engine.eyes.system_controls import run_action as system
         self.system = system     # (action, os_api) -> status text; tests pass a fake
@@ -65,13 +68,26 @@ class OsOutput:
         click = partial(self.os.click, button="right") if p.get("button") == "right" else self.os.click
         self._safely("click", lambda: self.driver.click(x, y, click) if self.driver else click(x, y))
 
+    def _to_page(self, action: str, **fields) -> bool:
+        """Page mode: the demo page acts it out on its simulated desktop. True if it went there."""
+        if self.page is None or not self.page.active:
+            return False
+        self.bus.publish(topics.TO_UI, messages.make(messages.PAGE_ACTION, action=action, **fields))
+        return True
+
     def on_type(self, p: dict) -> None:
+        if self._to_page("type", text=str(p.get("text", ""))):
+            return
         self._safely("type", lambda: self.os.type_text(p.get("text", "")))
 
     def on_key(self, p: dict) -> None:
+        if self._to_page("key", key=str(p.get("key", ""))):
+            return
         self._safely("key", lambda: self.os.combo(p.get("key", "")))
 
     def on_scroll(self, p: dict) -> None:
+        if self._to_page("scroll", direction="up" if p.get("direction") == "up" else "down"):
+            return
         if self.scroller is not None:
             self.scroller.glide("up" if p.get("direction") == "up" else "down", notches=SCROLL_NOTCHES)
             return
@@ -79,6 +95,8 @@ class OsOutput:
         self._safely("scroll", lambda: self.os.scroll(notches))
 
     def on_undo(self, p: dict) -> None:
+        if self._to_page("undo"):
+            return
         self._safely("undo", lambda: self.os.combo("ctrl+z"))
 
     def on_system(self, p: dict) -> None:
@@ -100,6 +118,14 @@ class OsOutput:
     def on_launch(self, p: dict) -> None:
         """Start an app from settings.launch_apps, or open an https:// URL. Anything else: a warning only."""
         app, url = p.get("app"), p.get("url")
+        if self.page is not None and self.page.active:   # the page opens its own Chrome, Google, YouTube and Mail
+            if app is not None:
+                self._to_page("launch", app=str(app))
+            elif isinstance(url, str) and url.startswith("https://") and not any(c.isspace() for c in url):
+                self._to_page("launch", url=url)
+            else:
+                self._status("warn", f"Not opening {url!r}: only https:// sites")
+            return
         if app is not None:
             apps = getattr(self.settings, "launch_apps", {}) or {}
             target = apps.get(app) if isinstance(app, str) else None

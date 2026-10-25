@@ -42,8 +42,15 @@ COMMAND = "command"                      # label ("Volume up", "New tab", "Brigh
 CONFIRM = "confirm"                      # id ("q1"), prompt, state: "open" | "confirmed" | "cancelled" | "expired",
                                          # expires_in_s (12.0 when open, 0 otherwise). Same id from open to the end
 
+# Page mode (the website's simulated desktop): while the demo page is open and sends PAGE_MODE, typing, keys, scrolling and
+# "open ..." go to the page as PAGE_ACTION instead of to Windows, and the webcam picture is streamed as DEBUG_FRAME.
+# Clicks stay real: the page is under the real cursor.
+PAGE_ACTION = "page_action"              # action: "type" (text) | "key" (key: "enter", "ctrl+c", "alt+left"...) |
+                                         # "scroll" (direction: "up"|"down") | "undo" | "launch" (app: a launch_apps key,
+                                         # or url: https://...)
+DEBUG_FRAME = "debug_frame"              # jpeg (base64) of the webcam, mirrored, about preview_width px wide; w, h. Only
+                                         # while the page keeps sending PAGE_MODE. Never saved; goes to the page on 127.0.0.1
 # Engine -> UI, only while the console is open. Not sent by the engine yet (names reserved)
-DEBUG_FRAME = "debug_frame"              # jpeg (base64), 640 px wide
 DEBUG_FACE = "debug_face"                # eye, iris and head-pose points
 DEBUG_FEATURES = "debug_features"        # h, v, lid per eye
 TARGET_DEBUG = "target_debug"            # crop (base64 JPEG), x, y, ms
@@ -66,6 +73,8 @@ FIELDS: dict[str, tuple[set[str], set[str]]] = {
     STATUS: ({"level", "text"}, set()),
     CONFIRM: ({"id", "prompt", "state", "expires_in_s"}, set()),
     COMMAND: ({"label"}, set()),
+    PAGE_ACTION: ({"action"}, {"text", "key", "direction", "app", "url"}),
+    DEBUG_FRAME: ({"jpeg", "w", "h"}, set()),
 }
 
 # UI -> engine
@@ -73,10 +82,12 @@ SET_MODE = "set_mode"                    # mode
 CALIBRATE = "calibrate"                  # action: "start" | "cancel"
 MENU_SELECT = "menu_select"              # item
 SETTINGS = "settings"                    # pause_seconds, dwell_ms, sensitivity
-DICTATION = "dictation"                  # action: "insert" | "discard" | "edit_word"
+DICTATION = "dictation"                  # action: "insert" | "discard" | "use_original" | "edit_word"
 TARGET = "target"                        # action: "click" | "cancel"
 CONSOLE = "console"                      # open: true/false
 CONFIRM_ANSWER = "confirm_answer"        # id, yes: true/false (a button, same as nod / shake)
+PAGE_MODE = "page_mode"                  # on: true. The demo page sends it every 2 s while it is open and showing; the engine
+                                         # treats it as on for 6 s after the last one (so a closed page can never swallow typing)
 
 
 def make(msg_type: str, **fields) -> dict:

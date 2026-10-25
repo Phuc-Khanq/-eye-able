@@ -505,6 +505,8 @@ class ModeManager:
                 self._insert_preview()
             elif action == "discard":
                 self._discard_preview()
+            elif action == "use_original":     # the card's "Use original": show the user's own words, not the clean-up
+                self._do(Command(name="use_original"))
             elif action == "edit_word":
                 shown = self._shown_words()
                 i = msg.get("index", -1)

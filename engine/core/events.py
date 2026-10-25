@@ -90,11 +90,14 @@ class WebSocketRelay:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._server = None
 
-    async def start(self, host: str, port: int) -> None:
+    async def start(self, host: str, port: int, origins: list[str] | None = None) -> None:
+        """origins: the web addresses allowed to connect (None = anyone). A program that sends no Origin header is
+        always allowed; a web page on another site is refused, so it can't read the camera picture or answer for you."""
         from websockets.asyncio.server import serve  # imported here so tests run without it
 
         self._loop = asyncio.get_running_loop()
-        self._server = await serve(self._handle, host, port)
+        self._server = await serve(self._handle, host, port,
+                                   origins=None if origins is None else [*origins, None])
         self.bus.subscribe(topics.TO_UI, self.send)
 
     async def close(self) -> None:

@@ -150,6 +150,7 @@ class ClickFeedback:
         self.flash = FlashModel(clock) if flash else None
         self.sound = ClickSound(volume, player=player) if sound else None
         self.hide_from_capture = hide_from_capture
+        self.page = None   # engine.core.page_mode.PageMode: the demo page draws its own click ripple, so no flash then
         if self.sound is not None:
             self.sound.prepare()
         bus.subscribe(topics.OS_CLICK, self.on_click)
@@ -159,7 +160,7 @@ class ClickFeedback:
         button = "right" if payload.get("button") == "right" else "left"
         if self.sound is not None:
             self.sound.play(button)
-        if self.flash is not None:
+        if self.flash is not None and not (self.page is not None and self.page.active):
             self.flash.on_click(float(payload["x"]), float(payload["y"]), button)
 
     # ------------------------------------------------------------- Tk thread (the click ring's)

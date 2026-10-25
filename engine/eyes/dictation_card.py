@@ -272,6 +272,7 @@ class DictationCard:
         self.opacity = min(1.0, max(0.3, float(opacity)))
         self.position = position
         self._lock = threading.Lock()
+        self.page = None   # engine.core.page_mode.PageMode: the demo page draws its own card, so this one hides
         bus.subscribe(topics.TO_UI, self._on_ui)
         bus.subscribe(topics.TRANSCRIPT, self._on_transcript)
         bus.subscribe(topics.OS_TYPE, self._on_type)
@@ -291,6 +292,8 @@ class DictationCard:
     def view(self) -> tuple[View, tuple]:
         with self._lock:
             self.model.tick_wave()
+            if self.page is not None and self.page.active:
+                return View(kind="hidden"), ()
             return self.model.view(), tuple(round(v, 2) for v in self.model.levels)
 
     # ------------------------------------------------------------- Tk thread (the click ring's)

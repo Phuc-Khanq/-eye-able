@@ -166,6 +166,7 @@
       setMode('pointer'); if (label) flash(label);
     }
     const SCROLL_EXIT = ['stop', 'done', 'stop scrolling'];
+    const SCROLL_HEARD = new Set(['scrolls', 'scrolled', 'scrolling', 'scrawl', 'scrawls', 'stroll', 'strolls', 'skroll', 'scroll it', 'scrawl mode', 'stroll mode', 'scrolling mode', 'scrolls mode', 'start scroll', 'start scroll mode']);   // only outside dictation, where those words are not typed
 
     function run(cmd, raw) {
       const n = cmd.name, say = l => flash(l);
@@ -244,6 +245,7 @@
         if (cl) { run(cl, t); return; }
         S.chunks.push(t.replace(/\s+/g, ' ')); showPreview(); return;      // everything else is words to type
       }
+      if (SCROLL_HEARD.has(clean)) { run({ name: 'scroll_mode' }, t); return; }   // one short word is often misheard ("scrawl", "stroll")
       let cmd = parse(t, false);                                          // pointer mode: fixed commands, then open/go to/search, then look-and-say
       if (cmd && cmd.name !== 'type_text') { run(cmd, t); return; }
       const l = launch(t);

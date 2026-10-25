@@ -139,6 +139,10 @@ test('"scroll" starts head scrolling when lite mode can, and the card goes to Sc
   const r = scrollRig(); r.v.heard('scroll');
   assert.deepStrictEqual(r.calls, [true]); assert.strictEqual(r.v.state.mode, 'scroll'); assert.strictEqual(r.last('mode').mode, 'scroll');
 });
+test('a misheard "scroll" (scrawl, stroll, scrolls...) still starts it, but those words are typed while dictating', () => {
+  for (const w of ['Scrawl.', 'stroll', 'Scrolls', 'scrolling', 'scroll it', 'Stroll mode']) { const r = scrollRig(); r.v.heard(w); assert.strictEqual(r.v.state.mode, 'scroll', w); }
+  const d = scrollRig(); d.v.heard('start dictation'); d.v.heard('we went for a stroll'); d.v.heard('stroll'); assert.strictEqual(d.v.state.mode, 'dictation'); assert.deepStrictEqual(d.calls, []);
+});
 test('"scroll" without the camera says what to do and stays in pointer mode', () => {
   const r = scrollRig(false); r.v.heard('scroll');
   assert.strictEqual(r.v.state.mode, 'pointer'); assert(/Try hands-free/.test(r.last('status').text), JSON.stringify(r.last('status')));

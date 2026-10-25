@@ -686,13 +686,16 @@
     const pg = $('#pg-gestures'), rows = [...pg.querySelectorAll('.gr')], cv = $('#gxCv'), ctx = cv.getContext('2d');
     const img = $('#gxImg'), srcs = [...document.querySelectorAll('#ctlAcc .inp-img')].map(i => i.getAttribute('src'));
     srcs.push($('#gxBlinkSrc').getAttribute('src'));
-    const IMG = [4,6,1,4,3,3,5,5,2,0,5];
+    const IMG = [0,6,1,4,3,3,5,5,2,4,5];
     const bump = (t, a, b, h, e=.12) => { if (t < a - e || t > b + e) return 0; if (t < a) return h*(1 - (a - t)/e)**2*0 + h*Math.sin((t - a + e)/e*Math.PI/2)**2*(t>a-e?1:0); if (t > b) return h*Math.cos((t - b)/e*Math.PI/2)**2; return h; };
     const n = (t, k) => .03*Math.sin(t*23 + k) + .02*Math.sin(t*41 + k*2);
     // each gesture: signal name, value(t) in a 3 s loop (0..1 or -1..1), thresholds, events [time, label]
     const vox = (t, a, b) => (t > a && t < b ? (.25 + .45*Math.abs(Math.sin(t*31)*Math.sin(t*7.3))) * Math.sin(t*44) : 0);
+    // gaze target jumps around the screen; eyes jump (sharp, jittery), the pointer glides after them
+    const sg = x => 1/(1 + Math.exp(-x)), GZ = [[.4,-.5],[1.1,.45],[1.8,-.2],[2.5,.55]];
+    const gz = (t, w) => GZ.reduce((v, [ti, tv], i) => v + (tv - (i ? GZ[i-1][1] : .55))*sg((t - ti)/w), .55);
     const SIG = [
-      {name:'eye + head movement', sym:true, f:t => .55*Math.sin(t*2.1) + .25*Math.sin(t*5.3 + 1) + n(t,1), th:[], ev:[]},
+      {name:'eyes \u2192 pointer', sym:true, f:t => gz(t - .09, .1) + n(t,1)*.5, f2:t => gz(t, .03) + n(t,1)*3.2, lab:['pointer','eyes'], th:[], ev:[]},
       {name:'eyes shut', f:t => .06 + bump(t, .35, .42, .8, .06) + bump(t, 1.0, 1.9, .85, .12) + n(t,8)*.6, th:[.6], ev:[[.45,'blink \u00b7 ignored'],[1.98,'LEFT CLICK']]},
       {name:'eyebrow raise', f:t => .06 + bump(t, 1.0, 1.55, .5) + n(t,2), th:[.3], ev:[[1.3,'YES']]},
       {name:'head shake', sym:true, f:t => (t > .6 && t < 1.5 ? .75*Math.sin((t - .6)*Math.PI*2/.45) : 0) + n(t,5), th:[.5,-.5], ev:[[1.55,'NO \u00b7 cancel']]},
@@ -749,6 +752,16 @@
           ctx.fillStyle = `rgba(232,245,223,${a})`; ctx.fillText(lab, lx + 6, top + 1); }
         ctx.lineWidth = 1;
       });
+      // second trace (eyes): thin amber line under the main one
+      if (g.f2){
+        ctx.lineWidth = 1.2; ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(240,169,75,.75)'; ctx.shadowColor = 'rgba(240,169,75,.5)'; ctx.shadowBlur = 4; ctx.beginPath();
+        for (let x = 0; x <= W; x += 2){ const t = T - (1 - x/W)*WIN, y = Y(g.f2(((t % CYC) + CYC) % CYC)); x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+        ctx.stroke(); ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(240,169,75,.95)'; ctx.beginPath(); ctx.arc(W - 3, Y(g.f2(((T % CYC) + CYC) % CYC)), 2.6, 0, 6.283); ctx.fill();
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText('\u2014 ' + g.lab[0], 8, bot - 4);
+        ctx.fillStyle = 'rgba(240,169,75,.95)'; ctx.fillText('\u2014 ' + g.lab[1], 8 + ctx.measureText('\u2014 ' + g.lab[0]).width + 14, bot - 4);
+      }
       // trace: glowing line, green while it is past the threshold
       const step = 2; let px = null, py = null;
       ctx.lineWidth = 1.7; ctx.lineCap = 'round';

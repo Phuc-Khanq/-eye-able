@@ -20,7 +20,7 @@
       'Say ' + say('open YouTube') + '.',
       'Say ' + say('play video two') + ' (any number from one to eight).',
       'Say ' + say('pause video') + ', then ' + say('play video') + '.',
-      'Say ' + say('like this video') + '.',
+      'Say ' + say('like this video') + ', then ' + say('unlike the video') + ' to take it back.',
       'Say ' + say('go home') + ' to go back to the start page.'] },
     { t: 'Search and scroll', tag: 'voice + head', steps: [
       'Say ' + say('search for cats and dogs') + ' or ' + say('search YouTube for piano music') + '.',

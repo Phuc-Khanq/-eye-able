@@ -351,9 +351,11 @@
         else { D.run('open:youtube', 'voice'); D.run('watch:' + i, 'voice'); }
         D.renderAll(); break;
       }
-      case 'play_toggle': case 'like':
+      case 'play_toggle': case 'like': case 'unlike':
         if (b.page !== 'watch') { toast('Open a video first, for example say “play video one”.'); break; }
-        D.run(m.name === 'like' ? 'like' : 'play', 'voice'); D.renderAll(); break;
+        if (m.name === 'like' || m.name === 'unlike') { if (!!b.liked !== (m.name === 'like')) D.run('like', 'voice'); }   // "like" and "unlike" set the state, they never flip it
+        else D.run('play', 'voice');
+        D.renderAll(); break;
       case 'compose': D.openWin('mail'); D.run('compose', 'voice'); D.renderAll(); break;
       case 'inbox': D.openWin('mail'); D.run('inbox', 'voice'); D.renderAll(); break;
       case 'sent': D.openWin('mail'); D.run('sentbox', 'voice'); D.renderAll(); break;

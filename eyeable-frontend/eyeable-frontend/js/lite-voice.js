@@ -117,6 +117,7 @@
     }
     if (/^(pause|play|resume|stop) (the |this )?video$/.test(clean)) return { name: 'play_toggle', say: /^(pause|stop)/.test(clean) ? 'Pause video' : 'Play video' };
     if (/^(like|thumbs up)( the| this)?( video)?$/.test(clean) && clean !== 'like') return { name: 'like', say: 'Like' };
+    if (/^(unlike|un like|remove (the |my )?like|thumbs down)( the| this)?( video)?$/.test(clean)) return { name: 'unlike', say: 'Unlike' };
     if (/^(new (email|e mail|message|mail)|compose( (a|an|new))?( (email|mail|message))?|write (a|an|new) (email|mail|message)|send (a|an) (email|mail|message))$/.test(clean)) return { name: 'compose', say: 'New message' };
     if (/^(go to |open |show )?(the |my )?inbox$/.test(clean)) return { name: 'inbox', say: 'Inbox' };
     if (/^(go to |open |show )?(the |my )?(sent|sent mail|sent messages|sent folder)$/.test(clean)) return { name: 'sent', say: 'Sent' };

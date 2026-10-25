@@ -880,3 +880,19 @@ header.top{border:1px solid rgba(255,255,255,.85)!important;box-shadow:0 0 6px r
 #demo .screen [data-act]{cursor:pointer}
 #demo .screen .field{cursor:text}
 #demo .gaze svg,#demo .gaze .core{display:none}
+
+/* Volume and brightness on the simulated desktop ("volume up", "mute", "brightness down" while the engine is live) */
+.sim-dim{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:990;transition:opacity .35s ease}
+.sim-osd{position:absolute;left:50%;bottom:60px;transform:translate(-50%,12px);z-index:995;pointer-events:none;opacity:0;
+  display:flex;align-items:center;gap:14px;min-width:280px;padding:12px 18px;border-radius:12px;
+  background:rgba(32,32,36,.92);color:#fff;font:600 14px var(--f-win,'Segoe UI',system-ui,sans-serif);
+  box-shadow:0 10px 30px rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);transition:opacity .2s ease,transform .2s ease}
+.sim-osd.show{opacity:1;transform:translate(-50%,0)}
+.sim-osd .ico{width:22px;height:22px;flex:none;display:grid;place-items:center}
+.sim-osd .ico svg{width:22px;height:22px}
+.sim-osd .bar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden}
+.sim-osd .bar i{display:block;height:100%;width:50%;background:#4cc2ff;border-radius:3px;transition:width .2s ease}
+.sim-osd.muted .bar i{background:rgba(255,255,255,.35)}
+.sim-osd .num{width:34px;text-align:right;font-variant-numeric:tabular-nums}
+.sim-zoom{margin-left:auto;flex:none;font:600 11px var(--f-win,'Segoe UI',sans-serif);color:#3a3f4b;background:#dfe3ea;border-radius:10px;padding:2px 8px}
+.sim-zoom[hidden]{display:none}

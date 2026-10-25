@@ -138,6 +138,25 @@ class TestRouting(unittest.TestCase):
         clock.t += 7
         self.assertFalse(page.has_pointer)
 
+    def test_volume_and_brightness_go_to_the_page(self):
+        bus, clock, page, out, os_api, launched = rig(True)
+        ran = []
+        out.system = lambda action, os_api: ran.append(action) or "x"
+        for name in ("volume_up", "volume_down", "mute", "brightness_up", "brightness_down"):
+            bus.publish(topics.OS_SYSTEM, {"action": name})
+        out.flush()
+        self.assertEqual(ran, [])                        # the PC's own volume and screen are left alone
+        self.assertEqual([m["name"] for m in bus.ui(messages.PAGE_ACTION) if m["action"] == "system"],
+                         ["volume_up", "volume_down", "mute", "brightness_up", "brightness_down"])
+
+    def test_volume_is_real_without_the_page(self):
+        bus, clock, page, out, os_api, launched = rig(False)
+        ran = []
+        out.system = lambda action, os_api: ran.append(action) or "Volume up"
+        bus.publish(topics.OS_SYSTEM, {"action": "volume_up"})
+        out.flush()
+        self.assertEqual(ran, ["volume_up"])
+
     def test_without_the_page_everything_is_real(self):
         bus, clock, page, out, os_api, launched = rig(False)
         bus.publish(topics.OS_TYPE, {"text": "hi "})

@@ -48,7 +48,8 @@ CONFIRM = "confirm"                      # id ("q1"), prompt, state: "open" | "c
 PAGE_ACTION = "page_action"              # action: "click" (x, y: screen px; button "left"|"right"; only while the page
                                          # said the cursor is over it) | "type" (text) | "key" (key: "enter", "ctrl+c", ...) |
                                          # "scroll" (direction: "up"|"down") | "undo" | "launch" (app: a launch_apps key,
-                                         # or url: https://...)
+                                         # or url: https://...) | "system" (name: "volume_up" | "volume_down" | "mute" |
+                                         # "brightness_up" | "brightness_down": the page's own volume and brightness)
 DEBUG_FRAME = "debug_frame"              # jpeg (base64) of the webcam, mirrored, about preview_width px wide; w, h. Only
                                          # while the page keeps sending PAGE_MODE. Never saved; goes to the page on 127.0.0.1
 # Engine -> UI, only while the console is open. Not sent by the engine yet (names reserved)
@@ -74,7 +75,7 @@ FIELDS: dict[str, tuple[set[str], set[str]]] = {
     STATUS: ({"level", "text"}, set()),
     CONFIRM: ({"id", "prompt", "state", "expires_in_s"}, set()),
     COMMAND: ({"label"}, set()),
-    PAGE_ACTION: ({"action"}, {"text", "key", "direction", "app", "url", "x", "y", "button"}),
+    PAGE_ACTION: ({"action"}, {"text", "key", "direction", "app", "url", "x", "y", "button", "name"}),
     DEBUG_FRAME: ({"jpeg", "w", "h"}, set()),
 }
 

@@ -131,6 +131,7 @@
       $('#camSrc').textContent = 'source: simulated face'; showWebcam(false);
       setRead(''); D.micLive = false; lastWant = null;
       S.q = null; S.preview = null; S.liveText = ''; S.speaking = false;
+      SYS.bright = 100; SYS.muted = false; applySys();
       log('sys', 'Engine disconnected, back to the simulation');
     }
     render();
@@ -313,7 +314,7 @@
     if (k === 'ctrl+a') { toast('Selected all'); return; }
     if (k === 'ctrl+s') { toast('Saved'); return; }
     if (k === 'ctrl+f') { toast('Find: not in this demo'); return; }
-    if (k === 'ctrl+=' || k === 'ctrl+-') { toast(k === 'ctrl+=' ? 'Zoom in' : 'Zoom out'); return; }
+    if (k === 'ctrl+=' || k === 'ctrl+-') { actZoom(k === 'ctrl+=' ? 1 : -1); return; }
     if (k === 'ctrl+tab' || k === 'ctrl+shift+tab') { toast('One tab in this demo'); return; }
     log('sys', 'Key ' + k + ' (nothing to do in the demo)');
   }
@@ -336,6 +337,72 @@
     } else if (host === 'mail.google.com') D.run('open:mail', 'voice');
     else toast(host + ' is not part of this demo');
   }
+  /* ---------- volume and brightness of the simulated desktop ("volume up", "mute", "brightness down", ...) ---------- */
+  // Same steps as the real engine (engine/eyes/system_controls.py): 10% a command, brightness never under 10%.
+  const SYS = { vol: 50, muted: false, bright: 100 };
+  const dim = document.createElement('div'); dim.className = 'sim-dim'; screenEl.append(dim);
+  const osd = document.createElement('div'); osd.className = 'sim-osd';
+  osd.innerHTML = '<span class="ico"></span><span class="bar"><i></i></span><span class="num"></span>';
+  screenEl.append(osd);
+  const ICONS = {
+    vol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+    mute: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>',
+    sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>',
+  };
+  let osdTimer = 0, audio = null;
+  // a short soft tone at the new volume, like a laptop's volume keys (browsers allow sound once the page was clicked)
+  const wakeAudio = () => { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (e) {} };
+  document.addEventListener('pointerdown', wakeAudio, true); document.addEventListener('keydown', wakeAudio, true);
+  function tone() {
+    if (!audio || audio.state !== 'running' || SYS.muted || !SYS.vol) return;
+    const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime;
+    o.type = 'sine'; o.frequency.value = 660;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25 * SYS.vol / 100 + 0.0001, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + 0.18);
+  }
+  function showOsd(kind, level, muted) {
+    osd.querySelector('.ico').innerHTML = kind === 'bright' ? ICONS.sun : (muted ? ICONS.mute : ICONS.vol);
+    osd.querySelector('.bar i').style.width = level + '%';
+    osd.querySelector('.num').textContent = kind === 'vol' && muted ? 'Muted' : level;
+    osd.classList.toggle('muted', kind === 'vol' && muted);
+    osd.classList.add('show'); clearTimeout(osdTimer); osdTimer = setTimeout(() => osd.classList.remove('show'), 1800);
+  }
+  function applySys() {
+    dim.style.opacity = ((100 - SYS.bright) / 100 * 0.75).toFixed(3);   // 10% brightness = 68% black over the screen
+    const tv = $('#trayVol'); if (tv) tv.textContent = SYS.muted || !SYS.vol ? '🔇' : (SYS.vol < 34 ? '🔈' : SYS.vol < 67 ? '🔉' : '🔊');
+  }
+  function actSystem(name) {
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    if (name === 'volume_up' || name === 'volume_down') {
+      SYS.muted = false;                                     // like Windows: a volume key unmutes
+      SYS.vol = clamp(SYS.vol + (name === 'volume_up' ? 10 : -10), 0, 100);
+      showOsd('vol', SYS.vol, false); tone();
+      S.flash = 'Volume ' + SYS.vol + '%'; log('voice', 'Volume ' + SYS.vol + '%');
+    } else if (name === 'mute') {
+      SYS.muted = !SYS.muted;
+      showOsd('vol', SYS.vol, SYS.muted); if (!SYS.muted) tone();
+      S.flash = SYS.muted ? 'Muted' : 'Sound on'; log('voice', SYS.muted ? 'Muted' : 'Sound on');
+    } else if (name === 'brightness_up' || name === 'brightness_down') {
+      SYS.bright = clamp(SYS.bright + (name === 'brightness_up' ? 10 : -10), 10, 100);
+      showOsd('bright', SYS.bright, false);
+      S.flash = 'Brightness ' + SYS.bright + '%'; log('voice', 'Brightness ' + SYS.bright + '%');
+    } else return;
+    applySys();
+    S.flashUntil = performance.now() + 1400; render(); setTimeout(render, 1450);
+  }
+  // "zoom in" / "zoom out": the simulated browser page gets bigger or smaller, with the level shown like Chrome does
+  let zoom = 1;
+  function actZoom(dir) {
+    zoom = Math.max(0.5, Math.min(2, Math.round((zoom + dir * 0.1) * 10) / 10));
+    const p = $('#bPage'); if (p) p.style.zoom = zoom;
+    let z = $('#simZoom');
+    if (!z) { z = document.createElement('span'); z.id = 'simZoom'; z.className = 'sim-zoom'; const omni = $('.omni'); (omni || screenEl).append(z); }
+    z.textContent = Math.round(zoom * 100) + '%'; z.hidden = zoom === 1;
+    if (!W.browser.open) toast('Zoom ' + Math.round(zoom * 100) + '% (open Chrome to see it)');
+    log('voice', 'Zoom ' + Math.round(zoom * 100) + '%');
+  }
+
   // The engine's click (a long blink, "click", "click Send" after yes) while the cursor is over this page: click that spot
   function actClick(m) {
     if (offX === null) { log('sys', 'Click from the engine, but the page does not know where it is yet'); return; }
@@ -358,6 +425,7 @@
   function onAction(m) {
     switch (m.action) {
       case 'click': actClick(m); break;
+      case 'system': actSystem(m.name); break;
       case 'type': actType(m.text); break;
       case 'key': actKey(m.key); break;
       case 'scroll': for (let i = 0; i < 2; i++) D.scrollBy(m.direction === 'up' ? -1 : 1); D.glabel('SCROLL ' + (m.direction === 'up' ? 'UP' : 'DOWN')); break;

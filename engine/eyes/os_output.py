@@ -3,8 +3,8 @@
 Route: Khang and Hung (Hung leads os_input; this is the bus side of it)
 Publishes: status (to the UI) when opening something, or when an action fails
 Page mode (engine/core/page_mode.py): while the website's demo page is open, type, key, scroll, undo and launch go to it
-as a page_action message instead of to Windows; so does a click while the real cursor is over the page (the page clicks
-that spot itself). Clicks elsewhere, volume and brightness stay real.
+as a page_action message instead of to Windows, and so do volume and brightness (the page has its own); so does a click
+while the real cursor is over the page (the page clicks that spot itself). Clicks elsewhere stay real.
 Subscribes: topics.OS_CLICK {"x", "y", "button": "left" | "right" (optional, left)}, OS_TYPE {"text"}, OS_KEY {"key": "enter" | "shift+enter" | ...},
             OS_SCROLL {"direction": "up" | "down"}, OS_UNDO {},
             OS_LAUNCH {"app": a key of settings.launch_apps} or {"url": "https://..."},
@@ -110,8 +110,11 @@ class OsOutput:
         self._safely("undo", lambda: self.os.combo("ctrl+z"))
 
     def on_system(self, p: dict) -> None:
-        """Volume or brightness. A screen that can't be dimmed is a warning, not an error."""
+        """Volume or brightness. A screen that can't be dimmed is a warning, not an error.
+        Page mode: the demo page turns its own volume and brightness (its volume bar, a dimmer simulated screen)."""
         action = str(p.get("action", ""))
+        if self._to_page("system", name=action):
+            return
 
         def run() -> None:
             from engine.eyes.system_controls import BrightnessUnsupported

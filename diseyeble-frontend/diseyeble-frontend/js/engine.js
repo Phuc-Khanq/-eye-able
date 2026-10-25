@@ -183,6 +183,7 @@
   document.addEventListener('click', e => {
     if (!live) return;
     if (e.target.closest('#pauseBtn')) { e.stopImmediatePropagation(); e.preventDefault(); send('set_mode', { mode: G.paused ? 'pointer' : 'paused' }); }
+    else if (e.target.closest('#allowCam, #demoCamBtn')) { e.stopImmediatePropagation(); e.preventDefault(); toast('The engine is using the webcam. The page keeps its simulated face.'); }   // one app at a time can hold a webcam on Windows
     else if (e.target.closest('#calibBtn')) { e.stopImmediatePropagation(); e.preventDefault(); send('calibrate', { action: 'start' }); }
   }, true);
   $('#dwellMs').addEventListener('input', e => send('settings', { dwell_ms: +e.target.value }));

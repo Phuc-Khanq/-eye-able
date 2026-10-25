@@ -1,6 +1,6 @@
 {"t": 0.0, "msg": {"type": "mode", "mode": "pointer"}}
 {"t": 0.033, "msg": {"type": "calib_target", "index": 0, "x": 960, "y": 540, "total": 1}}
-{"t": 0.033, "msg": {"type": "status", "level": "info", "text": "Calibrating: look at the dot in the middle of the screen"}}
+{"t": 0.033, "msg": {"type": "status", "level": "info", "text": "Recentering: look at the cursor in the middle of the screen"}}
 {"t": 1.551, "msg": {"type": "calib_result", "error_px": 0.0, "ok": true}}
 {"t": 1.551, "msg": {"type": "status", "level": "info", "text": "Calibrated: the screen center is where you face now"}}
 {"t": 1.65, "msg": {"type": "gaze", "x": 959.5, "y": 539.5, "confidence": 1.0}}
@@ -8,7 +8,7 @@
 {"t": 1.848, "msg": {"type": "gaze", "x": 959.5, "y": 539.5, "confidence": 1.0}}
 {"t": 1.947, "msg": {"type": "gaze", "x": 959.5, "y": 539.5, "confidence": 1.0}}
 {"t": 2.013, "msg": {"type": "calib_target", "index": 0, "x": 960, "y": 540, "total": 1}}
-{"t": 2.013, "msg": {"type": "status", "level": "info", "text": "Calibrating: look at the dot in the middle of the screen"}}
+{"t": 2.013, "msg": {"type": "status", "level": "info", "text": "Recentering: look at the cursor in the middle of the screen"}}
 {"t": 2.145, "msg": {"type": "calib_result", "error_px": 0.0, "ok": false}}
 {"t": 2.211, "msg": {"type": "gaze", "x": 959.5, "y": 539.5, "confidence": 1.0}}
 {"t": 2.31, "msg": {"type": "gaze", "x": 959.5, "y": 539.5, "confidence": 1.0}}
@@ -38,46 +38,46 @@
 {"t": 4.488, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 4.521, "msg": {"type": "dwell", "progress": 0.21, "ready": true}}
 {"t": 4.554, "msg": {"type": "dwell", "progress": 0.25, "ready": true}}
-{"t": 4.587, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
+{"t": 4.587, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 4.587, "msg": {"type": "dwell", "progress": 0.29, "ready": true}}
 {"t": 4.62, "msg": {"type": "dwell", "progress": 0.33, "ready": true}}
 {"t": 4.653, "msg": {"type": "dwell", "progress": 0.37, "ready": true}}
-{"t": 4.686, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
+{"t": 4.686, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 4.686, "msg": {"type": "dwell", "progress": 0.41, "ready": true}}
 {"t": 4.719, "msg": {"type": "dwell", "progress": 0.45, "ready": true}}
 {"t": 4.752, "msg": {"type": "dwell", "progress": 0.49, "ready": true}}
-{"t": 4.785, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
+{"t": 4.785, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 4.785, "msg": {"type": "dwell", "progress": 0.54, "ready": true}}
 {"t": 4.818, "msg": {"type": "dwell", "progress": 0.58, "ready": true}}
 {"t": 4.851, "msg": {"type": "dwell", "progress": 0.62, "ready": true}}
-{"t": 4.884, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
+{"t": 4.884, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 4.884, "msg": {"type": "dwell", "progress": 0.66, "ready": true}}
 {"t": 4.917, "msg": {"type": "dwell", "progress": 0.7, "ready": true}}
 {"t": 4.95, "msg": {"type": "dwell", "progress": 0.74, "ready": true}}
-{"t": 4.983, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
+{"t": 4.983, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 4.983, "msg": {"type": "dwell", "progress": 0.78, "ready": true}}
 {"t": 5.016, "msg": {"type": "dwell", "progress": 0.82, "ready": true}}
 {"t": 5.049, "msg": {"type": "dwell", "progress": 0.87, "ready": true}}
-{"t": 5.082, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
+{"t": 5.082, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 5.082, "msg": {"type": "dwell", "progress": 0.91, "ready": true}}
 {"t": 5.115, "msg": {"type": "dwell", "progress": 0.95, "ready": true}}
 {"t": 5.148, "msg": {"type": "dwell", "progress": 0.99, "ready": true}}
-{"t": 5.181, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
+{"t": 5.181, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 5.181, "msg": {"type": "dwell", "progress": 1.0, "ready": false}}
 {"t": 5.214, "msg": {"type": "dwell", "progress": 0.0, "ready": false}}
-{"t": 5.28, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 5.379, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 5.478, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 5.577, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 5.676, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 5.775, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 5.874, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
+{"t": 5.28, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 5.379, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 5.478, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 5.577, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 5.676, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 5.775, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 5.874, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
 {"t": 5.874, "msg": {"type": "status", "level": "info", "text": "Dwell clicking off"}}
-{"t": 5.973, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 6.072, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 6.171, "msg": {"type": "gaze", "x": 1088.0, "y": 539.5, "confidence": 1.0}}
-{"t": 6.27, "msg": {"type": "gaze", "x": 930.8, "y": 539.5, "confidence": 1.0}}
-{"t": 6.369, "msg": {"type": "gaze", "x": 908.4, "y": 539.5, "confidence": 1.0}}
+{"t": 5.973, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 6.072, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 6.171, "msg": {"type": "gaze", "x": 1087.9, "y": 539.5, "confidence": 1.0}}
+{"t": 6.27, "msg": {"type": "gaze", "x": 930.7, "y": 539.5, "confidence": 1.0}}
+{"t": 6.369, "msg": {"type": "gaze", "x": 908.3, "y": 539.5, "confidence": 1.0}}
 {"t": 6.468, "msg": {"type": "gaze", "x": 908.0, "y": 539.5, "confidence": 1.0}}
 {"t": 6.567, "msg": {"type": "gaze", "x": 908.0, "y": 539.5, "confidence": 1.0}}
 {"t": 6.666, "msg": {"type": "gaze", "x": 908.0, "y": 539.5, "confidence": 1.0}}
@@ -95,6 +95,7 @@
 {"t": 7.557, "msg": {"type": "gaze", "x": 908.0, "y": 539.5, "confidence": 1.0}}
 {"t": 7.656, "msg": {"type": "gaze", "x": 908.0, "y": 539.5, "confidence": 1.0}}
 {"t": 7.755, "msg": {"type": "gaze", "x": 908.0, "y": 539.5, "confidence": 1.0}}
+{"t": 7.755, "msg": {"type": "command", "label": "Click"}}
 {"t": 7.755, "msg": {"type": "target_searching", "label": "here", "snap": true}}
 {"t": 7.755, "msg": {"type": "target_found", "x": 937, "y": 549, "label": "here", "snap": true}}
 {"t": 7.854, "msg": {"type": "gaze", "x": 937.0, "y": 549.0, "confidence": 1.0}}
@@ -107,16 +108,20 @@
 {"t": 8.25, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 8.349, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 8.415, "msg": {"type": "gesture", "gesture": "mouth_open"}}
+{"t": 8.415, "msg": {"type": "command", "label": "Right click"}}
 {"t": 8.448, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 8.547, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 8.646, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 8.745, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
+{"t": 8.745, "msg": {"type": "command", "label": "Right click"}}
 {"t": 8.844, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 8.943, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 9.042, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
+{"t": 9.075, "msg": {"type": "command", "label": "Back"}}
 {"t": 9.141, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 9.24, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 9.339, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
+{"t": 9.405, "msg": {"type": "command", "label": "Escape"}}
 {"t": 9.438, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 9.537, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
 {"t": 9.636, "msg": {"type": "gaze", "x": 967.0, "y": 559.0, "confidence": 1.0}}
@@ -438,24 +443,24 @@
 {"t": 37.841, "msg": {"type": "gaze", "x": 1105.5, "y": 569.0, "confidence": 1.0}}
 {"t": 37.94, "msg": {"type": "gaze", "x": 1110.0, "y": 569.0, "confidence": 1.0}}
 {"t": 38.039, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
-{"t": 38.138, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 38.237, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 38.336, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 38.435, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 38.534, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
+{"t": 38.138, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.237, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.336, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.435, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.534, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 38.534, "msg": {"type": "gesture", "gesture": "brow_raise"}}
 {"t": 38.534, "msg": {"type": "target_searching", "label": "here", "snap": true}}
 {"t": 38.534, "msg": {"type": "target_found", "x": 1140, "y": 579, "label": "here", "snap": true}}
-{"t": 38.567, "msg": {"type": "status", "level": "error", "text": "Couldn't click: PermissionError: the window is run as administrator"}}
-{"t": 38.633, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 38.732, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 38.831, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 38.93, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
+{"t": 38.633, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.732, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.831, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.93, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.93, "msg": {"type": "status", "level": "error", "text": "Couldn't click: PermissionError: the window is run as administrator"}}
 {"t": 40.943, "msg": {"type": "status", "level": "warn", "text": "Can't see your face: face the camera, add light"}}
 {"t": 41.933, "msg": {"type": "status", "level": "info", "text": "Face found again"}}
-{"t": 41.999, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 42.098, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 42.197, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 42.296, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 42.395, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
-{"t": 42.494, "msg": {"type": "gaze", "x": 1110.2, "y": 569.0, "confidence": 1.0}}
+{"t": 41.999, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 42.098, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 42.197, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 42.296, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 42.395, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 42.494, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}

@@ -52,6 +52,26 @@ FIXED_COMMANDS: dict[str, str] = {
     "exit dictation": "stop_dictation",
     "close dictation": "stop_dictation",
     "turn off dictation": "stop_dictation",
+    # greeting / goodbye (Khang, Oct 24 night): "Hi Dizzy" starts dictation, "Bye" / "Bye Dizzy" / "Bye bye" ends it.
+    # "hey" is dropped as a filler word, so "Hey Dizzy" reaches us as "dizzy".
+    "hi dizzy": "start_dictation",
+    "hi dizzie": "start_dictation",
+    "hi dizzi": "start_dictation",
+    "high dizzy": "start_dictation",
+    "dizzy": "start_dictation",
+    "bye": "stop_dictation",
+    "bye dizzy": "stop_dictation",
+    "bye dizzie": "stop_dictation",
+    "bye bye": "stop_dictation",
+    # quit: stops the whole program, said alone (exact, never fuzzy: see EXACT_ONLY)
+    "quit": "quit_app",
+    "quit app": "quit_app",
+    "quit program": "quit_app",
+    "quit diseyeble": "quit_app",
+    "quit dizzy": "quit_app",
+    "exit program": "quit_app",
+    "exit app": "quit_app",
+    "shut down": "quit_app",
     "pause": "pause",
     # How Whisper writes a short "pause" (Khang's live test, Oct 24: "pot"). Said alone they mean nothing else
     "paws": "pause",
@@ -140,6 +160,21 @@ FIXED_COMMANDS: dict[str, str] = {
     "escape": "escape",
     "press escape": "escape",
     "calibrate": "calibrate",
+    # Recenter (Khang, Oct 24 night): the head pointer drifts after a while; this puts the cursor in the middle
+    # and takes "looking at it" as the new straight ahead. Whisper writes "Re-center." as "re center", which
+    # used to fuzzy-match "enter" and press Enter.
+    "recenter": "calibrate",
+    "re center": "calibrate",
+    "recentre": "calibrate",
+    "re centre": "calibrate",
+    "recenter cursor": "calibrate",
+    "recenter the cursor": "calibrate",
+    "center": "calibrate",
+    "center cursor": "calibrate",
+    "center the cursor": "calibrate",
+    "reset cursor": "calibrate",
+    "reset the cursor": "calibrate",
+    "cursor center": "calibrate",
     "delete my voice data": "delete_voice_data",
     # Scroll mode: tilt the head to scroll until "stop" (exact only: "scroll" used to fuzzy-match "scroll up")
     "scroll": "scroll_mode",
@@ -263,7 +298,7 @@ COMMAND_LABELS: dict[str, str] = {
     "key_zoom_out": "Zoom out", "key_page_up": "Page up", "key_page_down": "Page down", "key_top": "Top",
     "key_bottom": "Bottom", "key_enter": "Enter", "key_tab": "Tab", "key_backspace": "Backspace",
     "scroll_up": "Scroll up", "scroll_down": "Scroll down", "go_back": "Back", "escape": "Escape",
-    "undo": "Undo", "new_line": "New line",
+    "undo": "Undo", "new_line": "New line", "quit_app": "Quitting",
 }
 
 # System commands -> the os.system action (os_output: volume by media keys, brightness through Windows)
@@ -273,8 +308,12 @@ SYSTEM_COMMANDS = {"volume_up", "volume_down", "mute", "brightness_up", "brightn
 # tests/test_command_list.py fails otherwise, so adding a command means writing down what it does.
 # name -> (category, what it does). The list shows every phrase from FIXED_COMMANDS next to it.
 COMMAND_INFO: dict[str, tuple[str, str]] = {
-    "start_dictation": ("Dictation", "Starts dictation: what you say next shows on the card and is typed after you say yes"),
-    "stop_dictation": ("Dictation", "Ends dictation (asks first if words are waiting). While dictating, \"close\", \"off\" and \"turn off\" also work"),
+    "start_dictation": ("Dictation", "Starts dictation: what you say next shows on the card and is typed after you say yes. "
+                                     "Also \"hi Dizzy\""),
+    "stop_dictation": ("Dictation", "Ends dictation (asks first if words are waiting). Also \"bye\", \"bye Dizzy\", \"bye bye\". "
+                                    "While dictating, \"close\", \"off\" and \"turn off\" also work"),
+    "quit_app": ("Setup", "Quits Diseyeble completely: the engine, camera, mic and card all stop. Say \"quit\" alone; works "
+                          "in every mode, even paused"),
     "send_it": ("Dictation", "Types the preview and presses Enter, after asking \"send?\""),
     "undo": ("Dictation", "Drops the preview, or presses Ctrl+Z when none is showing"),
     "new_line": ("Dictation", "Starts a new line in the preview"),
@@ -298,7 +337,8 @@ COMMAND_INFO: dict[str, tuple[str, str]] = {
                        "than \"pause\""),
     "resume": ("Modes", "Wakes the engine up again"),
     "menu": ("Modes", "Opens the menu (no menu screen yet; say \"cancel\" to close it)"),
-    "calibrate": ("Setup", "Redoes the center calibration after you move your chair"),
+    "calibrate": ("Setup", "Recenter: the cursor jumps to the middle; look at it for a second and it becomes straight "
+                           "ahead. Also \"recenter\", \"center\", \"reset cursor\". Use it when the cursor drifts"),
     "delete_voice_data": ("Setup", "Deletes the saved voice data (asks first)"),
     "volume_up": ("Volume and screen", "Volume up 10%"),
     "volume_down": ("Volume and screen", "Volume down 10%"),
@@ -377,6 +417,9 @@ EXACT_ONLY = {"use original", "use the original", "clean it up", "stop clicking"
               "new tab", "new window", "next tab", "last tab", "louder", "quieter", "softer", "brighter", "dimmer", "darker",
               "refresh", "reload", "minimize", "maximize", "backspace", "go forward", "dictate on", "dictate off",
               "dictation on", "dictation off",
+              # greeting, goodbye and quit: exact, so only these words ever start dictation or stop the program
+              "hi dizzy", "hi dizzie", "hi dizzi", "high dizzy", "bye dizzy", "bye dizzie", "bye bye", "quit app",
+              "quit program", "quit diseyeble", "quit dizzy", "exit program", "exit app", "shut down",
               # pause / resume and the answers: exact, so "passed" never pauses and "note that" never says no
               "paused", "pause it", "pause listening", "take a break", "go to sleep", "resumed", "resuming",
               "unpause", "continue", "yes please", "write that", "type that", "insert it", "put it in", "keep it",

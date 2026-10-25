@@ -480,7 +480,7 @@ class EyesService:
             self.calib = {"t0": now, "gaze": []}
         cx, cy = self.W // 2, self.H // 2
         self._ui(messages.CALIB_TARGET, index=0, x=cx, y=cy, total=1)
-        self._status("info", "Calibrating: look at the dot in the middle of the screen")
+        self._status("info", "Recentering: look at the cursor in the middle of the screen")
         self.driver.snap(cx, cy)
 
     def _calibration_step(self, feats, pose, now: float) -> None:

@@ -103,7 +103,7 @@ class TestStillWorks(Base):
         self.raise_brows()
         self.assertEqual(self.typed(), ["hi mom ", "see you "])
         self.assertEqual(sum("tracker failed" in line for line in self.log), 1)
-        self.say("bye")
+        self.say("see you later")
         self.clock.t = 61
         self.raise_brows()
         self.assertEqual(sum("tracker failed" in line for line in self.log), 2)

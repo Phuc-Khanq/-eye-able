@@ -310,10 +310,20 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
         gpu.start()
     if stdin:
         threading.Thread(target=read_stdin, args=(bus, stop), daemon=True).start()
-    print(f"Diseyeble engine on ws://{settings.ws_host}:{relay.port}  (Ctrl+C to stop)")
+    print(f"Diseyeble engine on ws://{settings.ws_host}:{relay.port}  (Ctrl+C or say \"quit\" to stop)")
+    loop = asyncio.get_running_loop()
+    quit_now = asyncio.Event()
+    bus.subscribe(topics.QUIT, lambda _msg: loop.call_soon_threadsafe(quit_now.set))   # "quit": any thread
+    serving = asyncio.ensure_future(relay.serve_forever())
+    quitting = asyncio.ensure_future(quit_now.wait())
     try:
-        await relay.serve_forever()
+        await asyncio.wait({serving, quitting}, return_when=asyncio.FIRST_COMPLETED)
+        if quit_now.is_set():
+            print("[quit] you said quit: stopping everything")
     finally:
+        for task in (serving, quitting):
+            task.cancel()
+        await asyncio.gather(serving, quitting, return_exceptions=True)
         stop.set()
         if gpu:
             print(gpu.stop() or "[gpu] no reading")
@@ -365,6 +375,12 @@ def main() -> None:
     except OSError as exc:
         raise SystemExit(f"Can't serve on port {settings.ws_port}: {exc}. "
                          "Is the engine or tests.fake_engine already running?")
+    else:
+        print("Engine stopped.")
+    # "quit" means quit: if a camera, card or model thread is slow to close, don't leave the process hanging
+    watchdog = threading.Timer(5.0, os._exit, args=(0,))
+    watchdog.daemon = True
+    watchdog.start()
 
 
 if __name__ == "__main__":

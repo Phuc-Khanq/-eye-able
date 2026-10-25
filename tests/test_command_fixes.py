@@ -360,3 +360,75 @@ class TestOct24NightMishearings(unittest.TestCase):
                            ("New tap.", "key_new_tab"), ("Poss.", "pause")]:
             with self.subTest(text=text):
                 self.assertEqual(commands.parse(text, allow_targets=False).name, name)
+
+
+class TestRecenter(unittest.TestCase):
+    def test_recenter_phrases_recalibrate_and_never_press_enter(self):
+        from engine.voice import commands
+        for text in ["Re-center.", "Recenter.", "Center.", "Recenter the cursor.", "Reset cursor.", "Calibrate."]:
+            with self.subTest(text=text):
+                self.assertEqual(commands.parse(text, allow_targets=False).name, "calibrate")
+
+
+class TestQuitHiAndBye(unittest.TestCase):
+    def test_phrases(self):
+        from engine.voice import commands
+        want = {"Quit.": "quit_app", "quit": "quit_app", "Quit program.": "quit_app", "Shut down.": "quit_app",
+                "Hi Dizzy.": "start_dictation", "Hi, Dizzy!": "start_dictation", "Hey Dizzy.": "start_dictation",
+                "Hi Dizzie.": "start_dictation",
+                "Bye.": "stop_dictation", "Bye Dizzy.": "stop_dictation", "Bye bye.": "stop_dictation",
+                "Bye-bye.": "stop_dictation", "Bye, Dizzy.": "stop_dictation"}
+        for text, name in want.items():
+            with self.subTest(text=text):
+                self.assertEqual(commands.parse(text, allow_targets=False).name, name)
+
+    def test_chatter_never_matches(self):
+        from engine.voice import commands
+        for text in ["I quit my job", "quiet", "quick", "quite", "hi there", "hi daisy", "I feel dizzy today", "buy milk",
+                     "goodbye for now", "bye for now"]:
+            with self.subTest(text=text):
+                cmd = commands.parse(text, allow_targets=False)
+                self.assertTrue(cmd is None or cmd.name not in ("quit_app", "start_dictation", "stop_dictation"), cmd)
+
+
+class TestQuitInTheModeManager(unittest.TestCase):
+    def setUp(self):
+        from engine.core.mode_manager import ModeManager
+        from tests.helpers import FakeBus
+        self.bus = FakeBus()
+        self.mm = ModeManager(self.bus, clock=lambda: 100.0)
+
+    def say(self, text):
+        from engine.core import topics
+        self.bus.publish(topics.TRANSCRIPT, {"text": text, "words": [{"text": w, "conf": 1.0} for w in text.split()],
+                                             "ms": 0.0})
+
+    def quits(self):
+        from engine.core import topics
+        return len(self.bus.of(topics.QUIT))
+
+    def test_quit_in_pointer_dictation_and_paused(self):
+        self.say("quit")
+        self.assertEqual(self.quits(), 1)
+        self.say("hi dizzy")
+        self.say("quit")
+        self.assertEqual(self.quits(), 2)
+        self.say("take a break")
+        self.say("quit")
+        self.assertEqual(self.quits(), 3)
+
+    def test_hi_dizzy_then_bye(self):
+        from engine.core.mode_manager import Mode
+        self.say("hi dizzy")
+        self.assertEqual(self.mm.mode, Mode.DICTATION)
+        self.say("bye")
+        self.assertEqual(self.mm.mode, Mode.POINTER)
+        self.say("hi dizzy")
+        self.say("bye bye")
+        self.assertEqual(self.mm.mode, Mode.POINTER)
+        self.assertEqual(self.quits(), 0)
+
+    def test_quit_inside_a_sentence_is_just_words(self):
+        self.say("hi dizzy")
+        self.say("I might quit soon")
+        self.assertEqual(self.quits(), 0)

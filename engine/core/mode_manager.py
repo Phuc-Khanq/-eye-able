@@ -125,7 +125,7 @@ GESTURES: dict[Mode, dict[str, str]] = {
 }
 
 # Voice commands that still work while paused.
-PAUSED_COMMANDS = {"resume"}
+PAUSED_COMMANDS = {"resume", "quit_app"}
 
 # Scroll mode: these go back (only in Scroll mode: elsewhere "stop" and "done" mean what they always did)
 SCROLL_EXIT = {"stop", "done", "stop scrolling"}
@@ -548,6 +548,8 @@ class ModeManager:
                 self._set_mode(self._return_mode)
             elif self.preview:
                 self._discard_preview()
+        elif name == "quit_app":
+            self.bus.publish(topics.QUIT, {})     # engine/main.py shuts everything down
         elif name == "start_dictation":
             self._set_mode(Mode.DICTATION)
         elif name == "stop_dictation":

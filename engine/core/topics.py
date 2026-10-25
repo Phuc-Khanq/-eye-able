@@ -17,6 +17,8 @@ DWELL = "eyes.dwell"                # {"on": bool} (mode manager -> eyes service
                                     # clicking" turn dwell, the left click, off / on; EyesService.set_dwell
                                     # shows the "Dwell clicking on/off" status
 
+QUIT = "engine.quit"                # {} (mode manager -> engine/main.py): the user said "quit"; stop everything
+
 # Voice route
 UTTERANCE = "voice.utterance"       # numpy float32 array, 16 kHz mono (audio_in -> dictation)
 SPEECH_SPAN = "voice.speech_span"   # {"start_ms": float, "end_ms": float} (audio_in -> dictation), published

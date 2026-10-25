@@ -763,7 +763,7 @@
         if (!W.f.to.trim()){ W.focus='to'; toast('Add a recipient first'); break; }
         W.sent.unshift({to:W.f.to,subj:W.f.subj,body:W.f.body,time:new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})});
         log(src,'Email sent to '+W.f.to); wtoast('Mail','Message sent to '+W.f.to);
-        W.f.to=W.f.subj=W.f.body=''; m.view='sent'; W.focus=null; tip('Email sent! You did that with your eyes, your brows and your voice.'); break;
+        W.f.to=W.f.subj=W.f.body=''; m.view='sent'; W.focus=null; tip('Email sent! You did that with your eyes, a blink and your voice.'); break;
       case 'toast': toast(v); break;
       case 'ctx': ctxAction(v, src); return;
     }
@@ -863,8 +863,9 @@
   function flashSig(id){ const s=$(id); s.classList.add('fire'); clearTimeout(s._t); s._t=setTimeout(()=>s.classList.remove('fire'),700); }
 
   const FACE = { blinkStart:-9999, blinkEnd:-9999, nodAt:-9999, shakeAt:-9999, tiltAt:-9999, tiltDir:1, browAt:-9999, mouthAt:-9999, speakUntil:0, caption:null };
-  const DUR = { natural:150, brow:450, mouth:700, nod:650, shake:800, tiltL:700, tiltR:700 };
-  const CAPS = { brow:'BROW RAISE +0.31 → CLICK', mouth:'MOUTH OPEN 0.5 s → RIGHT CLICK', nod:'NOD 12° → YES', shake:'SHAKE ±15° → NO', tiltL:'HEAD UP → SCROLL UP', tiltR:'HEAD DOWN → SCROLL DOWN' };
+  // 'brow' is the simulated left click: since Oct 24 it is a long blink (both eyes shut 0.4 – 1.6 s), not an eyebrow raise
+  const DUR = { natural:150, brow:650, mouth:700, nod:650, shake:800, tiltL:700, tiltR:700 };
+  const CAPS = { brow:'LONG BLINK 0.6 s → CLICK', mouth:'MOUTH OPEN 0.5 s → RIGHT CLICK', nod:'NOD 12° → YES', shake:'SHAKE ±15° → NO', tiltL:'HEAD UP → SCROLL UP', tiltR:'HEAD DOWN → SCROLL DOWN' };
   const SIGS = { brow:'#sigBlink', mouth:'#sigShake', nod:'#sigNod', shake:'#sigNod', tiltL:'#sigTilt', tiltR:'#sigTilt' };
   // snap click: the button under the pointer, or the nearest clickable thing within ~150 px
   function snapTarget(){
@@ -881,7 +882,7 @@
     if ($('#demo').hidden) return;
     const now = performance.now();
     if (kind==='natural'){ FACE.blinkStart = now; FACE.blinkEnd = now + DUR.natural; }
-    if (kind==='brow'){ FACE.browAt = now; mascotDo('blinknow'); }
+    if (kind==='brow'){ FACE.blinkStart = now; FACE.blinkEnd = now + 600; mascotDo('blinknow'); }   // a long blink
     if (kind==='mouth') FACE.mouthAt = now;
     if (kind==='nod'){ FACE.nodAt = now; mascotDo('nodnow'); }
     if (kind==='shake'){ FACE.shakeAt = now; mascotDo('shakenow'); }
@@ -897,15 +898,13 @@
       if (G.paused){ setCaption(gcap(kind)+' seen · paused','muted'); return; }
       if (off){ setCaption(gcap(kind)+' seen · turned off in Settings','muted'); toast(gcap(kind)+' is turned off in Settings'); return; }
       // a question is waiting: brow / nod = yes, shake = no
-      if (G.pending && (kind==='brow' || kind==='nod' || kind==='shake')){ setCaption('✓ ' + CAPS[kind].replace(/→.*/, kind==='shake' ? '→ NO' : '→ YES'), kind==='shake'?'amber':'iris'); answer(kind!=='shake', kind==='shake'?'Head shake':'Brow raise'); return; }
+      if (G.pending && (kind==='brow' || kind==='nod' || kind==='shake')){ setCaption('✓ ' + CAPS[kind].replace(/→.*/, kind==='shake' ? '→ NO' : '→ YES'), kind==='shake'?'amber':'iris'); answer(kind!=='shake', kind==='shake'?'Head shake':(kind==='nod'?'Nod':'Long blink')); return; }
       setCaption('✓ ' + CAPS[kind], (kind==='mouth'||kind==='shake')?'amber':'iris');
-      if (kind==='brow'){
-        const el = snapTarget();
-        if (el){ const sr=screen.getBoundingClientRect(), r=el.getBoundingClientRect(), x=r.left-sr.left+r.width/2, y=r.top-sr.top+r.height/2, moved = !hitTest() ;
-          if (moved){ G.target.x = G.pos.x = x; G.target.y = G.pos.y = y; }
-          ripple('blink', {x, y}); glabel(moved ? 'BROW RAISE · SNAP CLICK' : 'BROW RAISE · CLICK');
-          log('eye', `Brow raise → ${moved?'snapped to':'click'} "${label(el)}"`); run(el.dataset.act, 'eye'); }
-        else { ripple('blink', pos); glabel('BROW RAISE · CLICK'); log('eye','Brow raise → click (nothing clickable within 150 px)'); $('#ctx').hidden = true; if (W.startOpen){ W.startOpen=false; renderAll(); } }
+      if (kind==='brow'){   // a long blink clicks exactly where the pointer is (the voice "click" is the one that snaps)
+        const sr = screen.getBoundingClientRect();
+        const what = clickAt(sr.left + pos.x, sr.top + pos.y, 'left', 'Long blink → click');
+        glabel('LONG BLINK · CLICK');
+        if (what === '') log('eye', 'Long blink → click (nothing to click there)');
         return;
       }
       if (kind==='mouth'){ ripple('shake', pos); glabel('MOUTH OPEN · RIGHT CLICK'); log('eye','Mouth open 0.5 s → right click'); openCtx(pos.x+6, pos.y+6); return; }
@@ -920,7 +919,7 @@
   function ask(prompt, onYes){
     if (G.pending) answer(false, 'replaced');
     const t0 = performance.now(); G.pending = { prompt, onYes, t0 };
-    $('#cqTxt').textContent = prompt; $('#confirmQ').hidden = false; log('sys', `Asking: "${prompt}"`); tip(prompt + ' Raise your brows or say "yes". Shake or say "no".');
+    $('#cqTxt').textContent = prompt; $('#confirmQ').hidden = false; log('sys', `Asking: "${prompt}"`); tip(prompt + ' Blink or say "yes". Shake or say "no".');
     clearInterval(cqTimer); cqTimer = setInterval(() => { const left = 12 - (performance.now()-t0)/1000; if (left <= 0) answer(false, 'expired'); else $('#cqT').textContent = Math.ceil(left)+' s'; }, 200);
     $('#cqT').textContent = '12 s';
   }
@@ -932,7 +931,7 @@
     if (yes) q.onYes(); else toast('Cancelled');
   }
   $('#cqYes').onclick = () => answer(true, 'button'); $('#cqNo').onclick = () => answer(false, 'button');
-  const gcap = k => ({brow:'Brow raise', mouth:'Mouth open', nod:'Nod', shake:'Head shake', tiltL:'Head up / down', tiltR:'Head up / down'})[k] || k;
+  const gcap = k => ({brow:'Long blink', mouth:'Mouth open', nod:'Nod', shake:'Head shake', tiltL:'Head up / down', tiltR:'Head up / down'})[k] || k;
 
   function setCaption(text, tone){ FACE.caption = {text, tone, until: performance.now()+1600}; }
   const label = el => (el.getAttribute('aria-label') || el.querySelector('b')?.textContent || el.textContent || '').replace(/\s+/g,' ').trim().slice(0,32) || el.dataset.act;
@@ -964,7 +963,7 @@
   /* settings */
   function sw(id,key,cb){ const b=$(id); b.onclick=()=>{ G[key]=!G[key]; b.setAttribute('aria-checked',G[key]); cb&&cb(); }; }
   sw('#swBrow','brow'); sw('#swMouth','mouth'); sw('#swTilt','tilt');
-  sw('#swDwell','dwell',()=>tip(G.dwell?'Dwell is on: rest the pointer on a button for '+G.dwellMs+' ms and it clicks.':'Dwell is off (the default). Raise your brows to click.'));
+  sw('#swDwell','dwell',()=>tip(G.dwell?'Dwell is on: rest the pointer on a button for '+G.dwellMs+' ms and it clicks.':'Dwell is off (the default). A long blink clicks.'));
   $('#dwellMs').oninput = e => { G.dwellMs=+e.target.value; $('#dwellOut').textContent=G.dwellMs+' ms'; };
   $('#steady').oninput = e => { G.steady=+e.target.value/100; $('#steadyOut').textContent=e.target.value+'%'; };
 
@@ -1036,7 +1035,7 @@
       const sr=screen.getBoundingClientRect(), r=el.getBoundingClientRect(); G.target.x=r.left-sr.left+r.width/2; G.target.y=r.top-sr.top+r.height/2;
       log('voice','UI-Venus found "'+label(el)+'"'); ask('Click '+label(el)+'?', () => run(el.dataset.act,'voice')); }
     else if (k==='pause'){ setPaused(true); }
-    else if (k==='type'){ if (W.focus){ insertText(v,true); renderAll(); } else toast('Click a text box first (raise your brows on it)'); }
+    else if (k==='type'){ if (W.focus){ insertText(v,true); renderAll(); } else toast('Click a text box first (a long blink on it)'); }
   }
   function processVoice(heard, meantOverride, confOverride){
     flashSig('#sigVoice'); FACE.speakUntil = performance.now()+900;
@@ -1213,7 +1212,7 @@
     finally { if (tok===demoToken){ G.scripted=false; G.dwell=prevDwell; dwellLock={x:G.pos.x,y:G.pos.y}; $('#demoBar').hidden=false; $('#runBar').hidden=true; renderChips(); } }
   }
   $$('[data-demo]').forEach(b => b.onclick = () => startDemo(b.dataset.demo));
-  $('#stopDemo').onclick = () => { demoToken++; G.scripted=false; G.dwell=$('#swDwell').getAttribute('aria-checked')==='true'; dwellLock={x:G.pos.x,y:G.pos.y}; $('#demoBar').hidden=false; $('#runBar').hidden=true; log('sys','Demo stopped'); tip('Demo stopped. Your turn: move the mouse (your eyes) and press B to raise your brows.'); renderChips(); };
+  $('#stopDemo').onclick = () => { demoToken++; G.scripted=false; G.dwell=$('#swDwell').getAttribute('aria-checked')==='true'; dwellLock={x:G.pos.x,y:G.pos.y}; $('#demoBar').hidden=false; $('#runBar').hidden=true; log('sys','Demo stopped'); tip('Demo stopped. Your turn: move the mouse (your eyes and head) and press B for a long blink.'); renderChips(); };
 
   /* ---------------- camera canvas ---------------- */
   const cam=$('#camCanvas'), cx=cam.getContext('2d'), video=$('#camVideo');
@@ -1289,12 +1288,12 @@
     cx.fillStyle = Math.abs(sg.yaw)>=15 ? '#F0A94B' : '#F1DCA7'; cx.fillText('yaw   '+sg.yaw.toFixed(1).padStart(6)+'°', Wd-150, 26);
     cx.fillStyle = sg.pitch<=-12 ? '#111111' : '#F1DCA7'; cx.fillText('pitch '+sg.pitch.toFixed(1).padStart(6)+'°', Wd-150, 44);
     cx.fillStyle = '#F1DCA7'; cx.fillText('roll  '+sg.roll.toFixed(1).padStart(6)+'°', Wd-150, 62);
-    cx.fillStyle = sg.brow>=.25 ? '#F0A94B' : '#F1DCA7'; cx.fillText('brow  '+(sg.brow>=0?'+':'')+sg.brow.toFixed(2), Wd-150, 80);
+    cx.fillStyle = blinking ? '#F0A94B' : '#F1DCA7'; cx.fillText('eyes  '+(blinking?'closed':'open').padStart(6), Wd-150, 80);
     cx.fillStyle = sg.mouth>=.35 ? '#F0A94B' : '#F1DCA7'; cx.fillText('mouth '+sg.mouth.toFixed(2).padStart(5), Wd-150, 98);
     // live caption for the gesture in progress / just detected
     let cap2 = null, tone = 'iris';
     const a = FACE.active;
-    if (a && a.kind==='brow') cap2 = `Brows up +${sg.brow.toFixed(2)} (needs 0.25 for 0.25 s)`;
+    if (a && a.kind==='brow') cap2 = `Long blink ${((now-a.t0)/1000).toFixed(2)} s (0.4 – 1.6 s clicks)`;
     else if (a && a.kind==='mouth') cap2 = `Mouth open ${((now-a.t0)/1000).toFixed(2)} s (0.3 – 1.5 s, then close)`;
     else if (a && a.kind==='natural') cap2 = 'Quick blink …';
     else if (a && a.kind==='nod') cap2 = `Nodding · pitch ${sg.pitch.toFixed(0)}° (yes)`;

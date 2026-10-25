@@ -53,7 +53,7 @@ def rows(category: str) -> list[tuple[str, str]]:
 def render(settings=None) -> str:
     if settings is None:
         from engine.config import settings
-    lines = ["# EYEable: what you can say", "",
+    lines = ["# [eye]able: what you can say", "",
              "The microphone is always on. In Pointer mode every sentence is checked for a command and anything else "
              "is ignored. Say \"dictate\" to start dictating; the card only shows what it hears while dictating.", "",
              TRIGGER_NOTE, ""]

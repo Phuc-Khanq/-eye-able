@@ -19,13 +19,18 @@ const SIZES = [[1024, 650], [1093, 614], [1280, 560], [1280, 610], [1280, 680], 
     const m = await p.evaluate(() => { const R = s => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right, h: r.height, w: r.width }; };
       const de = document.documentElement, rail = document.querySelector('#demo .rail');
       return { ih: innerHeight, iw: innerWidth, vs: de.scrollHeight - innerHeight, hs: de.scrollWidth - innerWidth, railOver: rail.scrollHeight - rail.clientHeight,
-        top: R('header.top'), lower: R('#demo .lower'), rail: R('#demo .rail'), screen: R('#demo .screen'), cam: R('#demo .cam'), lite: R('#demo .lite') }; });
+        logH: document.querySelector('#demo .log').getBoundingClientRect().height, buddyB: document.querySelector('#demo .buddy').getBoundingClientRect().bottom, top: R('header.top'), lower: R('#demo .lower'), rail: R('#demo .rail'), screen: R('#demo .screen'), cam: R('#demo .cam'), lite: R('#demo .lite') }; });
     const tag = `${w}x${h}`;
     ok(m.vs <= 0 && m.hs <= 0, `${tag}: the page does not scroll (${m.vs} px down, ${m.hs} px across)`);
     ok(m.lower.b <= m.ih && m.rail.b <= m.ih && m.top.t >= 0, `${tag}: header, camera rail and activity row are all inside the window`);
     ok(m.railOver <= 0, `${tag}: the camera rail needs no scrolling of its own (${m.railOver} px over)`);
     ok(m.screen.h >= 300 && m.screen.w >= 600, `${tag}: the simulated screen is usable (${Math.round(m.screen.w)}x${Math.round(m.screen.h)})`);
     ok(m.cam.h >= 90 && m.cam.b <= m.rail.b && m.lite.b <= m.rail.b + 1, `${tag}: camera picture (${Math.round(m.cam.h)} px tall) and the buttons under it are inside the rail`);
+    if (w >= 1200) {   // wide laptops: the screen is in the middle, Activity on its left, the camera on its right
+      ok(Math.abs((m.screen.l + m.screen.r) / 2 - m.iw / 2) <= 8, `${tag}: the simulated screen is centred on the window (${Math.round((m.screen.l + m.screen.r) / 2)} vs ${Math.round(m.iw / 2)})`);
+      ok(m.lower.r <= m.screen.l && m.rail.l >= m.screen.r && m.lower.w >= 200 && m.rail.w >= 200, `${tag}: Activity (${Math.round(m.lower.w)} px) sits left of the screen and the camera (${Math.round(m.rail.w)} px) right of it`);
+      ok(m.logH >= 60 && m.buddyB <= m.ih, `${tag}: the Activity list has room (${Math.round(m.logH)} px) and the helper is inside the window`);
+    }
     if (h >= 600) {   // mail: new message with the keyboard up (it opens with the cursor in To)
       await p.click('.dicon[data-act="open:mail"]'); await p.waitForTimeout(400); await p.click('[data-act="compose"]'); await p.waitForTimeout(400);
       await p.click('.field[data-act="focus:body"]'); await p.waitForTimeout(500);

@@ -354,7 +354,7 @@ input[type=range]{width:100%;accent-color:var(--iris)}
 
 .monitor-scroll{overflow-x:auto;border-radius:18px}
 .monitor{background:#1C1C1C;border-radius:18px;padding:10px 10px 20px;position:relative;min-width:760px}
-.monitor::after{content:"eyeable · simulated Windows desktop";position:absolute;bottom:3px;left:0;right:0;text-align:center;font-family:var(--f-mono);font-size:10px;color:#9A9B7A;letter-spacing:.1em}
+.monitor::after{content:"[eye]able · simulated Windows desktop";position:absolute;bottom:3px;left:0;right:0;text-align:center;font-family:var(--f-mono);font-size:10px;color:#9A9B7A;letter-spacing:.1em}
 
 /* ---- simulated Windows world (fixed light palette, independent of page theme) ---- */
 .screen{position:relative;height:660px;border-radius:8px;overflow:hidden;font-family:var(--f-win);color:#1B1B1F;cursor:crosshair;user-select:none;
@@ -1236,4 +1236,34 @@ main#intro,main#demo{position:relative}
 }
 @media (min-width:900px) and (max-width:999px){
   .tb-search{display:none}
+}
+
+/* ===== live demo, laptops 1200 px wide and up: the simulated screen sits in the middle of the window =====
+   Left of it: Activity and the helper. Right of it: the camera. Both sides are the same width, so the screen is
+   centred on the window (a person facing their webcam points at the middle of the screen). Under it: the status bar.
+   Narrower windows keep the earlier layout (screen with the camera beside it, Activity underneath). */
+@media (min-width:1200px) and (min-height:430px){
+  #demo{--side:clamp(206px,17vw,330px);--rail-w:var(--side)}
+  body.demo-on #demo .ws{padding:8px clamp(12px,2.4vw,56px) 10px}
+  body.demo-on #demo .ws-grid{display:grid;grid-template-columns:var(--side) minmax(0,1fr) var(--side);grid-template-rows:minmax(0,1fr) auto;gap:10px 12px}
+  body.demo-on #demo .main{display:contents}
+  body.demo-on #demo .main > .monitor-scroll{grid-column:2;grid-row:1;order:0;min-height:0;min-width:0}
+  body.demo-on #demo .main > .statusbar{grid-column:2;grid-row:2;order:0;margin:0;justify-content:center}
+  body.demo-on #demo .main > .statusbar .grow{display:none}
+  body.demo-on #demo .main > .statusbar #pauseBtn{margin-left:6px}
+  body.demo-on #demo .ws-grid > .rail{grid-column:3;grid-row:1 / 3;order:0;padding:0}
+  body.demo-on #demo .main > .lower{grid-column:1;grid-row:1 / 3;order:0;margin:0;height:auto;min-height:0;display:flex;flex-direction:column;gap:10px}
+  body.demo-on #demo .lower > .card:first-child{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:12px 14px}
+  body.demo-on #demo .lower .card-h{flex:0 0 auto}
+  body.demo-on #demo .log{flex:1 1 auto;height:auto;max-height:none;min-height:0;font-size:11.5px;gap:5px}
+  body.demo-on #demo .log > *{line-height:1.35}
+  body.demo-on #demo .lower > .buddy{flex:0 0 auto;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:12px 12px 14px}
+  body.demo-on #demo .buddy .mascot-slot{display:flex;justify-content:center}
+  body.demo-on #demo .buddy .mascot{width:56px}
+  body.demo-on #demo .buddy p{width:100%;font-size:12.5px;line-height:1.4;max-height:132px;overflow:auto}
+}
+@media (min-width:1200px) and (min-height:430px) and (max-height:700px){
+  body.demo-on #demo .buddy .mascot{width:44px}
+  body.demo-on #demo .buddy p{font-size:12px;max-height:92px;padding:6px 8px}
+  body.demo-on #demo .lower > .buddy{padding:8px 10px 10px;gap:6px}
 }

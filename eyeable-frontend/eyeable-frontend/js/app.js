@@ -206,7 +206,7 @@
       return true;
     } catch(e){
       S.camState = 'blocked'; setCamUI();
-      toast('The browser did not give this page the webcam, so the demo is driven by your mouse. To use your head, eyes and voice, start EYEable on your PC: this page connects to it by itself.');
+      toast('The browser did not give this page the webcam, so the demo is driven by your mouse. To use your head, eyes and voice, start [eye]able on your PC: this page connects to it by itself.');
       return false;
     }
   }
@@ -1080,7 +1080,7 @@
     $('#ctx').hidden = true;
     if (v==='back') run('back', src);
     else if (v==='reload') run('reload', src);
-    else if (v==='copy'){ clip = W.focus ? W.f[W.focus] : (W.browser.watchData?.[0] || 'eyeable'); toast('Copied'); }
+    else if (v==='copy'){ clip = W.focus ? W.f[W.focus] : (W.browser.watchData?.[0] || '[eye]able'); toast('Copied'); }
     else if (v==='paste'){ if (W.focus){ insertText(clip,true); renderAll(); } else toast('Select a text box first'); }
     else if (v==='close'){ const t = W.top || (W.browser.open?'browser':W.mail.open?'mail':null); if (t) run('close:'+t, src); }
   }
@@ -1181,7 +1181,7 @@
       if (kind==='mouth'){ ripple('shake', pos); glabel('MOUTH OPEN · RIGHT CLICK'); log('eye','Mouth open 0.5 s → right click'); openCtx(pos.x+6, pos.y+6); return; }
       if (kind==='tiltL' || kind==='tiltR'){ const d = kind==='tiltL' ? -1 : 1; glabel(d<0 ? 'HEAD UP · SCROLL UP' : 'HEAD DOWN · SCROLL DOWN'); log('head', `Head ${d<0?'up':'down'} (pitch held) → scroll ${d<0?'up':'down'}`); scrollBy(d); return; }
       if (kind==='shake'){ glabel('SHAKE · NO'); log('head','Head shake → no / cancel'); if (!$('#ctx').hidden){ $('#ctx').hidden = true; log('sys','Menu closed'); } return; }
-      if (kind==='nod'){ glabel('NOD · YES'); log('head','Nod → yes (only answers a question; not a click)'); toast('A nod means "yes" when eyeable asks. It is not a click.'); return; }
+      if (kind==='nod'){ glabel('NOD · YES'); log('head','Nod → yes (only answers a question; not a click)'); toast('A nod means "yes" when [eye]able asks. It is not a click.'); return; }
     }, DUR[kind]);
   }
 
@@ -1455,7 +1455,7 @@
       await step('Raise your brows to select it'); await g('brow', tok);
       await step('Dictating the message'); await say('hi my, see yoo sun-day at sick','hi mai, see you sunday at six', tok);
       await step('Picking a word suggestion'); await gazeTo('[data-act="sug:Love, Grandma"]', 600, tok); await g('brow', tok);
-      await step('Saying "send it": eyeable asks first'); await say('seh-n it','send it', tok);
+      await step('Saying "send it": [eye]able asks first'); await say('seh-n it','send it', tok);
       await step('Raise your brows to say yes'); await wait(500); await g('brow', tok);
       await step('Done: email written and sent with voice, a brow raise and a confirm.');
     },

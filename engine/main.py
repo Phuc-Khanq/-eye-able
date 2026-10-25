@@ -328,7 +328,7 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
         gpu.start()
     if stdin:
         threading.Thread(target=read_stdin, args=(bus, stop), daemon=True).start()
-    print(f"EYEable engine on ws://{settings.ws_host}:{relay.port}  (Ctrl+C or say \"quit\" to stop)")
+    print(f"[eye]able engine on ws://{settings.ws_host}:{relay.port}  (Ctrl+C or say \"quit\" to stop)")
     loop = asyncio.get_running_loop()
     quit_now = asyncio.Event()
     bus.subscribe(topics.QUIT, lambda _msg: loop.call_soon_threadsafe(quit_now.set))   # "quit": any thread
@@ -350,16 +350,18 @@ async def run(wav: str | None = None, eyes: bool = False, pointer: str = "head",
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="EYEable engine")
+    p = argparse.ArgumentParser(description="[eye]able engine")
     p.add_argument("--wav", help="use this recording instead of the mic")
     p.add_argument("--no-eyes", action="store_true", help="no camera, cursor, clicks or typing (voice only)")
-    p.add_argument("--pointer", choices=["head-eyes", "head", "head-nose", "head-abs", "hybrid", "gaze"],
+    p.add_argument("--pointer", choices=["head-eyes", "head", "head-nose", "head-push", "head-abs", "hybrid", "gaze"],
                    default=str(getattr(settings, "pointer_mode", "head")),
                    help="head-eyes = the head moves the cursor and the eyes pull it toward where you look while the "
                         "head turns that way (default, pointer_mode in settings; needs a gaze calibration, "
                         "tests.gaze_dot, else it is head); head = head only, as a mouse with acceleration; head-abs = "
                         "fixed head angle per screen spot; head-nose = head, plus the nose carries the cursor the last stretch to an "
-                        "edge when the head is turned that way; hybrid and gaze need a gaze calibration")
+                        "edge when the head is turned that way; head-push = head, but only a turn away from your resting angle moves the "
+                        "cursor: turning back leaves it where it is (push, come back, push again; say \"recenter\" to "
+                        "reset the resting angle); hybrid and gaze need a gaze calibration")
     p.add_argument("--dwell", action=argparse.BooleanOptionalAction, default=False,
                    help="resting the cursor dwell_ms (settings, 1 s) also left-clicks; off by default (the left click "
                         "is an eyebrow raise or \"click\", snapped onto the nearest button by UI-Venus)")

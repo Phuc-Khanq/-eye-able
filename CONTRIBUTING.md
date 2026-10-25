@@ -1,6 +1,6 @@
 # Rules for every commit
 
-EYEable runs on Khang's laptop: Windows, Python 3.11, an RTX 5080 with 16 GB, and Node 20 or newer. Code that doesn't run there doesn't count.
+[eye]able runs on Khang's laptop: Windows, Python 3.11, an RTX 5080 with 16 GB, and Node 20 or newer. Code that doesn't run there doesn't count.
 
 ## Environment
 

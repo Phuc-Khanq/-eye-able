@@ -1,4 +1,4 @@
-/* js/engine.js: connects this page to the real EYEable engine (python -m engine.main) over WebSocket.
+/* js/engine.js: connects this page to the real [eye]able engine (python -m engine.main) over WebSocket.
    Messages are the ones in engine/core/messages.py. With no engine running the page keeps its simulation.
    Needs window.DZ, which js/app.js exposes just before its boot block.
    Open the page with ?engine=ws://host:port to use another address (default ws://127.0.0.1:8765).
@@ -7,7 +7,7 @@
    - the pointer is the real mouse (the engine moves it with your head); a real click is a click on the simulated desktop
    - typing, keys, scrolling and "open ..." arrive as page_action messages and happen on the simulated desktop
    - the webcam picture arrives as debug_frame and shows in the camera box
-   - the EYEable card (mode, what you are saying, what will be typed, questions) is drawn here on the simulated screen
+   - the [eye]able card (mode, what you are saying, what will be typed, questions) is drawn here on the simulated screen
    Every 2 s this page tells the engine "page_mode on"; if it stops, the engine goes back to the real computer. */
 (() => {
   const D = window.DZ; if (!D) return;
@@ -27,13 +27,13 @@
   bar.insertBefore(pill, bar.firstChild); bar.insertBefore(read, pill.nextSibling);
   const setRead = t => { read.textContent = t || ''; };
 
-  /* ---------- the EYEable card, on the simulated screen ---------- */
-  const MODES = { pointer: ['EYEable', ''], dictation: ['Dictation', 'say “dictate off” to stop'], scroll: ['Scroll', 'tilt your head · say “stop”'],
+  /* ---------- the [eye]able card, on the simulated screen ---------- */
+  const MODES = { pointer: ['[eye]able', ''], dictation: ['Dictation', 'say “dictate off” to stop'], scroll: ['Scroll', 'tilt your head · say “stop”'],
                   menu: ['Menu', ''], paused: ['Paused', 'say “resume”'] };
   const screenEl = D.screen;
   const card = document.createElement('div');
   card.className = 'dz-card'; card.hidden = true;
-  card.innerHTML = `<div class="dz-pill"><i class="dz-dot"></i><span class="dz-pt">EYEable</span><small class="dz-ph"></small>
+  card.innerHTML = `<div class="dz-pill"><i class="dz-dot"></i><span class="dz-pt">[eye]able</span><small class="dz-ph"></small>
       <span class="dz-wave">${'<i></i>'.repeat(7)}</span></div>
     <div class="dz-panel" hidden><div class="dz-label"><span class="dz-lab"></span></div><span class="dz-chip" hidden></span>
       <div class="dz-body"></div><div class="dz-bar" hidden><i></i></div><div class="dz-actions"></div><div class="dz-hint"></div></div>`;
@@ -69,7 +69,7 @@
     chip.hidden = true; barEl.hidden = true; acts.innerHTML = ''; hintEl.innerHTML = ''; body.innerHTML = '';
     const q = S.q && S.q.state === 'open' ? S.q : null;
     if (q) {                                                           // 1. a yes/no question
-      panel.hidden = false; lab.textContent = 'EYEable asks';
+      panel.hidden = false; lab.textContent = '[eye]able asks';
       body.textContent = q.prompt;
       barEl.hidden = false; barEl.firstElementChild.style.width = Math.max(0, Math.min(100, 100 * q.left / q.total)) + '%';
       acts.innerHTML = '<button class="main" data-act="dz:yes">Yes</button><button data-act="dz:no">No</button>';
@@ -249,12 +249,12 @@
   function onConfirm(m) {
     if (m.state === 'open') {
       S.q = { id: m.id, prompt: m.prompt, state: 'open', total: m.expires_in_s || 12, left: m.expires_in_s || 12, t0: performance.now() };
-      const cur = $('#tip').textContent; if (!/^EYEable asks:/.test(cur)) S.prevTip = cur;   // so the question does not stay on the mascot afterwards
-      tip('EYEable asks: ' + m.prompt + ' Blink or say yes. Say no to cancel.');
+      const cur = $('#tip').textContent; if (!/^\[eye\]able asks:/.test(cur)) S.prevTip = cur;   // so the question does not stay on the mascot afterwards
+      tip('[eye]able asks: ' + m.prompt + ' Blink or say yes. Say no to cancel.');
       render();
     } else {
       S.q = null; clearInterval(qTick);
-      if (S.prevTip != null && /^EYEable asks:/.test($('#tip').textContent)) tip(S.prevTip);
+      if (S.prevTip != null && /^\[eye\]able asks:/.test($('#tip').textContent)) tip(S.prevTip);
       S.prevTip = null;
       say({ confirmed: 'Done', cancelled: 'Cancelled', expired: 'Timed out' }[m.state] || m.state);
       log('sys', m.prompt + ' → ' + m.state);
@@ -506,11 +506,11 @@
   }
   // capture phase: the page's own camera code never runs, because one app at a time can hold a webcam on Windows.
   // On the hosted website (GitHub Pages) there is no launcher: with no engine, the button shows the browser's own
-  // webcam as before, and the page connects by itself whenever EYEable is running on this PC.
+  // webcam as before, and the page connects by itself whenever [eye]able is running on this PC.
   const LOCAL = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   document.addEventListener('click', e => {
     if (!e.target.closest('#allowCam, #demoCamBtn')) return;
-    if (!LOCAL && !live) { toast('Showing your webcam. To control this page with your head, eyes and voice, start EYEable on your PC: the page connects by itself.'); return; }
+    if (!LOCAL && !live) { toast('Showing your webcam. To control this page with your head, eyes and voice, start [eye]able on your PC: the page connects by itself.'); return; }
     e.stopImmediatePropagation(); e.preventDefault(); startEngine();
   }, true);
 

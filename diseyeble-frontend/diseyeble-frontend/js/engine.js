@@ -56,7 +56,7 @@
   function say(text, ms = 1000) { S.done = text; S.doneUntil = performance.now() + ms; render(); setTimeout(render, ms + 30); }
 
   function render() {
-    if (!live) { card.hidden = true; badge.hidden = true; return; }
+    if (!live && !liteCard) { card.hidden = true; badge.hidden = true; return; }
     card.hidden = false; badge.hidden = false;
     const now = performance.now();
     const [name, hint] = MODES[S.mode] || [S.mode, ''];
@@ -108,7 +108,8 @@
 
   /* ---------- connection ---------- */
   let starting = false, ws = null, live = false, saved = null, lastWant = null, frameAt = 0, camBackTimer = 0;
-  const send = (type, fields) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type, ...fields })); };
+  let liteSend = null, liteCard = false;   // lite mode's voice (js/lite-voice.js) plays the engine's part when there is no engine
+  const send = (type, fields) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type, ...fields })); else if (liteSend) liteSend(type, fields); };
   const camBox = $('#camBox'), camLive = $('#camLive');
 
   function setLive(on) {
@@ -471,6 +472,9 @@
     if (!LOCAL && !live) { toast('Showing your webcam. To control this page with your head, eyes and voice, start Diseyeble on your PC: the page connects by itself.'); return; }
     e.stopImmediatePropagation(); e.preventDefault(); startEngine();
   }, true);
+
+  // lite mode (js/lite.js, js/lite-voice.js) drives the same card and page actions with its own in-browser voice
+  D.bridge = { handle, onAction, setSend(fn) { liteSend = fn; }, setCard(on) { liteCard = !!on; render(); } };
 
   connect();
 })();

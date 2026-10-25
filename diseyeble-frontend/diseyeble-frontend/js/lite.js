@@ -4,7 +4,8 @@
    no "click <name>" look-and-say, and it never touches the real computer, only the simulator on this page.
 
    What it does (the same gestures as the engine):
-   - head turn / nod moves the pointer on the simulated screen (nose position relative to the eyes)
+   - turning or nodding your head moves the pointer like a mouse (the engine's head pointer, ported: true head angles from
+     MediaPipe's face matrix, acceleration, filtering); the eyes are not used to aim, only to click
    - a long blink (0.4 to 1.2 s, both eyes) clicks where the pointer is; quick natural blinks are ignored
    - optional: mouth open for 0.6 s = right click (off by default: talking opens the mouth)
    - voice: the page's own microphone button (browser speech recognition) still works as before
@@ -14,72 +15,163 @@
 (() => {
   'use strict';
 
+  /* The pointer is the engine's "head" pointer (engine/eyes/pointer.py, HeadRelPointer), ported: the head is a mouse
+     with acceleration. Turning slowly aims finely, turning fast throws the pointer far; it works from the CHANGE in
+     head angle (so there is nothing to calibrate and no neck strain to reach the edges), the angles are filtered
+     (One Euro), a resting head's wobble is gated out and a one-frame tracking glitch is skipped.
+     Numbers are in the engine's 1920x1080 pixels; the page scales them to the simulated screen. */
+  const REF_W = 1920, REF_H = 1080;
   const CFG = {
-    rangeX: 0.26,        // nose offset (in eye-distances) that reaches the screen edge at sensitivity 1, left-right
-    rangeY: 0.15,        // same, up-down (nodding moves the nose less than turning does)
-    blinkClose: 0.55, blinkOpen: 0.35,   // eyeBlink score (the smaller of the two eyes) to count as shut / open again
-    blinkMinMs: 400, blinkMaxMs: 1200,   // a long blink; same window as the engine
-    freezeAt: 0.30, freezeAfterMs: 250, backMs: 200,   // the pointer holds still while the eyelids move
+    gainSlow: 10, gainFast: 50, speedSlow: 8, speedFast: 60,   // px per degree, and the head speed (deg/s) between them
+    maxStepPx: 90, vBoost: 1.4, maxStepDeg: 10, glitchFrames: 2,
+    speedAttack: 0.5, speedRelease: 0.2, cutoff: 1.0, beta: 0.3, dCutoff: 1.0,
+    restWindowMs: 150, restYaw: [0.08, 0.20], restPitch: [0.12, 0.30],
+    frameS: 0.04, maxFrameScale: 4,
+    blinkClose: 0.55, blinkOpen: 0.35, blinkMinMs: 400, blinkMaxMs: 1600,   // a long blink: same window as the engine (config.py)
+    // edge help, ported from the engine's head-nose mode: the turn that reaches a side edge / the top or bottom is
+    // 19 / 11 degrees; past 70% of it the pointer is carried on to the spot that angle points at (never backward)
+    edgeYaw: 19, edgePitch: 11, edgeZone: 0.7, edgeRate: 5, edgeMaxPx: 45,
+    absYaw: 15, absPitch: 10,          // 'face map' mode: this many degrees from straight ahead reaches a side edge / the top or bottom
+    neutralFrames: 15,                 // straight ahead = the median of this many frames after start or recenter
+    freezeAt: 0.30, freezeAfterMs: 350, backMs: 300,                        // the pointer holds still while the eyelids move
     jawOpen: 0.6, jawClose: 0.3, jawHoldMs: 600,
-    calibFrames: 20,
-    slowAlpha: 0.25, fastAlpha: 0.6, fastDist: 0.04, deadZone: 0.003,
   };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const ramp = (x, lo, hi) => { const k = clamp((x - lo) / (hi - lo), 0, 1); return k * k * (3 - 2 * k); };
+  const alpha = (dt, cutoff) => 1 / (1 + 1 / (2 * Math.PI * cutoff) / dt);
 
-  /* sample: {nose:{x,y}, eyeA:{x,y}, eyeB:{x,y}, blinkL, blinkR, jaw, t(ms)} or null when no face.
-     step() returns {x, y (0..1 on the screen), status, calib (0..1), blinkMs, events:[{type:'click'|'rightclick', ms}]} */
+  class OneEuro {
+    constructor(minCutoff, beta, dCutoff) { this.mc = minCutoff; this.beta = beta; this.dc = dCutoff; this.reset(); }
+    reset() { this.t = null; this.x = 0; this.dx = 0; }
+    f(t, v) {
+      if (this.t === null) { this.t = t; this.x = v; this.dx = 0; return v; }
+      const dt = t - this.t; if (dt <= 0) return this.x;
+      this.dx = alpha(dt, this.dc) * ((v - this.x) / dt) + (1 - alpha(dt, this.dc)) * this.dx;
+      this.x += alpha(dt, this.mc + this.beta * Math.abs(this.dx)) * (v - this.x); this.t = t; return this.x;
+    }
+  }
+
+  /* Head yaw and pitch (degrees) from MediaPipe's facial transformation matrix, the same maths as
+     engine/eyes/head_pose.py: yaw > 0 = turned to your right, pitch > 0 = chin down. data is the 4x4 matrix as a flat
+     array; MediaPipe packs it column by column, but the bottom row of zeros tells which way it came. */
+  function anglesFromMatrix(data) {
+    if (!data || data.length < 16) return null;
+    const colMajor = Math.abs(data[3]) + Math.abs(data[7]) + Math.abs(data[11]) < 1e-3;
+    const R = (i, j) => (colMajor ? data[j * 4 + i] : data[i * 4 + j]);
+    const n = [0, 1, 2].map(j => Math.hypot(R(0, j), R(1, j), R(2, j)));
+    if (n.some(v => !(v > 1e-9))) return null;
+    const r = (i, j) => R(i, j) / n[j];
+    const ry = Math.asin(clamp(-r(2, 0), -1, 1)), rx = Math.atan2(r(2, 1), r(2, 2));
+    return { yaw: -ry * 180 / Math.PI, pitch: rx * 180 / Math.PI };
+  }
+  /* When the matrix is missing: rough angles from the nose's offset from the eyes (in eye-distances). */
+  function anglesFromLandmarks(nose, eyeA, eyeB) {
+    const ed = Math.hypot(eyeA.x - eyeB.x, eyeA.y - eyeB.y); if (!(ed > 1e-4)) return null;
+    return { yaw: -((nose.x - (eyeA.x + eyeB.x) / 2) / ed) * 60, pitch: ((nose.y - (eyeA.y + eyeB.y) / 2) / ed) * 60 };
+  }
+
+  /* sample: {yaw, pitch (degrees), blinkL, blinkR, jaw (0..1), t (ms)} or null when no face.
+     step() returns {x, y (0..1 on the screen), status, blinkMs, events:[{type:'click'|'rightclick', ms}]} */
   function createCore(over = {}) {
     const cfg = { ...CFG, ...over };
-    const st = { cx: null, cy: null, calib: [], sx: 0.5, sy: 0.5, hist: [],
+    const st = { nx: 0.5, ny: 0.5, fy: new OneEuro(cfg.cutoff, cfg.beta, cfg.dCutoff), fp: new OneEuro(cfg.cutoff, cfg.beta, cfg.dCutoff),
+                 last: null, raw: null, wild: 0, speed: 0, recent: [], hist: [], needRebase: false, neutral: null, nbuf: [], stepX: 0, stepY: 0, mode: 'rel',
                  closedSince: null, reopenAt: -1e9, jawSince: null, jawArmed: true,
                  sens: 1, flipX: false, flipY: false, mouthClick: false };
 
-    function recenter() { st.cx = st.cy = null; st.calib = []; st.hist = []; }
+    function rebase() { st.last = null; st.raw = null; st.wild = 0; st.speed = 0; st.recent = []; st.fy.reset(); st.fp.reset(); }
+    function recenter() { st.nx = st.ny = 0.5; st.hist = []; st.neutral = null; st.nbuf = []; rebase(); }
+    const gain = speed => { const k = ramp(speed, cfg.speedSlow, cfg.speedFast); return cfg.gainSlow + (cfg.gainFast - cfg.gainSlow) * k; };
+    const frameScale = dt => clamp(dt / cfg.frameS, 1, cfg.maxFrameScale);
+
+    /* head-nose edge help (engine/eyes/pointer.py _nose_assist): a relative pointer stops short of the edges as small
+       errors pile up. In the outer part of a turn, carry it on to the spot the turn points at, and only forward. */
+    function edgeHelp(dyaw, dpitch, dt, k) {
+      const axes = [[dyaw * (st.flipX ? -1 : 1), cfg.edgeYaw, 'nx', st.stepX], [dpitch * (st.flipY ? -1 : 1), cfg.edgePitch, 'ny', st.stepY]];
+      for (const [ang, edge, key, stepPx] of axes) {
+        const a = ang / edge, m = Math.abs(a), dir = a > 0 ? 1 : -1;
+        if (m <= cfg.edgeZone) continue;                       // not far enough into the turn
+        if (stepPx * dir < -0.5) continue;                     // the head is already coming back
+        const target = clamp(0.5 + dir * Math.min(m, 1) * 0.5, 0, 1);
+        const gap = (target - st[key]) * dir; if (gap <= 0) continue;   // already there, or past it
+        const w = (1 - Math.exp(-cfg.edgeRate * dt)) * ramp(m, cfg.edgeZone, 1);
+        const ref = key === 'nx' ? REF_W : REF_H;
+        st[key] = clamp(st[key] + dir * Math.min(gap * w, cfg.edgeMaxPx * k / ref), 0, 1);
+      }
+    }
+
+    function move(yaw, pitch, tMs) {
+      if (st.raw) {
+        const jump = Math.hypot(yaw - st.raw.yaw, pitch - st.raw.pitch);
+        if (jump > cfg.maxStepDeg * frameScale((tMs - st.raw.t) / 1000)) {      // a tracking glitch, or a real fast turn
+          st.wild++;
+          if (st.wild < cfg.glitchFrames) return;                                // one wild frame: skip it
+          rebase();                                                              // it stays there: start again from the new angle
+        }
+      }
+      st.wild = 0; st.raw = { yaw, pitch, t: tMs };
+      const t = tMs / 1000, fy = st.fy.f(t, yaw), fp = st.fp.f(t, pitch);
+      if (!st.neutral) {                                   // straight ahead: the middle of the first frames after start
+        st.nbuf.push({ y: yaw, p: pitch });
+        if (st.nbuf.length >= cfg.neutralFrames) {
+          const med = a => { const b = a.slice().sort((x, y) => x - y); return b[b.length >> 1]; };
+          st.neutral = { yaw: med(st.nbuf.map(v => v.y)), pitch: med(st.nbuf.map(v => v.p)) }; st.nbuf = [];
+        }
+      }
+      st.recent.push({ t: tMs, fy, fp });
+      while (st.recent.length > 2 && tMs - st.recent[1].t >= cfg.restWindowMs) st.recent.shift();
+      if (st.last) {
+        const dt = Math.max((tMs - st.last.t) / 1000, 1e-3);
+        st.stepX = st.stepY = 0;
+        if (st.mode === 'abs') {
+          if (st.neutral) {                                    // face map: the head angle IS the pointer position
+            const sy = st.sens || 1;
+            st.nx = clamp(0.5 + (st.flipX ? -1 : 1) * (fy - st.neutral.yaw) / (2 * cfg.absYaw / sy), 0, 1);
+            st.ny = clamp(0.5 + (st.flipY ? -1 : 1) * (fp - st.neutral.pitch) / (2 * cfg.absPitch / sy), 0, 1);
+          }
+        } else if (dt < 0.5) {
+          const dyaw = fy - st.last.fy, dpitch = fp - st.last.fp, k = frameScale(dt);
+          const inst = Math.hypot(dyaw, dpitch) / dt;
+          const rate = 1 - Math.pow(1 - (inst > st.speed ? cfg.speedAttack : cfg.speedRelease), k);
+          st.speed += rate * (inst - st.speed);
+          const g = gain(st.speed) * Math.max(st.sens, 0.1);
+          const r0 = st.recent[0];
+          const kx = ramp(Math.abs(fy - r0.fy), cfg.restYaw[0], cfg.restYaw[1]);   // a resting head's wobble does not move it
+          const ky = ramp(Math.abs(fp - r0.fp), cfg.restPitch[0], cfg.restPitch[1]);
+          let mx = dyaw * g * kx * (st.flipX ? -1 : 1), my = dpitch * g * cfg.vBoost * ky * (st.flipY ? -1 : 1);
+          const step = Math.hypot(mx, my), limit = cfg.maxStepPx * k;
+          if (step > limit) { mx *= limit / step; my *= limit / step; }
+          st.nx = clamp(st.nx + mx / REF_W, 0, 1); st.ny = clamp(st.ny + my / REF_H, 0, 1);
+          st.stepX = mx; st.stepY = my;
+          if (st.neutral) edgeHelp(fy - st.neutral.yaw, fp - st.neutral.pitch, dt, k);
+        }
+      }
+      st.last = { t: tMs, fy, fp };
+    }
 
     function step(s) {
-      const out = { x: st.sx, y: st.sy, status: 'noface', calib: 0, blinkMs: 0, events: [] };
-      if (!s || !s.nose || !s.eyeA || !s.eyeB) { st.closedSince = null; st.jawSince = null; return out; }
-      const ed = Math.hypot(s.eyeA.x - s.eyeB.x, s.eyeA.y - s.eyeB.y);
-      if (!(ed > 1e-4)) { st.closedSince = null; return out; }
-      const dx = (s.nose.x - (s.eyeA.x + s.eyeB.x) / 2) / ed;
-      const dy = (s.nose.y - (s.eyeA.y + s.eyeB.y) / 2) / ed;
-
-      if (st.cx === null) {                         // look straight ahead for ~0.7 s: that is the centre
-        st.calib.push({ dx, dy });
-        if (st.calib.length >= cfg.calibFrames) {
-          st.cx = st.calib.reduce((a, c) => a + c.dx, 0) / st.calib.length;
-          st.cy = st.calib.reduce((a, c) => a + c.dy, 0) / st.calib.length;
-          st.calib = []; st.sx = st.sy = 0.5;
-        } else { out.status = 'calibrating'; out.calib = st.calib.length / cfg.calibFrames; return out; }
-      }
-
+      const out = { x: st.nx, y: st.ny, status: 'noface', blinkMs: 0, events: [] };
+      if (!s || !Number.isFinite(s.yaw) || !Number.isFinite(s.pitch)) { st.closedSince = null; st.jawSince = null; st.needRebase = true; return out; }
       const t = s.t, mn = Math.min(s.blinkL || 0, s.blinkR || 0);
-      // eyes: shut / open with hysteresis
-      let closedNow = st.closedSince !== null ? mn > cfg.blinkOpen : mn >= cfg.blinkClose;
+      // eyes: shut / open, with hysteresis
+      const closedNow = st.closedSince !== null ? mn > cfg.blinkOpen : mn >= cfg.blinkClose;
       if (closedNow && st.closedSince === null) {
         st.closedSince = t;
-        const old = st.hist.find(h => h.t >= t - cfg.backMs);       // the pointer where it was before the lids moved
-        if (old) { st.sx = old.x; st.sy = old.y; }
+        const old = st.hist.find(h => h.t >= t - cfg.backMs);      // the pointer where it was before the lids moved
+        if (old) { st.nx = old.x; st.ny = old.y; }
       } else if (!closedNow && st.closedSince !== null) {
         const dur = t - st.closedSince; st.closedSince = null; st.reopenAt = t;
         if (dur >= cfg.blinkMinMs && dur <= cfg.blinkMaxMs) out.events.push({ type: 'click', ms: dur });
       }
       if (st.closedSince !== null) out.blinkMs = t - st.closedSince;
 
-      // pointer: hold still while the eyes are shut or just reopened
+      // the pointer holds still while the eyes are shut or just reopened, and picks up from the new angle afterwards
       const frozen = st.closedSince !== null || mn >= cfg.freezeAt || t - st.reopenAt < cfg.freezeAfterMs;
-      if (!frozen) {
-        const hx = cfg.rangeX / st.sens, hy = cfg.rangeY / st.sens;
-        // the camera image is not mirrored: turning right moves the nose to the image's left, so subtract
-        let tx = 0.5 + (st.flipX ? 1 : -1) * ((dx - st.cx) / hx) * 0.5;
-        let ty = 0.5 + (st.flipY ? -1 : 1) * ((dy - st.cy) / hy) * 0.5;
-        tx = clamp(tx, 0, 1); ty = clamp(ty, 0, 1);
-        const d = Math.hypot(tx - st.sx, ty - st.sy);
-        if (d > cfg.deadZone) {
-          const a = d > cfg.fastDist ? cfg.fastAlpha : cfg.slowAlpha;
-          st.sx += (tx - st.sx) * a; st.sy += (ty - st.sy) * a;
-        }
-        st.hist.push({ t, x: st.sx, y: st.sy });
+      if (frozen) st.needRebase = true;
+      else {
+        if (st.needRebase) { rebase(); st.needRebase = false; }
+        move(s.yaw, s.pitch, t);
+        st.hist.push({ t, x: st.nx, y: st.ny });
         while (st.hist.length && st.hist[0].t < t - 1000) st.hist.shift();
       }
 
@@ -90,8 +182,7 @@
         if (st.jawArmed && st.mouthClick && t - st.jawSince >= cfg.jawHoldMs) { st.jawArmed = false; out.events.push({ type: 'rightclick', ms: t - st.jawSince }); }
       } else if (jaw <= cfg.jawClose) { st.jawSince = null; st.jawArmed = true; }
 
-      out.x = st.sx; out.y = st.sy;
-      out.status = st.closedSince !== null ? 'closed' : 'tracking';
+      out.x = st.nx; out.y = st.ny; out.status = st.closedSince !== null ? 'closed' : 'tracking';
       return out;
     }
     const set = (k, v) => { st[k] = v; };
@@ -99,7 +190,7 @@
   }
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {            // node (the unit tests)
-    if (typeof module !== 'undefined') module.exports = { createCore, CFG };
+    if (typeof module !== 'undefined') module.exports = { createCore, CFG, anglesFromMatrix, anglesFromLandmarks };
     return;
   }
   const D = window.DZ; if (!D) return;
@@ -119,7 +210,7 @@
     let model = REMOTE_MODEL;
     try { const r = await fetch(LOCAL_MODEL, { method: 'HEAD' }); if (r.ok) model = LOCAL_MODEL; } catch (e) { /* use the download */ }
     const make = delegate => mod.FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: model, delegate }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true });
+      baseOptions: { modelAssetPath: model, delegate }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true });
     let lm; try { lm = await make('GPU'); } catch (e) { lm = await make('CPU'); }
     return { detect: (v, t) => lm.detectForVideo(v, t), close: () => lm.close() };
   }
@@ -134,6 +225,7 @@
   .lite summary{cursor:pointer;font-weight:600}
   .lite label{display:flex;align-items:center;gap:8px;margin:6px 0}
   .lite input[type=range]{flex:1}
+  .lite select{flex:1;min-width:0;font:inherit;padding:4px 6px;border-radius:8px}
   .lite p{margin:0;color:var(--muted,#667);font-size:12px;line-height:1.4}
   .lite-cur{position:absolute;left:0;top:0;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;z-index:70;pointer-events:none;
     border:3px solid #fff;box-shadow:0 0 0 2px #111,0 0 14px rgba(0,0,0,.5);background:rgba(17,17,17,.25);transition:transform .08s,border-color .1s}
@@ -149,11 +241,12 @@
     <button class="mini-btn" id="liteBtn" type="button">Try hands-free in your browser (lite)</button>
     <div class="lite-stat" id="liteStat" aria-live="polite"></div>
     <details id="liteSet"><summary>Lite settings</summary>
+      <label>Pointer <select id="liteMode"><option value="rel">Mouse-style, reaches the edges (best)</option><option value="abs">Face map: where you face is where it points</option></select></label>
       <label>Sensitivity <input type="range" id="liteSens" min="0.5" max="2.5" step="0.1" value="1"><span id="liteSensV">1.0×</span></label>
       <label><input type="checkbox" id="liteFx"> Flip left-right</label>
       <label><input type="checkbox" id="liteFy"> Flip up-down</label>
       <label><input type="checkbox" id="liteMouth"> Mouth open 0.6 s = right click</label>
-      <button class="mini-btn" id="liteRecenter" type="button">Recenter (look straight ahead)</button>
+      <button class="mini-btn" id="liteRecenter" type="button">Put the pointer in the middle</button>
     </details>
     <p>Runs in this tab only: your camera is not recorded or sent anywhere. Lite mode is a simulation and less accurate than the Diseyeble app, which also types by voice with the tuned model.</p>`;
   camBox.parentElement.append(panel);
@@ -171,7 +264,10 @@
     const bs = {};
     const cats = res.faceBlendshapes && res.faceBlendshapes[0] && res.faceBlendshapes[0].categories;
     if (cats) for (const c of cats) bs[c.categoryName] = c.score;
-    return { nose: f[NOSE], eyeA: f[EYE_A], eyeB: f[EYE_B], blinkL: bs.eyeBlinkLeft, blinkR: bs.eyeBlinkRight, jaw: bs.jawOpen, t, f };
+    const m = res.facialTransformationMatrixes && res.facialTransformationMatrixes[0];
+    const ang = (m && anglesFromMatrix(m.data)) || anglesFromLandmarks(f[NOSE], f[EYE_A], f[EYE_B]);
+    if (!ang) return null;
+    return { yaw: ang.yaw, pitch: ang.pitch, blinkL: bs.eyeBlinkLeft, blinkR: bs.eyeBlinkRight, jaw: bs.jawOpen, t, f };
   }
 
   function loop() {
@@ -185,7 +281,6 @@
     const o = core.step(s);
     draw(s, o);
     if (o.status === 'noface') { setStat('No face found. Move into view and face the screen.'); return; }
-    if (o.status === 'calibrating') { setStat('Look at the middle of the screen and hold still… ' + Math.round(o.calib * 100) + '%'); return; }
 
     const r = screen.getBoundingClientRect();
     const px = o.x * r.width, py = o.y * r.height;
@@ -194,10 +289,11 @@
     cursor.className = 'lite-cur' + (o.status === 'closed' ? (o.blinkMs >= core.cfg.blinkMinMs ? ' ready' : ' shut') : '');
     setStat(o.status === 'closed'
       ? (o.blinkMs >= core.cfg.blinkMinMs ? 'Eyes shut ' + (o.blinkMs / 1000).toFixed(1) + ' s: open them to click' : 'Eyes shut… keep them closed a bit longer to click')
-      : 'Tracking. Turn or nod to move, hold a long blink to click.');
+      : 'Tracking. Turn your head to move (small turns aim, fast turns throw). Hold a long blink to click.');
 
     for (const ev of o.events) {
       if (ev.type === 'click') {
+        if (window.DZVoice && window.DZVoice.waiting()) { log('eye', 'Lite: long blink → yes'); window.DZVoice.answer(true); continue; }   // a question or words are waiting: a blink is yes, like the engine
         if (G.pending) { log('eye', 'Lite: long blink → yes'); el('cqYes').click(); continue; }
         const what = D.clickAt(r.left + px, r.top + py, 'left', 'Lite: long blink → click');
         D.glabel('LONG BLINK · CLICK'); lastClickAt = t;
@@ -213,10 +309,6 @@
     c.save(); c.translate(w, 0); c.scale(-1, 1);                     // mirrored, like a mirror
     c.drawImage(video, 0, 0, w, h);
     c.restore();
-    if (s && s.f) {
-      c.fillStyle = o.status === 'closed' ? '#F0A94B' : '#7DD3FC';
-      for (const p of [s.nose, s.eyeA, s.eyeB]) { c.beginPath(); c.arc((1 - p.x) * w, p.y * h, 4, 0, 6.3); c.fill(); }
-    }
   }
 
   async function start() {
@@ -241,7 +333,7 @@
     core.recenter(); on = true; starting = false; D.engineLive = true;
     el('liteBtn').disabled = false; el('liteBtn').textContent = 'Stop lite mode';
     log('sys', 'Lite mode on: the head moves the pointer, a long blink clicks (simulation, runs in this tab)');
-    tip('Lite mode: look at the middle of the screen for a second, then turn your head to move and hold a long blink to click.');
+    tip('Lite mode: turn your head to move the pointer like a mouse (small turns aim, quick turns throw it). Hold a long blink, about half a second, to click.');
     guard = setInterval(() => { const p = document.getElementById('engPill'); if (p && !p.classList.contains('off')) stop('Diseyeble connected: using the real engine instead.', true); }, 1000);
     raf = requestAnimationFrame(loop);
   }
@@ -262,7 +354,8 @@
   }
 
   el('liteBtn').addEventListener('click', () => (on ? stop() : start()));
-  el('liteRecenter').addEventListener('click', () => { core.recenter(); setStat('Look at the middle of the screen and hold still…'); });
+  el('liteRecenter').addEventListener('click', () => { core.recenter(); setStat('Pointer in the middle.'); });
+  el('liteMode').addEventListener('change', e => { core.set('mode', e.target.value); core.recenter(); setStat(e.target.value === 'abs' ? 'Face map: look at the middle of the screen, hold still a moment, then point with your face.' : 'Mouse-style pointer.'); });
   el('liteSens').addEventListener('input', e => { core.set('sens', +e.target.value); el('liteSensV').textContent = (+e.target.value).toFixed(1) + '×'; });
   el('liteFx').addEventListener('change', e => core.set('flipX', e.target.checked));
   el('liteFy').addEventListener('change', e => core.set('flipY', e.target.checked));

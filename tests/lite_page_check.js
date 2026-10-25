@@ -27,8 +27,8 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
   const pos = () => p.evaluate(() => ({ x: window.DZ.G.pos.x, y: window.DZ.G.pos.y, w: window.DZ.screen.clientWidth, h: window.DZ.screen.clientHeight }));
   const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
   const c0 = await pos(); ok(Math.abs(c0.x / c0.w - 0.5) < 0.05, 'pointer starts in the middle');
-  await p.evaluate(() => { window.__face.nx = -0.04; }); await p.waitForTimeout(900);
-  const r = await pos(); ok(r.x / r.w > 0.7, 'turning right moves the pointer right (' + (r.x / r.w).toFixed(2) + ')');
+  await p.evaluate(() => { const f = window.__face; let n = 0; const id = setInterval(() => { f.nx -= 0.012; if (++n >= 6) clearInterval(id); }, 33); }); await p.waitForTimeout(900);  // a quick turn to the right
+  const r = await pos(); ok(r.x / r.w > 0.6, 'turning right moves the pointer right (' + (r.x / r.w).toFixed(2) + ')');
   ok(await p.evaluate(() => !!document.querySelector('.lite-cur') && !!document.querySelector('.sim-badge') && document.querySelector('#liteCanvas')), 'cursor, badge and camera preview are shown');
   await p.evaluate(() => { window.__face.b = 0.9; }); await p.waitForTimeout(800); await p.evaluate(() => { window.__face.b = 0; }); await p.waitForTimeout(300);
   const clicks = await p.evaluate(() => window.__clicks); ok(clicks.length === 1 && clicks[0][0] === 'left', 'a long blink made one left click: ' + JSON.stringify(clicks));

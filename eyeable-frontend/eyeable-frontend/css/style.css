@@ -862,6 +862,7 @@ main#intro,main#demo{position:relative}
 .dz-chip{display:inline-block;background:#2563eb;color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;float:right;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dz-body{font-size:19px;line-height:1.35;font-weight:500;word-break:break-word;min-height:1.35em}
 .dz-body .live{opacity:.55}
+.dz-body .more{opacity:.55;font-size:.8em}
 .dz-body .shaky{color:#fbbf24;text-decoration:underline;text-underline-offset:3px}
 .dz-bar{height:4px;border-radius:2px;background:rgba(255,255,255,.14);margin-top:10px;overflow:hidden}
 .dz-bar i{display:block;height:100%;background:#7aa7ff;width:100%}

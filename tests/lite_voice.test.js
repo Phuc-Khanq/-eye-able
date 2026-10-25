@@ -1,6 +1,6 @@
 // Unit tests for the in-browser voice (eyeable-frontend/eyeable-frontend/js/lite-voice.js). Run: node tests/lite_voice.test.js
 const assert = require('assert');
-const { createVoice, parse, launch } = require('../eyeable-frontend/eyeable-frontend/js/lite-voice.js');
+const { createVoice, parse, launch, tidy } = require('../eyeable-frontend/eyeable-frontend/js/lite-voice.js');
 
 function rig(findResult) {
   const out = { msgs: [], acts: [], clicks: [], timers: [], finds: [] };
@@ -98,6 +98,33 @@ test('paused: only resume (and quit) are heard', () => {
 test('undo drops waiting words, otherwise undoes the last typing', () => {
   const r = rig(); r.v.heard('hi dizzy'); r.v.heard('oops'); r.v.heard('scratch that'); assert.strictEqual(r.last('dictation_preview').words.length, 0);
   r.v.heard('undo'); assert.deepStrictEqual(r.acts.at(-1), { action: 'undo' });
+});
+
+test('tidy: a message body gets a capital, "I" and a full stop; a subject no stop; anything else is left as heard', () => {
+  assert.strictEqual(tidy('quarterly demo is ready', 'body'), 'Quarterly demo is ready.');
+  assert.strictEqual(tidy("i think i'm free tonight", 'body'), "I think I'm free tonight.");
+  assert.strictEqual(tidy('see you soon.', 'body'), 'See you soon.');
+  assert.strictEqual(tidy('are you free?', 'body'), 'Are you free?');
+  assert.strictEqual(tidy('thanks, ', 'body'), 'Thanks,');
+  assert.strictEqual(tidy('lunch tomorrow. bring the slides', 'body'), 'Lunch tomorrow. Bring the slides.');
+  assert.strictEqual(tidy('dinner on sunday.', 'subj'), 'Dinner on sunday');
+  assert.strictEqual(tidy('weather today', 'plain'), 'weather today');
+  assert.strictEqual(tidy('anna at example dot com', 'plain'), 'anna at example dot com');
+  assert.strictEqual(tidy('', 'body'), '');
+});
+test('the card shows the tidied words and "yes" types exactly those, for the message body only', () => {
+  const kinds = { v: 'body' };
+  const out = { msgs: [], acts: [] };
+  const v = createVoice({ emit: m => out.msgs.push(m), act: m => out.acts.push(m), pointerClick() {}, find: () => null, recenter() {}, quit() {}, kindFor: () => kinds.v });
+  v.heard('hi dizzy'); v.heard('i will send the slides tonight');
+  const words = out.msgs.filter(m => m.type === 'dictation_preview').at(-1).words.map(w => w.text).join(' ');
+  assert.strictEqual(words, 'I will send the slides tonight.');
+  v.heard('yes'); assert.deepStrictEqual(out.acts.at(-1), { action: 'type', text: 'I will send the slides tonight. ' });
+  kinds.v = 'plain'; v.heard('hi dizzy'); v.heard('cats and dogs'); v.heard('yes'); assert.deepStrictEqual(out.acts.at(-1), { action: 'type', text: 'cats and dogs ' });
+  kinds.v = 'body'; v.heard('hi dizzy'); v.heard('first part'); v.heard('second part'); v.heard('yes');
+  assert.deepStrictEqual(out.acts.at(-1), { action: 'type', text: 'First part. Second part. ' });
+  kinds.v = 'body'; v.heard('hi dizzy'); v.heard('hello'); v.heard('new line'); v.heard('bye now'); v.heard('yes');
+  assert.deepStrictEqual(out.acts.at(-1), { action: 'type', text: 'Hello.\nBye now. ' });
 });
 
 let failed = 0;

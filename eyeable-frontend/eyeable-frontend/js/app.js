@@ -853,7 +853,8 @@
 
   const field = (name, ph) => {
     const v = W.f[name], foc = W.focus===name;
-    return `<div class="field${foc?' focus':''}" data-act="focus:${name}">${name==='gq'||name==='yq'?'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>':''}${v?`<span>${esc(v)}</span>`:(foc?'':`<span class="ph">${ph}</span>`)}${foc?'<span class="caret"></span>':''}</div>`;
+    const al = ({to:'Recipient', subj:'Subject', body:'Message'})[name];       // so "click message" / "click subject" find the box by voice
+    return `<div class="field${foc?' focus':''}" data-act="focus:${name}"${al?` aria-label="${al}"`:''}>${name==='gq'||name==='yq'?'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-5-5"/></svg>':''}${v?`<span>${esc(v)}</span>`:(foc?'':`<span class="ph">${ph}</span>`)}${foc?'<span class="caret"></span>':''}</div>`;
   };
 
   function renderBrowser(){

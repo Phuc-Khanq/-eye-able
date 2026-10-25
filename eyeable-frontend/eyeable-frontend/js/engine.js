@@ -13,7 +13,7 @@
   const D = window.DZ; if (!D) return;
   const { $, esc, log, toast, tip, flashSig, addEvent, mascotDo, FACE, G, W } = D;
   const URL_WS = new URLSearchParams(location.search).get('engine') || 'ws://127.0.0.1:8765';
-  const RETRY_MS = 2000, SHAKY_CONF = 0.6, HEARTBEAT_MS = 1000, FRAME_GAP_MS = 3000;
+  const RETRY_MS = 2000, SHAKY_CONF = 0.6, HEARTBEAT_MS = 1000, FRAME_GAP_MS = 3000, MAX_PREVIEW_WORDS = 28;
 
   /* ---------- status pill + readout in the status bar ---------- */
   const st = document.createElement('style');
@@ -75,9 +75,12 @@
       acts.innerHTML = '<button class="main" data-act="dz:yes">Yes</button><button data-act="dz:no">No</button>';
       hintEl.innerHTML = 'Blink or say <b>yes</b> · say <b>no</b> to cancel';
     } else if (S.preview && S.preview.words.length) {                  // 2. what will be typed
-      panel.hidden = false; lab.textContent = S.preview.cleaned ? 'Will type (cleaned)' : 'Will type';
+      const into = NAMES[destFor(S.preview.words.map(w => w.text).join(' '))];          // the mail window sits under the card, so say where the words will go
+      panel.hidden = false; lab.textContent = (S.preview.cleaned ? 'Will type (cleaned)' : 'Will type') + (into ? ' · into ' + into : '');
       if (S.preview.cleaned && S.preview.original) { chip.hidden = false; chip.textContent = S.preview.original; }
-      body.innerHTML = S.preview.words.map(w => `<span class="${w.conf !== undefined && w.conf < SHAKY_CONF ? 'shaky' : ''}">${esc(w.text)}</span>`).join(' ')
+      const all = S.preview.words, extra = Math.max(0, all.length - MAX_PREVIEW_WORDS), shownW = extra ? all.slice(-MAX_PREVIEW_WORDS) : all;   // a long passage: the last words, like the app's card
+      body.innerHTML = (extra ? `<span class="more">… ${extra} earlier word${extra === 1 ? '' : 's'}</span> ` : '')
+        + shownW.map(w => `<span class="${w.conf !== undefined && w.conf < SHAKY_CONF ? 'shaky' : ''}">${esc(w.text)}</span>`).join(' ')
         + (S.liveText ? ` <span class="live">${esc(S.liveText)}</span>` : '');
       acts.innerHTML = '<button class="main" data-act="dz:insert">Type it</button><button data-act="dz:discard">Drop it</button>'
         + (S.preview.cleaned ? '<button data-act="dz:original">Use original</button>' : '');
@@ -246,10 +249,13 @@
   function onConfirm(m) {
     if (m.state === 'open') {
       S.q = { id: m.id, prompt: m.prompt, state: 'open', total: m.expires_in_s || 12, left: m.expires_in_s || 12, t0: performance.now() };
+      const cur = $('#tip').textContent; if (!/^EYEable asks:/.test(cur)) S.prevTip = cur;   // so the question does not stay on the mascot afterwards
       tip('EYEable asks: ' + m.prompt + ' Blink or say yes. Say no to cancel.');
       render();
     } else {
       S.q = null; clearInterval(qTick);
+      if (S.prevTip != null && /^EYEable asks:/.test($('#tip').textContent)) tip(S.prevTip);
+      S.prevTip = null;
       say({ confirmed: 'Done', cancelled: 'Cancelled', expired: 'Timed out' }[m.state] || m.state);
       log('sys', m.prompt + ' → ' + m.state);
     }
@@ -272,11 +278,22 @@
     if (b.open && !b.min && ['youtube', 'yresults', 'watch'].includes(b.page)) return 'yq';
     return null;
   };
+  /* Which box the dictated words go into: the one with focus, else the first empty one of the open window. A new
+     message starts with the cursor in "To", but a sentence is not an address, so a sentence goes into the message. */
+  const NAMES = { to: 'To', subj: 'Subject', body: 'Message', gq: 'search', yq: 'video search' };
+  function destFor(text) {
+    const f = W.focus || FIELD_FOR();
+    if (f === 'to' && W.mail.open && W.mail.view === 'compose' && !/@|\b(?:at|dot)\b/i.test(text) && String(text).trim().split(/\s+/).length >= 4) return 'body';
+    return f;
+  }
   function actType(text) {
     if (!text) return;
     lastTypeAt = performance.now();
-    if (!W.focus) { const f = FIELD_FOR(); if (f) { W.focus = f; log('sys', 'No text box was selected, so typing into ' + f); } }
-    const f = W.focus;
+    const before0 = W.focus, f = destFor(text);
+    if (f && f !== before0) {
+      W.focus = f;
+      log('sys', before0 ? 'The To box takes an address, so the words went into the message' : 'No text box was selected, so typing into ' + (NAMES[f] || f));
+    }
     if (!f) { toast('Click a text box first, then dictate'); log('sys', 'Typed “' + text.trim() + '” but no text box is open'); return; }
     const before = W.f[f].length;
     D.insertText(text, false);
@@ -474,7 +491,7 @@
   }, true);
 
   // lite mode (js/lite.js, js/lite-voice.js) drives the same card and page actions with its own in-browser voice
-  D.bridge = { handle, onAction, setSend(fn) { liteSend = fn; }, setCard(on) { liteCard = !!on; render(); } };
+  D.bridge = { handle, onAction, fieldFor: destFor, setSend(fn) { liteSend = fn; }, setCard(on) { liteCard = !!on; render(); } };
 
   connect();
 })();

@@ -98,6 +98,18 @@
     return null;
   }
 
+  /* The browser's recognizer gives plain words. For the message body (kind 'body') and the subject ('subj') tidy them
+     the way a reader expects: a capital to start, "I" for "i", a full stop at the end of a body sentence (not a subject).
+     Anything else (a search box, an address) is left exactly as heard. This is NOT the engine's clean-up model: it never
+     rewords, it only fixes capitals and the final stop. */
+  function tidy(text, kind) {
+    let t = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!t || (kind !== 'body' && kind !== 'subj')) return t;
+    t = t.replace(/\bi\b(?!\.)/g, 'I').replace(/^[a-z]/, c => c.toUpperCase()).replace(/([.!?]\s+)([a-z])/g, (m, a, b) => a + b.toUpperCase());
+    if (kind === 'body') { if (!/[.!?…:,;]["”')]?$/.test(t)) t += '.'; } else t = t.replace(/\.+$/, '');
+    return t;
+  }
+
   /* ---------------- the voice logic: modes, dictation preview, questions ---------------- */
   /* hooks: emit(msg) sends an engine-style message to the page (js/engine.js draws the card from them);
             act(msg) is a page_action; pointerClick(button, snap); find(label) -> {label, click()} | null;
@@ -109,8 +121,12 @@
     const status = (text, level = 'info') => emit({ type: 'status', level, text });
     const flash = label => emit({ type: 'command', label });
     const setMode = mode => { if (S.mode !== mode) { S.mode = mode; emit({ type: 'mode', mode }); } };
-    const previewText = () => S.chunks.join(' ').replace(/ ?\n ?/g, '\n').trim();
-    const showPreview = () => emit({ type: 'dictation_preview', words: S.chunks.filter(c => c !== '\n').join(' ').split(' ').filter(Boolean).map(text => ({ text, conf: 1 })), cleaned: false, original: '' });
+    /* hooks.kindFor(text) -> 'body' | 'subj' | 'plain': where the words will land (the page knows), so the card shows
+       exactly what will be typed. No hook (the unit tests) = 'plain' = as heard. */
+    const kindOf = () => { const raw = S.chunks.filter(c => c !== '\n').join(' '); try { return (hooks.kindFor && raw && hooks.kindFor(raw)) || 'plain'; } catch (e) { return 'plain'; } };
+    const shown = () => { const kind = kindOf(); return S.chunks.map(c => (c === '\n' ? c : tidy(c, kind))); };
+    const previewText = () => shown().join(' ').replace(/ ?\n ?/g, '\n').trim();
+    const showPreview = () => emit({ type: 'dictation_preview', words: shown().filter(c => c !== '\n').join(' ').split(' ').filter(Boolean).map(text => ({ text, conf: 1 })), cleaned: false, original: '' });
     const live = text => emit({ type: 'dictation_live', text: text || '' });
     function dropPreview() { S.chunks = []; showPreview(); }
     function insert(extra) {
@@ -218,7 +234,7 @@
   }
 
   if (typeof window === 'undefined' || typeof document === 'undefined') {            // node (the unit tests)
-    if (typeof module !== 'undefined') module.exports = { createVoice, parse, launch, normalize, answerOf, ratio };
+    if (typeof module !== 'undefined') module.exports = { createVoice, parse, launch, normalize, answerOf, ratio, tidy };
     return;
   }
   const D = window.DZ; if (!D || !D.bridge) return;
@@ -253,6 +269,7 @@
     emit: m => B.handle(m),
     act: m => B.onAction(m),
     pointerClick, find,
+    kindFor: text => { const f = B.fieldFor && B.fieldFor(text); return f === 'body' ? 'body' : f === 'subj' ? 'subj' : 'plain'; },
     recenter: () => { if (window.DZLite) window.DZLite.core.recenter(); },
     quit: () => { stop(); if (window.DZLite) window.DZLite.stop('Voice and lite mode are off.'); },
   });

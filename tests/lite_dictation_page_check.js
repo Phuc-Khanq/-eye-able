@@ -1,5 +1,5 @@
 // Headless check of dictating on the hosted page's simulated desktop (stand-in speech recogniser).
-// Run: node tests/lite_dictation_page_check.js   (SHOT=/path.png saves a screenshot of the finished state)
+// Run: node tests/lite_dictation_page_check.js   (SHOT=/path.png saves a screenshot of the finished state; W= and H= set the window size)
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..', 'eyeable-frontend', 'eyeable-frontend');
@@ -9,7 +9,7 @@ const srv = http.createServer((q, r) => { const f = path.join(root, decodeURICom
 (async () => {
   await new Promise(r => srv.listen(8099, r));
   const b = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
-  const p = await (await b.newContext({ viewport: { width: 1500, height: 1000 } })).newPage();
+  const p = await (await b.newContext({ viewport: { width: +(process.env.W || 1500), height: +(process.env.H || 1000) } })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message));
   await p.addInitScript(() => {
     window.__sr = null;

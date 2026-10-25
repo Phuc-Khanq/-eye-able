@@ -639,7 +639,7 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.04em}
 }
 
 /* ===== live demo: full screen (desktop) ===== */
-@media (min-width:1101px) and (min-height:620px){
+@media (min-width:900px) and (min-height:430px){
   body.demo-on{height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
   body.demo-on .top{flex:0 0 auto}
   body.demo-on #demo{flex:1 1 auto;min-height:0;display:flex}
@@ -660,16 +660,16 @@ h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:-.04em}
   #demo .demos{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   #demo .demos .demo-btn{white-space:nowrap;flex:none}
 }
-@media (min-width:1101px) and (max-width:1499px) and (min-height:620px){
+@media (min-width:900px) and (max-width:1499px) and (min-height:430px){
   #demo .demos .dur{display:none}
 }
 
 
 /* live demo: computer screen left, rail right */
-@media (min-width:1101px){#demo .ws-grid{grid-template-columns:minmax(0,1fr) 350px}#demo .ws-grid > .rail{order:2}#demo .ws-grid > .main{order:1}#demo .rail{padding-right:0;padding-left:2px}}
+@media (min-width:900px){#demo .ws-grid{grid-template-columns:minmax(0,1fr) 350px}#demo .ws-grid > .rail{order:2}#demo .ws-grid > .main{order:1}#demo .rail{padding-right:0;padding-left:2px}}
 
 /* live demo: status + guided demos under the computer screen */
-@media (min-width:1101px){#demo .main > .monitor-scroll{order:1}#demo .main > .statusbar{order:2}#demo .main > .demos,#demo .main > .running{order:3}#demo .main > .lower{order:4;margin-top:0}}
+@media (min-width:900px){#demo .main > .monitor-scroll{order:1}#demo .main > .statusbar{order:2}#demo .main > .demos,#demo .main > .running{order:3}#demo .main > .lower{order:4;margin-top:0}}
 
 /* ===== How it works: sketch layout (eye panel → wired steps) ===== */
 #pg-how .how-grid{position:relative;display:grid;grid-template-columns:minmax(0,1fr) clamp(70px,9vw,150px) minmax(0,1fr);align-items:stretch}
@@ -874,7 +874,8 @@ main#intro,main#demo{position:relative}
 .dz-hint b{display:inline-block;padding:0 6px;border-radius:5px;background:rgba(255,255,255,.14);font-weight:700}
 .sim-badge{position:absolute;left:10px;bottom:54px;z-index:900;font:700 10.5px var(--f-mono,monospace);letter-spacing:.08em;color:#fff;background:rgba(0,0,0,.5);padding:3px 8px;border-radius:6px;pointer-events:none}
 
-@media (min-width:1101px){#demo .ws-grid{grid-template-columns:minmax(0,1fr) 420px}}
+#demo{--rail-w:clamp(280px,27vw,420px)}
+@media (min-width:900px){#demo .ws-grid{grid-template-columns:minmax(0,1fr) var(--rail-w)}}
 
 /* The simulated screen uses the real mouse cursor (Oct 25): an arrow, a hand over things you can click, a text bar
    over text boxes. The old gaze ring is gone; its CLICK / SCROLL label still pops next to the pointer. */
@@ -1147,4 +1148,92 @@ main#intro,main#demo{position:relative}
 #demo .pill,#demo .demo-btn,#demo .mini-btn,#demo .lower .btn{border-color:rgba(255,255,255,.45)!important;box-shadow:0 0 6px rgba(255,255,255,.22),inset 0 0 8px rgba(255,255,255,.04)}
 #demo .demo-btn:hover,#demo .mini-btn:hover{border-color:rgba(255,255,255,.85)!important;box-shadow:0 0 10px rgba(255,255,255,.45),inset 0 0 10px rgba(255,255,255,.06)}
 #demo .plot-wrap,#demo .cam{border:1px solid rgba(255,255,255,.28);box-shadow:0 0 8px rgba(255,255,255,.12)}
-@media (min-width:1101px){#demo .monitor-scroll{overflow:visible}}
+@media (min-width:900px){#demo .monitor-scroll{overflow:visible}}
+
+/* ===== Live demo fits one screen on every laptop (Oct 25) =====
+   The page is a full-screen app from 900 px wide and 430 px tall. Taller screens keep the roomy layout above.
+   Shorter ones (most laptops: the browser's own toolbars leave 560 to 860 px) get a slimmer header, tighter
+   gaps, a rail whose camera picture takes whatever height is left, and a smaller on-screen keyboard. */
+@media (min-width:900px) and (min-height:430px) and (max-height:860px){
+  body.demo-on .top{margin:10px auto 8px;top:0;width:calc(100% - 2*clamp(12px,2.4vw,56px))}   /* the bar lines up with the demo's edges; its sticky offset (36px) would push it down over the demo */
+  body.demo-on .top .wrap{padding-block:5px;gap:8px}
+  body.demo-on .top .brand{padding-left:14px}
+  body.demo-on .top .wordmark{font-size:21px}
+  body.demo-on .top .pagelinks{margin-left:10px}
+  body.demo-on .top .pagelinks button{padding:5px 10px;font-size:13.5px}
+  body.demo-on .top .nav-demo{margin-left:4px}
+  #demo .ws{padding:4px clamp(12px,2.4vw,56px) 10px}
+  #demo .ws-grid{gap:12px}
+  #demo .rail{display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+  #demo .rail > .card:first-child{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;padding:10px 12px}
+  #demo .rail > .card:first-child .card-h{margin-bottom:8px}
+  #demo .rail .cam{flex:1 1 90px;min-height:90px;max-height:calc((var(--rail-w) - 26px) * .75);aspect-ratio:auto;width:100%}
+  #demo .rail .cam canvas{object-fit:contain;background:#161616}
+  #demo .rail .cam.live{aspect-ratio:auto}
+  #demo .rail .lite{flex:0 0 auto;margin-top:8px;gap:6px;font-size:12.5px}
+  #demo .rail .lite .lite-stat{min-height:1.2em;font-size:11.5px}
+  #demo .rail .lite details{padding:4px 10px}
+  #demo .rail .lite p{font-size:11.5px;line-height:1.35}
+  #demo .statusbar{margin:0}
+  #demo .main{gap:8px}
+  #demo .lower{margin-top:0;height:88px;grid-template-columns:minmax(0,1fr) minmax(340px,42%)}
+  #demo .buddy p{padding:4px 10px;line-height:1.25}
+  #demo .lower .card{padding-block:8px}
+  #demo .lower .card-h{margin-bottom:4px}
+  #demo .log{height:40px;max-height:40px;font-size:12.5px}
+  #demo .buddy .mascot{width:46px}
+  #demo .buddy p{font-size:12.5px;line-height:1.3;padding:6px 10px;max-height:70px}
+  /* the dictation card and keyboard take less of a short screen */
+  .dz-card{top:8px;gap:6px}
+  .dz-pill{padding:5px 14px;font-size:13px}
+  .dz-panel{padding:10px 14px;border-radius:14px}
+  .dz-body{font-size:16px;line-height:1.3}
+  .dz-actions{margin-top:8px}
+  .dz-actions button{padding:6px 14px;font-size:12.5px}
+  .dz-hint{margin-top:6px}
+  .osk{bottom:50px;padding:6px 8px 8px}
+  .osk-label{display:none}
+  .osk-sug{margin-bottom:5px}
+  .osk-sug button{padding:3px 4px;font-size:12px}
+  .osk-keys{gap:3px}
+  .k{height:26px;font-size:13px}
+  .taskbar{height:44px}
+  .dicons{bottom:52px}
+  .win{bottom:52px}
+  .sim-badge{bottom:48px}
+}
+@media (min-width:900px) and (min-height:430px) and (max-height:760px){
+  /* mail form above the keyboard: the heading goes, the form tightens, and the box you type in stays in view */
+  .screen.kb .mhead{display:none}
+  .screen.kb .compose{gap:4px;padding:6px 12px}
+  .screen.kb .cfield .field{height:28px}
+  .screen.kb .cfield.body .field{height:40px;padding-top:5px}
+  .screen.kb .crow .ghostbtn,.screen.kb .crow .sendbtn{padding-block:5px}
+  .screen.kb .win .titlebar{height:32px}
+}
+@media (min-width:900px) and (min-height:430px) and (max-height:700px){
+  .osk-sug{display:none}
+  .k{height:24px;font-size:12.5px}
+}
+@media (min-width:900px) and (min-height:430px) and (max-height:640px){
+  body.demo-on .top{margin:6px auto 6px}
+  body.demo-on .top .wrap{padding-block:3px}
+  #demo .ws{padding-bottom:8px}
+  #demo .lower{height:76px}
+  #demo .log{height:32px;max-height:32px}
+  #demo .buddy .mascot{width:40px}
+  #demo .buddy p{font-size:12px;max-height:60px}
+  .k{height:22px;font-size:12px}
+  .dz-body{font-size:15px}
+}
+@media (min-width:900px) and (min-height:430px) and (max-height:860px) and (max-width:1299px){
+  #demo .lower{grid-template-columns:minmax(0,1fr) minmax(340px,54%)}
+}
+/* a narrower simulated screen (laptops under about 1200 px wide): the taskbar's tray no longer runs over the app icons */
+@media (min-width:900px) and (max-width:1199px){
+  .tb-search{width:34px;padding:0;justify-content:center;font-size:0;gap:0}
+  .tray .tray-chev,.tray > span:first-of-type{display:none}
+}
+@media (min-width:900px) and (max-width:999px){
+  .tb-search{display:none}
+}

@@ -937,7 +937,15 @@
   function renderOSK(){
     const o = $('#osk');
     screen.classList.toggle('kb', !!W.focus);
-    if (W.focus) requestAnimationFrame(() => { const o = $('#osk'); if (!o.hidden && o.offsetHeight) screen.style.setProperty('--kb-gap', (screen.clientHeight - o.offsetTop + 8) + 'px'); });
+    if (W.focus) requestAnimationFrame(() => { const o = $('#osk'); if (!o.hidden && o.offsetHeight) screen.style.setProperty('--kb-gap', (screen.clientHeight - o.offsetTop + 8) + 'px');
+      requestAnimationFrame(() => {                               // a short screen: keep the box you type in visible above the keyboard
+        const f = screen.querySelector('.win:not([hidden]) .field.focus'), wb = f && f.closest('.wbody'); if (!wb) return;
+        const a = f.getBoundingClientRect(), z = wb.getBoundingClientRect(), inner = f.closest('#bPage');
+        if (inner) {                                              // the browser page scrolls by a transform, like the scroll commands do
+          const max = Math.max(0, inner.scrollHeight - inner.parentElement.clientHeight);
+          if (a.bottom > z.bottom - 6) { W.browser.scroll = clamp(W.browser.scroll + a.bottom - z.bottom + 14, 0, max); inner.style.transform = `translateY(${-W.browser.scroll}px)`; }
+        } else if (a.bottom > z.bottom) wb.scrollTop += a.bottom - z.bottom + 6; else if (a.top < z.top) wb.scrollTop -= z.top - a.top + 6;
+      }); });
     if (!W.focus){ o.hidden = true; return; }
     o.hidden = false;
     const rows = 'qwertyuiopasdfghjkl@zxcvbnm.,?';

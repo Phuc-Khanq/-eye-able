@@ -242,18 +242,33 @@
 
   /* ---------------- the browser side: microphone, buttons, finding things on the simulated screen ---------------- */
   const elLabel = el => (el.getAttribute('aria-label') || (el.querySelector('b') && el.querySelector('b').textContent) || el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40);
-  function visibleActs() { return [...screen.querySelectorAll('[data-act]')].filter(e => e.offsetParent && e.getBoundingClientRect().width); }
+  /* Things you could really click right now: shown, on the screen, and not hidden under a window (on a small screen the desktop
+     icons sit in several columns and an open window covers some of them; a click on a covered icon would hit the window). */
+  function visibleActs() {
+    return [...screen.querySelectorAll('[data-act]')].filter(e => {
+      if (!e.offsetParent) return false;
+      const r = e.getBoundingClientRect(); if (!r.width || !r.height) return false;
+      if (e.closest('.dz-card')) return true;                                          // the card's own buttons
+      const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return !!t && (t === e || e.contains(t));
+    });
+  }
+  function clickThroughCard(x, y, button, how) {                                      // the question card must not catch the click meant for the screen
+    const card = screen.querySelector('.dz-card'), was = card ? card.style.visibility : '';
+    if (card) card.style.visibility = 'hidden';
+    try { return D.clickAt(x, y, button, how); } finally { if (card) card.style.visibility = was; }
+  }
   function centerOf(el) { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
   function find(label) {                                                              // look-and-say, by label, on the simulated screen
     const want = normalize(label); if (!want) return null;
     let best = null, bs = 0;
     for (const el of visibleActs()) {
       const l = normalize(elLabel(el)); if (!l) continue;
-      const s = l === want ? 100 : (l.includes(want) || want.includes(l)) ? 90 : ratio(l, want);
+      const s = l === want ? 100 : (l.includes(want) || (l.length >= 3 && want.includes(l))) ? 90 : ratio(l, want);   // a one-letter key ("i") is not a match for "mail"
       if (s > bs) { bs = s; best = el; }
     }
     if (!best || bs < 70) return null;
-    return { label: elLabel(best), click: () => { const c = centerOf(best); D.clickAt(c.x, c.y, 'left', 'Voice: click “' + elLabel(best) + '”'); } };
+    return { label: elLabel(best), click: () => { const c = centerOf(best); clickThroughCard(c.x, c.y, 'left', 'Voice: click “' + elLabel(best) + '”'); } };
   }
   function pointerClick(button, snap) {
     const r = screen.getBoundingClientRect(); let x = r.left + D.G.pos.x, y = r.top + D.G.pos.y;
@@ -289,7 +304,7 @@
   note.textContent = 'Voice uses your browser’s speech recognition (Chrome or Edge); on Chrome it may send audio to Google unless on-device recognition is available. The EYEable app uses Whisper on your own PC. Try: “volume up”, “brightness down”, “open YouTube”, “search for cats”, “click Mail”, “hi Dizzy”, then speak, then “yes”.';
   const host = document.querySelector('.lite') || $('#camBox').parentElement;
   const anchor = host.querySelector('.lite-stat') || null;
-  host.insertBefore(btn, anchor); host.insertBefore(vstat, anchor); host.append(note);
+  host.insertBefore(btn, anchor); host.insertBefore(vstat, anchor); (host.querySelector('#liteInfo') || host).append(note);
   const setV = t => { vstat.textContent = t; };
   if (!SR) { btn.disabled = true; btn.textContent = 'Voice needs Chrome or Edge'; setV('This browser has no speech recognition. Use Google Chrome or Microsoft Edge on a computer.'); }
 

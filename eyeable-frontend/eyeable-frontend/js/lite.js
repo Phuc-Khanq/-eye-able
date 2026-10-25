@@ -248,8 +248,16 @@
       <label><input type="checkbox" id="liteMouth"> Mouth open 0.6 s = right click</label>
       <button class="mini-btn" id="liteRecenter" type="button">Put the pointer in the middle</button>
     </details>
-    <p>Runs in this tab only: your camera is not recorded or sent anywhere. Lite mode is a simulation and less accurate than the EYEable app, which also types by voice with the tuned model.</p>`;
+    <details id="liteInfo"><summary>Privacy and how it works</summary>
+      <p>Runs in this tab only: your camera is not recorded or sent anywhere. Lite mode is a simulation and less accurate than the EYEable app, which also types by voice with the tuned model.</p>
+    </details>`;
   camBox.parentElement.append(panel);
+  /* the privacy notes are open when the screen has room and fold away on short laptop screens, so the whole demo fits one screen;
+     a person who opens or closes them is not overruled */
+  { const info = panel.querySelector('#liteInfo'), roomy = matchMedia('(min-height:861px), (max-width:899px), (max-height:429px)'); let touched = false;
+    info.addEventListener('toggle', () => { if (info.open !== roomy.matches) touched = true; });
+    const sync = () => { if (!touched) info.open = roomy.matches; }; sync();
+    (roomy.addEventListener ? roomy.addEventListener('change', sync) : roomy.addListener(sync)); }
   const el = id => document.getElementById(id);
   const setStat = t => { el('liteStat').textContent = t; };
 

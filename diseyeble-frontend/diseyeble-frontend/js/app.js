@@ -31,6 +31,16 @@
   /* ---------------- intro: eye lab ---------------- */
 
 
+
+
+  /* ---------- Controls: expanding cards ---------- */
+  (function ctlAcc(){
+    const acc = $('#ctlAcc'); if (!acc) return;
+    const cards = [...acc.querySelectorAll('.inp')];
+    const open = i => { acc.classList.toggle('has-open', i >= 0); cards.forEach((c,k) => c.classList.toggle('open', k===i)); };
+    cards.forEach((c,k) => { c.addEventListener('mouseenter', () => open(k)); c.addEventListener('focus', () => open(k)); c.addEventListener('click', () => open(k)); c.addEventListener('blur', () => { if (!acc.matches(':hover')) open(-1); }); });
+    acc.addEventListener('mouseleave', () => open(-1));   // nothing hovered: all six cards equal again
+  })();
   /* ---------- How it works: soft twinkling dots that stay on the page ---------- */
   (function howDots(){
     const cv = $('#howDots'), page = $('#pg-how'); if (!cv) return;
@@ -463,7 +473,7 @@
     if (reduce || !r || !r.width || portalBusy || typeof PEEP === 'undefined') return false;
     portalBusy = true;
     const home = $('#pg-home'), how = $('#pg-how'), CX = innerWidth/2, CY = innerHeight/2 + 30;
-    const MOVE = 300, RING = 400, BURST = 310, SCATTER = 1600, SHOW = 300;
+    const MOVE = 340, RING = 470, BURST = 360, SCATTER = 1900, SHOW = 350;
     home.classList.add('portal-out');
     PEEP.portal({ X:CX, Y:CY, move:MOVE, ring:RING, burst:BURST, scatter:SCATTER });
     setTimeout(() => {
@@ -478,7 +488,7 @@
       const d0 = pr.r*2, rad = getComputedStyle(lab).borderTopLeftRadius;
       const W1 = lr.width, H1 = lr.height;
       // one continuous, smoothly eased morph (sampled keyframes, no stops in between): circle → rounded square → frame
-      const rEnd = parseFloat(rad) || 18, KF = [], N = 40, T = 1260, tm0 = 70/T, tm1 = 630/T;
+      const rEnd = parseFloat(rad) || 18, KF = [], N = 40, T = 1500, tm0 = 80/T, tm1 = 750/T;
       const sm = u => u*u*u*(u*(u*6 - 15) + 10);      // smootherstep: zero speed only at the very start and end
       for (let i = 0; i <= N; i++){
         const o = i/N, u = sm(clamp((o - tm0)/(tm1 - tm0), 0, 1));
@@ -494,20 +504,46 @@
         {transform:`translate(${dx}px,${dy}px)`, opacity:1, offset:.6},
         {transform:`translate(${dx}px,${dy}px)`, opacity:1, offset:.7, easing:'cubic-bezier(.5,0,.12,1)'},
         {transform:'none', opacity:1}
-      ], {duration:1800});
+      ], {duration:2150});
       // Peep's dots fade once they have spread out
-      setTimeout(() => $('#peepCanvas').animate([{opacity:1},{opacity:0}], {duration:760, fill:'forwards'}), 1220);
-      setTimeout(() => { PEEP.portalEnd(); home.classList.remove('portal-keep','portal-out'); home.hidden = true; $('#peepCanvas').getAnimations().forEach(a => a.cancel()); }, 2050);
+      setTimeout(() => $('#peepCanvas').animate([{opacity:1},{opacity:0}], {duration:900, fill:'forwards'}), 1450);
+      setTimeout(() => { PEEP.portalEnd(); home.classList.remove('portal-keep','portal-out'); home.hidden = true; $('#peepCanvas').getAnimations().forEach(a => a.cancel()); }, 2400);
       // wires draw out of the panel as it arrives; steps follow
       setTimeout(() => {
         $$('#howWires .w').forEach((w, k) => { const L = w.getTotalLength();
-          w.animate([{strokeDasharray:`${L} ${L}`, strokeDashoffset:L},{strokeDasharray:`${L} ${L}`, strokeDashoffset:0}], {duration:340, delay:k*60, easing:'cubic-bezier(.5,0,.2,1)', fill:'backwards'}); });
-        $$('#howWires .d').forEach((d, k) => d.animate([{opacity:0, transform:'scale(.2)'},{opacity:1, transform:'none'}], {duration:200, delay:(k%2 ? 240 : 0) + (k>>1)*60, fill:'backwards'}));
-        $$('#howWires .p, #howWires .c').forEach(q => q.animate([{opacity:0},{opacity:0, offset:.75},{opacity:1}], {duration:800, fill:'backwards'}));
-      }, 1700);
-      setTimeout(() => { how.classList.remove('portal-in'); portalBusy = false; }, 2800);
+          w.animate([{strokeDasharray:`${L} ${L}`, strokeDashoffset:L},{strokeDasharray:`${L} ${L}`, strokeDashoffset:0}], {duration:400, delay:k*70, easing:'cubic-bezier(.5,0,.2,1)', fill:'backwards'}); });
+        $$('#howWires .d').forEach((d, k) => d.animate([{opacity:0, transform:'scale(.2)'},{opacity:1, transform:'none'}], {duration:220, delay:(k%2 ? 280 : 0) + (k>>1)*70, fill:'backwards'}));
+        $$('#howWires .p, #howWires .c').forEach(q => q.animate([{opacity:0},{opacity:0, offset:.75},{opacity:1}], {duration:900, fill:'backwards'}));
+      }, 2020);
+      setTimeout(() => { how.classList.remove('portal-in'); portalBusy = false; }, 3400);
     }, SHOW);
     return true;
+  }
+
+  /* How it works → Controls: the text slides in first, then the six cards slide in from the right, card 01 leading */
+  function controlsIntro(){
+    const pg = $('#pg-controls'), head = [pg.querySelector('.ipage-num'), ...pg.querySelectorAll('.sec-head > *')];
+    const cards = [...pg.querySelectorAll('#ctlAcc .inp')], nav = pg.querySelector('.ctl-nav');
+    const ease = 'cubic-bezier(.22,.9,.24,1)';
+    head.forEach((el, k) => el && el.animate([{opacity:0, transform:'translateX(-70px)'},{opacity:1, transform:'none'}], {duration:620, delay:k*90, easing:ease, fill:'backwards'}));
+    const right = innerWidth;
+    const T0 = 520;                                   // cards start once the heading is mostly in
+    cards.forEach((c, k) => {                          // 01 first, then 02 … 06, each sliding in from the right
+      const r = c.getBoundingClientRect(), dx = right - r.left + 40;
+      const D = 500, at = T0 + k*330;                  // next card leaves as this one is nearly home
+      c.animate([{translate:`${dx}px 0`},{translate:'0 0'}], {duration:D, delay:at, easing:'cubic-bezier(.3,.7,.3,1)', fill:'backwards'});
+      // motion trail: light smears out behind the card while it moves, then settles
+      c.animate([
+        {filter:'blur(2px) brightness(1.25) drop-shadow(36px 0 6px rgba(255,255,255,.45)) drop-shadow(90px 0 18px rgba(143,227,106,.35)) drop-shadow(170px 0 34px rgba(255,255,255,.15))', skew:'-6deg 0deg'},
+        {filter:'blur(1px) brightness(1.1) drop-shadow(18px 0 6px rgba(255,255,255,.3)) drop-shadow(44px 0 14px rgba(143,227,106,.22)) drop-shadow(80px 0 24px rgba(255,255,255,.08))', skew:'-2deg 0deg', offset:.7},
+        {filter:'blur(0px) brightness(1) drop-shadow(0 0 0 rgba(255,255,255,0)) drop-shadow(0 0 0 rgba(143,227,106,0)) drop-shadow(0 0 0 rgba(255,255,255,0))', skew:'0deg 0deg'}
+      ], {duration:D, delay:at, easing:'cubic-bezier(.3,.7,.3,1)', fill:'backwards'});
+      // ghost copies that lag behind and fade (afterimage)
+      [0.12, 0.24].forEach((lag, g) => { const gh = document.createElement('div'); gh.className = 'ctl-ghost';
+        const r0 = c.getBoundingClientRect(); Object.assign(gh.style, {left:r0.left+'px', top:r0.top+'px', width:r0.width+'px', height:r0.height+'px'}); document.body.appendChild(gh);
+        gh.animate([{translate:`${dx}px 0`, opacity:.0},{opacity:g?.18:.3, offset:.15},{translate:'0 0', opacity:0}], {duration:D*(1+lag*2), delay:at + D*lag, easing:'cubic-bezier(.3,.7,.3,1)', fill:'both'}).finished.then(() => gh.remove()); });
+    });
+    nav && nav.animate([{opacity:0, transform:'translateY(14px)'},{opacity:1, transform:'none'}], {duration:400, delay:T0 + 5*330 + 460, fill:'backwards'});
   }
   function showPage(i, viaPortal){
     i = clamp(i, 0, IP.list.length-1);
@@ -515,7 +551,9 @@
     if ($('#intro').hidden) go('intro');
     const back = i < IP.cur;
     IP.list.forEach((p,k) => { p.hidden = k!==i; p.classList.remove('enter','back'); });
-    const p = IP.list[i]; void p.offsetWidth; if (!viaPortal){ p.classList.add('enter'); if (back) p.classList.add('back'); }
+    const ctlIn = !viaPortal && i === 2 && IP.cur === 1 && !matchMedia('(prefers-reduced-motion: reduce)').matches && innerWidth > 1100;
+    const p = IP.list[i]; void p.offsetWidth; if (!viaPortal && !ctlIn){ p.classList.add('enter'); if (back) p.classList.add('back'); }
+    if (ctlIn) controlsIntro();
     IP.cur = i;
     $$('.pagelinks button').forEach((b,k)=>b.setAttribute('aria-current', k===i));
     scrollTo({top:0});
@@ -639,7 +677,7 @@
       main = `<div class="mhead">New message</div><div class="compose">
         <div class="cfield"><span>To</span>${field('to','Recipient')}</div>
         <div class="cfield"><span>Subject</span>${field('subj','Add a subject')}</div>
-        <div class="cfield body"><span>Message</span>${field('body','Look here and hold, then speak or type')}</div>
+        <div class="cfield body"><span>Message</span>${field('body','Raise your brows here, then speak or type')}</div>
         <div class="crow"><button class="ghostbtn" data-act="discard">Discard</button><button class="sendbtn" data-act="send">Send ➤</button></div></div>`;
     }
     P.innerHTML = `<div class="mailapp">${side}<div class="mmain">${main}</div></div>`;
@@ -653,7 +691,7 @@
     if (!W.focus){ o.hidden = true; return; }
     o.hidden = false;
     const rows = 'qwertyuiopasdfghjkl@zxcvbnm.,?';
-    o.innerHTML = `<div class="osk-label"><span>On-screen keyboard · look at a key and hold, or nod</span><span>typing into: ${{gq:'search',yq:'video search',to:'To',subj:'Subject',body:'Message'}[W.focus]}</span></div>
+    o.innerHTML = `<div class="osk-label"><span>On-screen keyboard · point at a key and raise your brows</span><span>typing into: ${{gq:'search',yq:'video search',to:'To',subj:'Subject',body:'Message'}[W.focus]}</span></div>
       <div class="osk-sug">${(SUG[W.focus]||[]).slice(0,4).map(s=>`<button data-act="sug:${esc(s)}">${esc(s)}</button>`).join('')}</div>
       <div class="osk-keys">${rows.split('').map(c=>`<button class="k" data-act="key:${c}">${c}</button>`).join('')}
       <button class="k w2" data-act="key:hide">⌄ Hide</button><button class="k w4" data-act="key:space">space</button><button class="k w2" data-act="key:bksp">⌫</button><button class="k w2 acc" data-act="key:enter">${W.focus==='body'?'↵':'Enter'}</button></div>`;
@@ -723,7 +761,7 @@
         if (!W.f.to.trim()){ W.focus='to'; toast('Add a recipient first'); break; }
         W.sent.unshift({to:W.f.to,subj:W.f.subj,body:W.f.body,time:new Date().toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})});
         log(src,'Email sent to '+W.f.to); wtoast('Mail','Message sent to '+W.f.to);
-        W.f.to=W.f.subj=W.f.body=''; m.view='sent'; W.focus=null; tip('Email sent! You did that with your eyes, a nod and your voice.'); break;
+        W.f.to=W.f.subj=W.f.body=''; m.view='sent'; W.focus=null; tip('Email sent! You did that with your eyes, your brows and your voice.'); break;
       case 'toast': toast(v); break;
       case 'ctx': ctxAction(v, src); return;
     }
@@ -757,7 +795,7 @@
   /* ---------------- context menu (head shake) ---------------- */
   function openCtx(x,y){
     const c = $('#ctx');
-    c.innerHTML = `<div class="ctx-tag">RIGHT CLICK · HEAD SHAKE</div>
+    c.innerHTML = `<div class="ctx-tag">RIGHT CLICK · MOUTH OPEN</div>
       <button data-act="ctx:back">Back <small>Alt+←</small></button><button data-act="ctx:reload">Reload <small>Ctrl+R</small></button>
       <hr><button data-act="ctx:copy">Copy <small>Ctrl+C</small></button><button data-act="ctx:paste">Paste <small>Ctrl+V</small></button>
       <hr><button data-act="ctx:close">Close window</button><button data-act="ctx:cancel">Cancel</button>`;
@@ -777,16 +815,16 @@
   /* ---------------- gaze engine ---------------- */
   const screen = $('#screen'), gazeEl = $('#gaze'), prog = $('#prog');
   const G = { target:{x:380,y:260}, pos:{x:380,y:260}, steady:.7, jitter:9, paused:false, scripted:false, seen:false,
-    blink:false, nod:true, shake:true, tilt:true, dwell:true, dwellMs:900, calibrated:false };
+    brow:true, mouth:true, tilt:true, dwell:false, dwellMs:1000, calibrated:false, pending:null };
   let hot = null, hotSince = 0, dwellFired = false, dwellLock = null;
   screen.addEventListener('pointermove', e => {
     if (G.scripted) return;
     const r = screen.getBoundingClientRect(); G.target.x = e.clientX-r.left; G.target.y = e.clientY-r.top;
-    if (!G.seen){ G.seen = true; tip('Look at the Chrome icon on the taskbar and hold still until the orange ring fills. That opens it. You can also nod (N) or just say "open Chrome".'); }
+    if (!G.seen){ G.seen = true; tip('Look (move the mouse) roughly at Chrome on the taskbar and raise your brows (B or a left click): the click snaps onto it. You can also just say "open Chrome".'); }
   });
   screen.addEventListener('pointerdown', e => {
     if (G.scripted) return; e.preventDefault();
-    if (e.button===2) gesture('shake'); else gesture('nod');
+    if (e.button===2) gesture('mouth'); else gesture('brow');
   });
   screen.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -800,39 +838,78 @@
   function glabel(t){ const g=$('#glabel'); g.textContent=t; g.classList.add('show'); clearTimeout(glabel.t); glabel.t=setTimeout(()=>g.classList.remove('show'),900); }
   function flashSig(id){ const s=$(id); s.classList.add('fire'); clearTimeout(s._t); s._t=setTimeout(()=>s.classList.remove('fire'),700); }
 
-  const FACE = { blinkStart:-9999, blinkEnd:-9999, nodAt:-9999, shakeAt:-9999, tiltAt:-9999, tiltDir:1, speakUntil:0, caption:null };
-  const DUR = { blink:520, natural:150, nod:650, shake:800, tiltL:700, tiltR:700 };
+  const FACE = { blinkStart:-9999, blinkEnd:-9999, nodAt:-9999, shakeAt:-9999, tiltAt:-9999, tiltDir:1, browAt:-9999, mouthAt:-9999, speakUntil:0, caption:null };
+  const DUR = { natural:150, brow:450, mouth:700, nod:650, shake:800, tiltL:700, tiltR:700 };
+  const CAPS = { brow:'BROW RAISE +0.31 → CLICK', mouth:'MOUTH OPEN 0.5 s → RIGHT CLICK', nod:'NOD 12° → YES', shake:'SHAKE ±15° → NO', tiltL:'HEAD UP → SCROLL UP', tiltR:'HEAD DOWN → SCROLL DOWN' };
+  const SIGS = { brow:'#sigBlink', mouth:'#sigShake', nod:'#sigNod', shake:'#sigNod', tiltL:'#sigTilt', tiltR:'#sigTilt' };
+  // snap click: the button under the pointer, or the nearest clickable thing within ~150 px
+  function snapTarget(){
+    const here = hitTest(); if (here) return here;
+    const sr = screen.getBoundingClientRect(), px = sr.left + G.pos.x, py = sr.top + G.pos.y;
+    let best = null, bd = 150 * (sr.width/1920*1.4 + .3);
+    $$('[data-act]', screen).forEach(el => { if (!el.offsetParent) return; const r = el.getBoundingClientRect(); if (!r.width) return;
+      const dx = Math.max(r.left - px, 0, px - r.right), dy = Math.max(r.top - py, 0, py - r.bottom), d = Math.hypot(dx, dy);
+      const top = document.elementFromPoint(r.left + r.width/2, r.top + r.height/2); if (!top || !el.contains(top)) return;
+      if (d < bd){ bd = d; best = el; } });
+    return best;
+  }
   function gesture(kind){
     if ($('#demo').hidden) return;
     const now = performance.now();
-    if (kind==='blink' || kind==='natural'){ FACE.blinkStart = now; FACE.blinkEnd = now + DUR[kind]; if (kind==='blink') mascotDo('blinknow'); }
+    if (kind==='natural'){ FACE.blinkStart = now; FACE.blinkEnd = now + DUR.natural; }
+    if (kind==='brow'){ FACE.browAt = now; mascotDo('blinknow'); }
+    if (kind==='mouth') FACE.mouthAt = now;
     if (kind==='nod'){ FACE.nodAt = now; mascotDo('nodnow'); }
     if (kind==='shake'){ FACE.shakeAt = now; mascotDo('shakenow'); }
-    if (kind==='tiltL' || kind==='tiltR'){ FACE.tiltAt = now; FACE.tiltDir = kind==='tiltL' ? -1 : 1; mascotDo(kind==='tiltL'?'tiltl':'tiltr'); }
+    if (kind==='tiltL' || kind==='tiltR'){ FACE.tiltAt = now; FACE.tiltDir = kind==='tiltL' ? -1 : 1; mascotDo('nodnow'); }
     FACE.active = {kind, t0:now};
-    const off = (kind==='blink' && !G.blink) || (kind==='nod' && !G.nod) || (kind==='shake' && !G.shake) || (kind.startsWith('tilt') && !G.tilt);
-    const el = (G.paused || off || kind==='natural') ? null : hitTest();
+    const off = (kind==='brow' && !G.brow) || (kind==='mouth' && !G.mouth) || (kind.startsWith('tilt') && !G.tilt);
     const pos = {x:G.pos.x, y:G.pos.y};
     setTimeout(() => {
       const t = performance.now();
       FACE.active = null;
-      if (kind==='natural'){ addEvent(t,'natural','natural blink 0.15 s · ignored'); setCaption('Quick blink (0.15 s) · ignored', 'muted'); log('eye','Natural blink 0.15 s · ignored (shorter than 0.30 s)'); return; }
-      const txt = {blink:'BLINK 0.52 s → CLICK', nod:'NOD −18° → CLICK', shake:'SHAKE ±17° → RIGHT CLICK', tiltL:'TILT LEFT −20° → CLICK', tiltR:'TILT RIGHT +20° → RIGHT CLICK'}[kind];
-      addEvent(t, kind, txt);
-      flashSig({blink:'#sigBlink', nod:'#sigNod', shake:'#sigShake', tiltL:'#sigTilt', tiltR:'#sigTilt'}[kind]);
-      if (G.paused){ setCaption(cap(kind)+' seen · tracking paused','muted'); return; }
-      if (off){ setCaption(cap(kind)+' seen · turned off in Settings','muted'); toast(cap(kind)+' is turned off in Settings'); return; }
-      const isRight = kind==='shake' || kind==='tiltR';
-      setCaption('✓ ' + txt, isRight?'amber':'iris');
-      ripple(isRight?'shake':kind, pos);
-      if (kind==='tiltR'){ glabel('TILT RIGHT · RIGHT CLICK'); log('head','Head tilt right (roll +20°) → right click'); openCtx(pos.x+6, pos.y+6); return; }
-      if (kind==='shake'){ glabel('SHAKE · RIGHT CLICK'); log('head','Head shake (yaw ±17°) → right click'); openCtx(pos.x+6, pos.y+6); return; }
-      glabel(kind==='blink'?'BLINK · CLICK':kind==='nod'?'NOD · CLICK':'TILT LEFT · CLICK');
-      const who = kind==='blink'?'eye':'head', what = kind==='blink'?'Blink 0.52 s':kind==='nod'?'Nod −18°':'Head tilt left (roll −20°)';
-      if (el){ log(who, `${what} → click "${label(el)}"`); run(el.dataset.act, who); }
-      else { log(who, `${what} → click (nothing under the pointer)`); $('#ctx').hidden = true; if (W.startOpen){ W.startOpen=false; renderAll(); } }
+      if (kind==='natural'){ addEvent(t,'natural','natural blink 0.15 s · ignored'); setCaption('Quick blink (0.15 s) · ignored', 'muted'); log('eye','Natural blink 0.15 s · ignored'); return; }
+      addEvent(t, kind, CAPS[kind]); flashSig(SIGS[kind]);
+      if (G.paused){ setCaption(gcap(kind)+' seen · paused','muted'); return; }
+      if (off){ setCaption(gcap(kind)+' seen · turned off in Settings','muted'); toast(gcap(kind)+' is turned off in Settings'); return; }
+      // a question is waiting: brow / nod = yes, shake = no
+      if (G.pending && (kind==='brow' || kind==='nod' || kind==='shake')){ setCaption('✓ ' + CAPS[kind].replace(/→.*/, kind==='shake' ? '→ NO' : '→ YES'), kind==='shake'?'amber':'iris'); answer(kind!=='shake', kind==='shake'?'Head shake':'Brow raise'); return; }
+      setCaption('✓ ' + CAPS[kind], (kind==='mouth'||kind==='shake')?'amber':'iris');
+      if (kind==='brow'){
+        const el = snapTarget();
+        if (el){ const sr=screen.getBoundingClientRect(), r=el.getBoundingClientRect(), x=r.left-sr.left+r.width/2, y=r.top-sr.top+r.height/2, moved = !hitTest() ;
+          if (moved){ G.target.x = G.pos.x = x; G.target.y = G.pos.y = y; }
+          ripple('blink', {x, y}); glabel(moved ? 'BROW RAISE · SNAP CLICK' : 'BROW RAISE · CLICK');
+          log('eye', `Brow raise → ${moved?'snapped to':'click'} "${label(el)}"`); run(el.dataset.act, 'eye'); }
+        else { ripple('blink', pos); glabel('BROW RAISE · CLICK'); log('eye','Brow raise → click (nothing clickable within 150 px)'); $('#ctx').hidden = true; if (W.startOpen){ W.startOpen=false; renderAll(); } }
+        return;
+      }
+      if (kind==='mouth'){ ripple('shake', pos); glabel('MOUTH OPEN · RIGHT CLICK'); log('eye','Mouth open 0.5 s → right click'); openCtx(pos.x+6, pos.y+6); return; }
+      if (kind==='tiltL' || kind==='tiltR'){ const d = kind==='tiltL' ? -1 : 1; glabel(d<0 ? 'HEAD UP · SCROLL UP' : 'HEAD DOWN · SCROLL DOWN'); log('head', `Head ${d<0?'up':'down'} (pitch held) → scroll ${d<0?'up':'down'}`); scrollBy(d); return; }
+      if (kind==='shake'){ glabel('SHAKE · NO'); log('head','Head shake → no / cancel'); if (!$('#ctx').hidden){ $('#ctx').hidden = true; log('sys','Menu closed'); } return; }
+      if (kind==='nod'){ glabel('NOD · YES'); log('head','Nod → yes (only answers a question; not a click)'); toast('A nod means "yes" when diseyeble asks. It is not a click.'); return; }
     }, DUR[kind]);
   }
+
+  /* ---------- confirm: the engine asks before risky actions, 12 s to answer ---------- */
+  let cqTimer = null;
+  function ask(prompt, onYes){
+    if (G.pending) answer(false, 'replaced');
+    const t0 = performance.now(); G.pending = { prompt, onYes, t0 };
+    $('#cqTxt').textContent = prompt; $('#confirmQ').hidden = false; log('sys', `Asking: "${prompt}"`); tip(prompt + ' Raise your brows or say "yes". Shake or say "no".');
+    clearInterval(cqTimer); cqTimer = setInterval(() => { const left = 12 - (performance.now()-t0)/1000; if (left <= 0) answer(false, 'expired'); else $('#cqT').textContent = Math.ceil(left)+' s'; }, 200);
+    $('#cqT').textContent = '12 s';
+  }
+  function answer(yes, how){
+    const q = G.pending; if (!q) return; G.pending = null; clearInterval(cqTimer); $('#confirmQ').hidden = true;
+    if (how==='replaced') return;
+    if (how==='expired'){ log('sys', `"${q.prompt}" expired after 12 s · counts as no`); toast('No answer in 12 s, so nothing was done'); return; }
+    log('sys', `"${q.prompt}" → ${yes?'yes':'no'} (${how})`);
+    if (yes) q.onYes(); else toast('Cancelled');
+  }
+  $('#cqYes').onclick = () => answer(true, 'button'); $('#cqNo').onclick = () => answer(false, 'button');
+  const gcap = k => ({brow:'Brow raise', mouth:'Mouth open', nod:'Nod', shake:'Head shake', tiltL:'Head up / down', tiltR:'Head up / down'})[k] || k;
+
   function setCaption(text, tone){ FACE.caption = {text, tone, until: performance.now()+1600}; }
   const label = el => (el.getAttribute('aria-label') || el.querySelector('b')?.textContent || el.textContent || '').replace(/\s+/g,' ').trim().slice(0,32) || el.dataset.act;
 
@@ -844,31 +921,26 @@
   addEventListener('keydown', e => {
     if ($('#demo').hidden || e.target.tagName==='INPUT' || e.target.tagName==='TEXTAREA' || e.repeat) return;
     if (G.scripted) return;
+    else if (e.key==='b'||e.key==='B') gesture('brow');
+    else if (e.key==='m'||e.key==='M') gesture('mouth');
     else if (e.key==='n'||e.key==='N') gesture('nod');
     else if (e.key==='h'||e.key==='H') gesture('shake');
-    else if (e.key==='ArrowLeft'){ e.preventDefault(); gesture('tiltL'); }
-    else if (e.key==='ArrowRight'){ e.preventDefault(); gesture('tiltR'); }
+    else if (e.key==='ArrowUp'){ e.preventDefault(); gesture('tiltL'); }
+    else if (e.key==='ArrowDown'){ e.preventDefault(); gesture('tiltR'); }
     else if (e.key==='p'||e.key==='P') setPaused(!G.paused);
     else if ((e.key==='v'||e.key==='V') && !vHeld){ vHeld=true; micStart(); }
   });
   addEventListener('keyup', e => { if ((e.key==='v'||e.key==='V') && vHeld){ vHeld=false; micStop(); } });
-  $('#sNod').onclick = () => gesture('nod');
-  $('#sShake').onclick = () => gesture('shake');
-  $('#sNat').onclick = () => gesture('natural');
-  $('#sTiltL').onclick = () => gesture('tiltL');
-  $('#sTiltR').onclick = () => gesture('tiltR');
-  $('#bTiltL').onclick = () => gesture('tiltL');
-  $('#bTiltR').onclick = () => gesture('tiltR');
-  $('#bNod').onclick = () => gesture('nod');
-  $('#bShake').onclick = () => gesture('shake');
+  [['#sBrow','brow'],['#sMouth','mouth'],['#sNod','nod'],['#sShake','shake'],['#sNat','natural'],['#sTiltL','tiltL'],['#sTiltR','tiltR'],
+   ['#bBrow','brow'],['#bMouth','mouth'],['#bTiltL','tiltL'],['#bTiltR','tiltR'],['#bShake','shake']].forEach(([id,k]) => { const b=$(id); if (b) b.onclick = () => gesture(k); });
 
   function setPaused(p){ G.paused=p; $('#trackPill').classList.toggle('paused',p); $('#trackTxt').textContent=p?'Paused':'Tracking'; $('#pauseBtn').firstChild.textContent=p?'Resume ':'Pause '; gazeEl.classList.toggle('hide',p); log('sys',p?'Tracking paused':'Tracking resumed'); }
   $('#pauseBtn').onclick = () => setPaused(!G.paused);
 
   /* settings */
   function sw(id,key,cb){ const b=$(id); b.onclick=()=>{ G[key]=!G[key]; b.setAttribute('aria-checked',G[key]); cb&&cb(); }; }
-  sw('#swNod','nod'); sw('#swShake','shake'); sw('#swTilt','tilt');
-  sw('#swDwell','dwell',()=>tip(G.dwell?'Gaze-hold is on: look at something for '+G.dwellMs+' ms and it clicks.':'Gaze-hold is off. Nod or tilt your head to click.'));
+  sw('#swBrow','brow'); sw('#swMouth','mouth'); sw('#swTilt','tilt');
+  sw('#swDwell','dwell',()=>tip(G.dwell?'Dwell is on: rest the pointer on a button for '+G.dwellMs+' ms and it clicks.':'Dwell is off (the default). Raise your brows to click.'));
   $('#dwellMs').oninput = e => { G.dwellMs=+e.target.value; $('#dwellOut').textContent=G.dwellMs+' ms'; };
   $('#steady').oninput = e => { G.steady=+e.target.value/100; $('#steadyOut').textContent=e.target.value+'%'; };
 
@@ -900,14 +972,20 @@
     if ((m = t.match(/^(?:play|watch) (.+)$/))) return {cmd:'do:playq:'+m[1], say:`Play “${m[1]}”`};
     if (/^(open|check|show)( my)? (mail|email|inbox)$/.test(t) || t==='mail' || t==='email') return {cmd:'open:mail', say:'Open Mail'};
     if ((m = t.match(/^(?:write|new|compose|send)(?: an| a)? (?:email|mail)(?: to (\w+))?$/))) return {cmd:'do:compose:'+(m[1]||''), say:'Write an email'+(m[1]?' to '+cap(m[1]):'')};
-    if (/^send( it)?$/.test(t)) return {cmd:'send', say:'Send the email'};
+    if (/^(send( it| message)?)$/.test(t)) return {cmd:'do:sendask', say:'Send it · asks first'};
+    if (/^(yes|yeah|yep|confirm|do it|go ahead|click it)$/.test(t)) return {cmd:'do:yes', say:'Yes'};
+    if (/^(no|nope|cancel|never mind)$/.test(t)) return {cmd:'do:no', say:'No'};
+    if (/^(resume|wake up|start listening)$/.test(t)) return {cmd:'do:resume', say:'Resume'};
+    if (/^(calibrate)$/.test(t)) return {cmd:'do:calib', say:'Calibrate'};
+    if (/^(scroll|scroll mode|start scrolling)$/.test(t)) return {cmd:'do:scrollmode', say:'Scroll mode'};
+    if ((m = t.match(/^(?:click|open|select) (?!this$|that$|it$|here$|there$)(.+)$/)) && !/youtube|chrome|browser|google|mail|email|inbox/.test(m[1])) return {cmd:'do:find:'+m[1], say:`Click “${m[1]}” · asks first`};
     if (/scroll down|down$/.test(t)) return {cmd:'do:scroll:1', say:'Scroll down'};
     if (/scroll up/.test(t)) return {cmd:'do:scroll:-1', say:'Scroll up'};
     if (/^(go )?back$/.test(t)) return {cmd:'back', say:'Go back'};
     if (/^close( the)?( window| it| this)?$/.test(t)) return {cmd:'do:close', say:'Close window'};
     if (/^right click$/.test(t)) return {cmd:'do:right', say:'Right click'};
-    if (/^click( this| it)?$/.test(t)) return {cmd:'do:click', say:'Click'};
-    if (/^(pause|stop)( tracking)?$/.test(t)) return {cmd:'do:pause', say:'Pause tracking'};
+    if (/^click( this| that| here| there)?$/.test(t)) return {cmd:'do:click', say:'Click (snap)'};
+    if (/^(pause|stop listening)$/.test(t)) return {cmd:'do:pause', say:'Pause'};
     if ((m = t.match(/^(?:type|write) (.+)$/))) return {cmd:'do:type:'+m[1], say:`Type “${m[1]}”`};
     return null;
   }
@@ -922,9 +1000,19 @@
     else if (k==='scroll'){ scrollBy(+v); }
     else if (k==='close'){ const t=W.top||(W.browser.open?'browser':W.mail.open?'mail':null); if (t) run('close:'+t,'voice'); }
     else if (k==='right'){ openCtx(G.pos.x+6,G.pos.y+6); }
-    else if (k==='click'){ const el=hitTest(); if (el) run(el.dataset.act,'voice'); }
+    else if (k==='click'){ if (G.pending) return answer(true,'voice'); const el=snapTarget(); if (el){ log('voice','"click" → snapped to "'+label(el)+'"'); run(el.dataset.act,'voice'); } }
+    else if (k==='yes'){ if (G.pending) answer(true,'voice'); else toast('Nothing is waiting for a yes'); }
+    else if (k==='no'){ if (G.pending) answer(false,'voice'); else if (!$('#ctx').hidden) $('#ctx').hidden=true; }
+    else if (k==='resume'){ setPaused(false); }
+    else if (k==='calib'){ $('#calibBtn').click(); }
+    else if (k==='scrollmode'){ toast('Scroll mode: move your head down or up to scroll. Say "stop" to end.'); log('voice','Scroll mode on'); scrollBy(1); }
+    else if (k==='sendask'){ const m=W.mail; if (m.open && m.view==='compose') ask('Send the email?', () => run('send','voice')); else toast('Nothing to send yet'); }
+    else if (k==='find'){ const want=v.toLowerCase(); const el=[...$$('[data-act]', screen)].filter(e=>e.offsetParent).find(e=>label(e).toLowerCase().includes(want));
+      if (!el){ toast('Could not find "'+v+'" on the screen'); log('voice','UI-Venus: nothing called "'+v+'"'); return; }
+      const sr=screen.getBoundingClientRect(), r=el.getBoundingClientRect(); G.target.x=r.left-sr.left+r.width/2; G.target.y=r.top-sr.top+r.height/2;
+      log('voice','UI-Venus found "'+label(el)+'"'); ask('Click '+label(el)+'?', () => run(el.dataset.act,'voice')); }
     else if (k==='pause'){ setPaused(true); }
-    else if (k==='type'){ if (W.focus){ insertText(v,true); renderAll(); } else toast('Hold your gaze on a text box first'); }
+    else if (k==='type'){ if (W.focus){ insertText(v,true); renderAll(); } else toast('Click a text box first (raise your brows on it)'); }
   }
   function processVoice(heard, meantOverride, confOverride){
     flashSig('#sigVoice'); FACE.speakUntil = performance.now()+900;
@@ -994,16 +1082,13 @@
     if (G.scripted) return;
     const cal=$('#calib'), pt=$('#calibPt'), msg=$('#calibMsg');
     cal.hidden=false; pt.hidden=true; msg.hidden=false;
-    msg.innerHTML='<h3>9-point calibration</h3><p>Keep your head still and follow each orange dot with your eyes until it turns green.</p>';
-    log('sys','Calibration started'); await wait(1800); msg.hidden=true; pt.hidden=false;
-    for (const [x,y] of [[8,10],[50,10],[92,10],[8,50],[50,50],[92,50],[8,88],[50,88],[92,88]]){
-      pt.classList.remove('go'); pt.style.left=x+'%'; pt.style.top=y+'%'; await wait(400); void pt.offsetWidth; pt.classList.add('go'); await wait(1000);
-    }
+    msg.innerHTML='<h3>One-look calibration</h3><p>Look at the dot in the middle of the screen for about 2 seconds.</p>';
+    log('sys','Calibration started (1 dot)'); await wait(1400); msg.hidden=true; pt.hidden=false;
+    pt.classList.remove('go'); pt.style.left='50%'; pt.style.top='50%'; await wait(300); void pt.offsetWidth; pt.classList.add('go'); await wait(1500);
     pt.hidden=true; msg.hidden=false; G.jitter=3; G.calibrated=true;
-    const err=(1.2+Math.random()*.5).toFixed(1); $('#accTxt').textContent='±'+err+'°';
-    msg.innerHTML=`<h3>Done · accuracy ±${err}°</h3><p>The pointer now follows your eyes more closely.</p>`;
-    log('sys','Calibration done · ±'+err+'°'); tip('Calibrated! Try a guided demo above the screen, or do it yourself.');
-    await wait(1500); cal.hidden=true;
+    msg.innerHTML='<h3>Calibrated</h3><p>The pointer now follows your eyes more closely.</p>';
+    log('sys','Calibrated: one look at the centre'); tip('Calibrated! Try a guided demo above the screen, or do it yourself.');
+    await wait(1300); cal.hidden=true;
   };
 
   /* ---------------- guided demos ---------------- */
@@ -1013,6 +1098,11 @@
   async function gazeTo(sel, ms=650, tok){
     const el = typeof sel==='string' ? $(sel) : sel;
     if (!el) throw new Error('missing '+sel);
+    // small screens: if the target sits below the window's visible area, scroll the page to it first
+    const inner = el.closest('#bPage');
+    if (inner){ const vp = inner.parentElement.getBoundingClientRect(), r0 = el.getBoundingClientRect();
+      if (r0.bottom > vp.bottom - 6 || r0.top < vp.top){ const max = Math.max(0, inner.scrollHeight - inner.parentElement.clientHeight);
+        W.browser.scroll = clamp(W.browser.scroll + (r0.top + r0.height/2) - (vp.top + vp.height/2), 0, max); inner.style.transform = `translateY(${-W.browser.scroll}px)`; await wait(120); } }
     const sr=screen.getBoundingClientRect(), r=el.getBoundingClientRect();
     const tx=r.left-sr.left+r.width/2, ty=r.top-sr.top+r.height/2;
     const sx=G.target.x, sy=G.target.y, t0=performance.now();
@@ -1024,16 +1114,12 @@
     }
     await wait(260); if (tok!==demoToken) throw new Cancel();
   }
-  async function hold(tok){
-    // gaze hold: fill the ring around the pointer, then click what is under it
+  async function g(kind, tok){
     if (tok!==demoToken) throw new Cancel();
-    const t0 = performance.now(), ms = G.dwellMs;
-    while (performance.now()-t0 < ms){ if (tok!==demoToken) throw new Cancel(); prog.style.strokeDashoffset = 157.1*(1-(performance.now()-t0)/ms); await wait(16); }
-    prog.style.strokeDashoffset = 157.1; flashSig('#sigBlink'); ripple('blink'); glabel('GAZE HOLD · CLICK');
-    const el = hitTest(); if (el){ log('eye','Gaze hold → click "'+label(el)+'"'); run(el.dataset.act,'eye'); }
-    await wait(380);
+    // let the pointer settle on its target first (the head pointer is smoothed)
+    for (let i=0; i<60 && Math.hypot(G.pos.x-G.target.x, G.pos.y-G.target.y) > 4; i++){ await wait(16); if (tok!==demoToken) throw new Cancel(); }
+    gesture(kind); await wait(DUR[kind]+380);
   }
-  async function g(kind, tok){ if (kind==='blink') return hold(tok); if (tok!==demoToken) throw new Cancel(); gesture(kind); await wait(DUR[kind]+380); }
   async function say(heard, meant, tok){
     if (tok!==demoToken) throw new Cancel();
     micLive=true; mic.classList.add('live'); micT0=performance.now(); FACE.speakUntil=performance.now()+1300; $('#heardTxt').textContent='Listening…';
@@ -1044,7 +1130,7 @@
   async function eyeType(text, tok){
     for (const ch of text){
       const sel = ch===' ' ? '[data-act="key:space"]' : `[data-act="key:${ch}"]`;
-      await gazeTo(sel, 300, tok); await g('blink', tok);
+      await gazeTo(sel, 300, tok); await g('brow', tok);
     }
   }
   function resetWorld(){
@@ -1054,45 +1140,48 @@
   const DEMOS = {
     async youtube(tok){
       await step('Looking at Chrome on the taskbar…'); await gazeTo('#tbBrowser', 800, tok);
-      await step('Hold your gaze to open it'); await g('blink', tok);
+      await step('Raise your brows to click it'); await g('brow', tok);
       await step('Looking at the YouTube shortcut…'); await gazeTo('[data-act="nav:youtube"]', 700, tok);
-      await step('Nod to click'); await g('nod', tok);
+      await step('Raise your brows to click'); await g('brow', tok);
       await step('Saying the search out loud (slurred speech)'); await say('seh fo pee-ah-no moo-sic','search for piano music', tok);
-      await step('Looking at the first video…'); await gazeTo('[data-act="watchq:0"]', 700, tok);
-      await step('Tilt head left to click play'); await g('tiltL', tok);
+      await step('Lower your head to scroll down'); await g('tiltR', tok);
+      await step('Looking roughly at the first video…'); await gazeTo('[data-act="watchq:0"]', 700, tok);
+      await step('Raise your brows: the click snaps onto it'); await g('brow', tok);
       await wait(1200);
-      await step('Tilt head right for the right-click menu'); await g('tiltR', tok);
+      await step('Open your mouth for the right-click menu'); await g('mouth', tok);
       await gazeTo('[data-act="ctx:back"]', 500, tok);
-      await step('Nod to choose "Back"'); await g('nod', tok);
-      await step('Done: YouTube opened, searched and played without hands.');
+      await step('Raise your brows to choose "Back"'); await g('brow', tok);
+      await step('Done: YouTube opened, searched and played with eyes, brows and voice.');
     },
     async mail(tok){
       await step('Saying "write an email to Mai"'); await say('ri ee-meh to my','write an email to mai', tok);
       await step('Dictating the subject'); await say('din-nah on sun-day','dinner on sunday', tok);
+      if ($('[data-act="key:hide"]')){ await step('Hiding the keyboard'); await gazeTo('[data-act="key:hide"]', 600, tok); await g('brow', tok); }
       await step('Looking at the message box…'); await gazeTo('[data-act="focus:body"]', 700, tok);
-      await step('Hold your gaze to select it'); await g('blink', tok);
+      await step('Raise your brows to select it'); await g('brow', tok);
       await step('Dictating the message'); await say('hi my, see yoo sun-day at sick','hi mai, see you sunday at six', tok);
-      await step('Picking a word suggestion with the eyes'); await gazeTo('[data-act="sug:Love, Grandma"]', 600, tok); await g('blink', tok);
-      await step('Looking at Send…'); await gazeTo('[data-act="send"]', 800, tok);
-      await step('Nod to send'); await g('nod', tok);
-      await step('Done: email written and sent with voice, gaze holds and a nod.');
+      await step('Picking a word suggestion'); await gazeTo('[data-act="sug:Love, Grandma"]', 600, tok); await g('brow', tok);
+      await step('Saying "send it": diseyeble asks first'); await say('seh-n it','send it', tok);
+      await step('Raise your brows to say yes'); await wait(500); await g('brow', tok);
+      await step('Done: email written and sent with voice, a brow raise and a confirm.');
     },
     async google(tok){
-      await step('Looking at the Start button…'); await gazeTo('#tbStart', 700, tok); await g('blink', tok);
-      await step('Choosing Chrome'); await gazeTo('#startMenu [data-act="open:browser"]', 600, tok); await g('blink', tok);
-      await step('Looking at the search box…'); await gazeTo('[data-act="focus:gq"]', 700, tok); await g('blink', tok);
-      await step('Typing "bus" with the eyes, one key at a time'); await eyeType('bus', tok);
-      await step('Picking "bus times" from suggestions'); await gazeTo('[data-act="sug:bus times"]', 500, tok); await g('blink', tok);
+      await step('Looking at the Start button…'); await gazeTo('#tbStart', 700, tok); await g('brow', tok);
+      await step('Choosing Chrome'); await gazeTo('#startMenu [data-act="open:browser"]', 600, tok); await g('brow', tok);
+      await step('Looking at the search box…'); await gazeTo('[data-act="focus:gq"]', 700, tok); await g('brow', tok);
+      await step('Typing "bus" on the on-screen keys, one brow raise per key'); await eyeType('bus', tok);
+      await step('Picking "bus times" from suggestions'); await gazeTo('[data-act="sug:bus times"]', 500, tok); await g('brow', tok);
       await gazeTo('[data-act="key:enter"]', 500, tok);
-      await step('Nod to press Enter'); await g('nod', tok);
+      await step('Raise your brows on Enter'); await g('brow', tok);
+      await step('Lower your head to scroll down'); await g('tiltR', tok);
       await step('Saying "scroll down"'); await say('sco dow','scroll down', tok);
-      await step('Done: searched Google by eye-typing.');
+      await step('Done: searched Google with the eyes, brow clicks and a head-down scroll.');
     }
   };
   async function startDemo(name){
     if (G.scripted) return;
     if (G.paused) setPaused(false);
-    const tok = ++demoToken; G.scripted = true; const prevDwell = G.dwell; G.dwell = false;
+    const tok = ++demoToken; G.scripted = true; const prevDwell = G.dwell; G.dwell = false; if (G.pending) answer(false,'replaced');
     $('#demoBar').hidden = true; $('#runBar').hidden = false;
     resetWorld(); log('sys','Guided demo: '+name);
     try { await DEMOS[name](tok); await wait(1800); }
@@ -1100,7 +1189,7 @@
     finally { if (tok===demoToken){ G.scripted=false; G.dwell=prevDwell; dwellLock={x:G.pos.x,y:G.pos.y}; $('#demoBar').hidden=false; $('#runBar').hidden=true; renderChips(); } }
   }
   $$('[data-demo]').forEach(b => b.onclick = () => startDemo(b.dataset.demo));
-  $('#stopDemo').onclick = () => { demoToken++; G.scripted=false; G.dwell=$('#swDwell').getAttribute('aria-checked')==='true'; dwellLock={x:G.pos.x,y:G.pos.y}; $('#demoBar').hidden=false; $('#runBar').hidden=true; log('sys','Demo stopped'); tip('Demo stopped. Your turn: move the mouse and blink with Space.'); renderChips(); };
+  $('#stopDemo').onclick = () => { demoToken++; G.scripted=false; G.dwell=$('#swDwell').getAttribute('aria-checked')==='true'; dwellLock={x:G.pos.x,y:G.pos.y}; $('#demoBar').hidden=false; $('#runBar').hidden=true; log('sys','Demo stopped'); tip('Demo stopped. Your turn: move the mouse (your eyes) and press B to raise your brows.'); renderChips(); };
 
   /* ---------------- camera canvas ---------------- */
   const cam=$('#camCanvas'), cx=cam.getContext('2d'), video=$('#camVideo');
@@ -1113,11 +1202,13 @@
     const nod = np2>=0&&np2<1 ? Math.sin(np2*Math.PI)*24 : 0;                 // head dips down then comes back up
     const shake = sp2>=0&&sp2<1 ? Math.sin(sp2*Math.PI*3)*22*(1-sp2*.35) : 0; // left-right-left
     const tp = (now-FACE.tiltAt)/DUR.tiltL;
-    const roll = tp>=0&&tp<1 ? FACE.tiltDir*Math.sin(tp*Math.PI)*20 : 0;     // degrees, - = towards left shoulder
+    const roll = 0, hpitch = tp>=0&&tp<1 ? FACE.tiltDir*Math.min(1, Math.sin(tp*Math.PI)*1.5)*14 : 0;   // held head up (−) / down (+)
     const open = eyeOpen(now), blinking = open < 0.25, speaking = now < FACE.speakUntil;
-    const sig = { ear: 0.04 + 0.26*open + (Math.random()-.5)*.006, pitch: gy*-6 - nod*0.75 + (Math.random()-.5)*.4, yaw: gx*9 + shake*0.78 + (Math.random()-.5)*.4, roll: gx*1.5 + roll + (Math.random()-.5)*.4 };
+    const bp = (now-FACE.browAt)/DUR.brow, browUp = bp>=0&&bp<1 ? Math.sin(bp*Math.PI) : 0;
+    const mp = (now-FACE.mouthAt)/DUR.mouth, mouthOpen = mp>=0&&mp<1 ? Math.min(1, Math.sin(mp*Math.PI)*1.6) : 0;
+    const sig = { brow: 0.03 + 0.32*browUp + (Math.random()-.5)*.012, mouth: 0.03 + (speaking ? 0.12*Math.abs(Math.sin(t*9)) : 0) + 0.46*mouthOpen + (Math.random()-.5)*.012, ear: 0.04 + 0.26*open, pitch: gy*-6 - nod*0.75 - hpitch + (Math.random()-.5)*.4, yaw: gx*9 + shake*0.78 + (Math.random()-.5)*.4, roll: gx*1.5 + roll + (Math.random()-.5)*.4 };
     SIGNAL = sig; sample(now, sig);
-    let fx = Wd/2 + gx*10 + shake + roll*1.6, fy = H*.52 + gy*5 + nod + Math.abs(roll)*.5, tilt = gx*.03 + shake*.004 + roll*Math.PI/180;
+    let fx = Wd/2 + gx*10 + shake + roll*1.6, fy = H*.52 + gy*5 + nod + hpitch*1.3, tilt = gx*.03 + shake*.004 + roll*Math.PI/180;
     if (S.stream && video.readyState>=2){
       cx.save(); cx.translate(Wd,0); cx.scale(-1,1); cx.drawImage(video,0,0,Wd,H); cx.restore();
       overlay(Wd*.32,H*.16,Wd*.36,H*.62,gx,gy,blinking,null,nod,shake,now);
@@ -1130,7 +1221,7 @@
     cx.fillStyle='#6E6E6E'; cx.beginPath(); cx.ellipse(shake*.3,150,150,70,0,Math.PI,0); cx.fill();
     cx.fillStyle='#E9BE98'; cx.fillRect(-26,62,52,48);
     cx.restore();
-    cx.save(); cx.translate(fx, fy); cx.rotate(tilt); cx.scale(1, 1 - Math.abs(nod)/220);
+    cx.save(); cx.translate(fx, fy); cx.rotate(tilt); cx.scale(1, 1 - (Math.abs(nod) + Math.abs(hpitch))/220);
     // hair back (gray, older person)
     cx.fillStyle='#C9CCD3'; cx.beginPath(); cx.ellipse(0,-30,96,92,0,Math.PI,0); cx.fill();
     cx.fillStyle='#F0C7A2';
@@ -1144,12 +1235,12 @@
       cx.fillStyle='#fff'; cx.beginPath(); cx.ellipse(ex,ey,19,Math.max(1.2,11*open),0,0,Math.PI*2); cx.fill();
       if (open<1){ cx.strokeStyle='#B98563'; cx.lineWidth=2.5; cx.beginPath(); cx.ellipse(ex,ey,19,Math.max(1.2,11*open),0,Math.PI,0); cx.stroke(); }
       if (open>0.35){ const ix=ex+gx*8, iy=ey+gy*4.5; cx.fillStyle='#5B4030'; cx.beginPath(); cx.arc(ix,iy,7.5,0,Math.PI*2); cx.fill(); cx.fillStyle='#111'; cx.beginPath(); cx.arc(ix,iy,3.6,0,Math.PI*2); cx.fill(); cx.fillStyle='#fff'; cx.beginPath(); cx.arc(ix-2.5,iy-2.5,1.6,0,Math.PI*2); cx.fill(); }
-      cx.strokeStyle='#9AA0AC'; cx.lineWidth=4; cx.lineCap='round'; cx.beginPath(); cx.moveTo(ex-17,ey-22); cx.quadraticCurveTo(ex,ey-28,ex+17,ey-22); cx.stroke();
+      const bu = browUp*9; cx.strokeStyle='#9AA0AC'; cx.lineWidth=4; cx.lineCap='round'; cx.beginPath(); cx.moveTo(ex-17,ey-22-bu); cx.quadraticCurveTo(ex,ey-28-bu*1.3,ex+17,ey-22-bu); cx.stroke();
     });
     // glasses
     cx.strokeStyle='rgba(40,46,60,.8)'; cx.lineWidth=3; cx.beginPath(); cx.roundRect?cx.roundRect(-58,-20,50,34,10):cx.rect(-58,-20,50,34); cx.stroke(); cx.beginPath(); cx.roundRect?cx.roundRect(8,-20,50,34,10):cx.rect(8,-20,50,34); cx.stroke(); cx.beginPath(); cx.moveTo(-8,-6); cx.lineTo(8,-6); cx.stroke();
     cx.strokeStyle='rgba(120,70,50,.55)'; cx.lineWidth=3; cx.beginPath(); cx.moveTo(gx*4,12); cx.quadraticCurveTo(-8+gx*4,34,6+gx*4,36); cx.stroke();
-    const mo = speaking ? 4 + Math.abs(Math.sin(t*18))*9 : 0;
+    const mo = Math.max(speaking ? 4 + Math.abs(Math.sin(t*18))*9 : 0, mouthOpen*20);
     cx.fillStyle='#8E3F3A'; cx.strokeStyle='#A0524A'; cx.lineWidth=4;
     if (mo>1){ cx.beginPath(); cx.ellipse(0,60,16,mo,0,0,Math.PI*2); cx.fill(); } else { cx.beginPath(); cx.moveTo(-20,58); cx.quadraticCurveTo(0,66,20,58); cx.stroke(); }
     cx.restore();
@@ -1168,22 +1259,23 @@
       if (!blinking){ cx.strokeStyle='#F0A94B'; cx.lineWidth=2.5; f.eyes.forEach(([ex,ey])=>{ cx.beginPath(); cx.moveTo(ex+gx*8,ey+gy*4.5); cx.lineTo(ex+gx*60,ey+gy*40); cx.stroke(); cx.beginPath(); cx.arc(ex+gx*60,ey+gy*40,3,0,Math.PI*2); cx.fillStyle='#F0A94B'; cx.fill(); }); }
       cx.restore();
     }
-    cx.fillStyle='rgba(0,0,0,.5)'; cx.fillRect(Wd-158,8,150,82);
+    cx.fillStyle='rgba(0,0,0,.5)'; cx.fillRect(Wd-158,8,150,100);
     cx.fillStyle='#F1DCA7'; cx.font='11px "JetBrains Mono", monospace';
     const sg = SIGNAL;
     cx.fillStyle = Math.abs(sg.yaw)>=15 ? '#F0A94B' : '#F1DCA7'; cx.fillText('yaw   '+sg.yaw.toFixed(1).padStart(6)+'°', Wd-150, 26);
     cx.fillStyle = sg.pitch<=-12 ? '#111111' : '#F1DCA7'; cx.fillText('pitch '+sg.pitch.toFixed(1).padStart(6)+'°', Wd-150, 44);
-    cx.fillStyle = Math.abs(sg.roll)>=15 ? '#F1DCA7' : '#F1DCA7'; cx.fillText('roll  '+sg.roll.toFixed(1).padStart(6)+'°', Wd-150, 62);
-    const closedFor = blinking && now>=FACE.blinkStart ? (now-FACE.blinkStart)/1000 : 0;
-    cx.fillStyle = blinking ? '#111111' : '#F1DCA7'; cx.fillText('eyes  '+(blinking?'closed '+closedFor.toFixed(2)+'s':'open'), Wd-150, 80);
+    cx.fillStyle = '#F1DCA7'; cx.fillText('roll  '+sg.roll.toFixed(1).padStart(6)+'°', Wd-150, 62);
+    cx.fillStyle = sg.brow>=.25 ? '#F0A94B' : '#F1DCA7'; cx.fillText('brow  '+(sg.brow>=0?'+':'')+sg.brow.toFixed(2), Wd-150, 80);
+    cx.fillStyle = sg.mouth>=.35 ? '#F0A94B' : '#F1DCA7'; cx.fillText('mouth '+sg.mouth.toFixed(2).padStart(5), Wd-150, 98);
     // live caption for the gesture in progress / just detected
     let cap2 = null, tone = 'iris';
     const a = FACE.active;
-    if (a && a.kind==='blink') cap2 = `Eyes closed ${((now-a.t0)/1000).toFixed(2)} s … (needs ≥ 0.30 s)`;
+    if (a && a.kind==='brow') cap2 = `Brows up +${sg.brow.toFixed(2)} (needs 0.25 for 0.25 s)`;
+    else if (a && a.kind==='mouth') cap2 = `Mouth open ${((now-a.t0)/1000).toFixed(2)} s (0.3 – 1.5 s, then close)`;
     else if (a && a.kind==='natural') cap2 = 'Quick blink …';
-    else if (a && a.kind==='nod') cap2 = `Nodding · pitch ${sg.pitch.toFixed(0)}° (needs ≤ −12°)`;
-    else if (a && a.kind.startsWith('tilt')) cap2 = `Tilting ${a.kind==='tiltL'?'left':'right'} · roll ${sg.roll.toFixed(0)}° (needs ±15°)`;
-    else if (a && a.kind==='shake') cap2 = `Shaking · yaw ${sg.yaw.toFixed(0)}° (needs ±15°)`;
+    else if (a && a.kind==='nod') cap2 = `Nodding · pitch ${sg.pitch.toFixed(0)}° (yes)`;
+    else if (a && a.kind.startsWith('tilt')) cap2 = `Head ${a.kind==='tiltL'?'up':'down'} · pitch ${sg.pitch.toFixed(0)}° (hold to scroll)`;
+    else if (a && a.kind==='shake') cap2 = `Shaking · yaw ${sg.yaw.toFixed(0)}° (no)`;
     else if (FACE.caption && now < FACE.caption.until){ cap2 = FACE.caption.text; tone = FACE.caption.tone; }
     if (cap2){
       cx.font='700 15px "JetBrains Mono", monospace';
@@ -1203,7 +1295,7 @@
     if (t > d - close) return (t - (d - close))/close;
     return 0;
   }
-  let SIGNAL = {ear:.3,pitch:0,yaw:0};
+  let SIGNAL = {ear:.3,brow:.03,mouth:.03,pitch:0,yaw:0,roll:0};
   const HIST = [], EVENTS = [], WINDOW_MS = 6000;
   function sample(now, s){ HIST.push({t:now, ...s}); while (HIST.length && now-HIST[0].t > WINDOW_MS+200) HIST.shift(); }
   function addEvent(t, kind, text){ EVENTS.push({t, kind, text}); while (EVENTS.length && t-EVENTS[0].t > WINDOW_MS+200) EVENTS.shift(); }
@@ -1218,10 +1310,10 @@
     const Wd = plot.width, H = plot.height, c = plotColors(now), L = 112, Rp = 10, top = 8, axisH = 26;
     pctx.clearRect(0,0,Wd,H);
     const lanes = [
-      {k:'ear',   name:'eyes',  unit:'',  min:0,   max:.34, thr:[.18], tl:'closed < 0.18', col:c.iris},
-      {k:'pitch', name:'pitch', unit:'°', min:-24, max:12,  thr:[-12], tl:'nod ≤ −12°',   col:c.amber},
-      {k:'yaw',   name:'yaw',   unit:'°', min:-24, max:24,  thr:[15,-15], tl:'shake ±15°', col:c.rose},
-      {k:'roll',  name:'roll',  unit:'°', min:-24, max:24,  thr:[15,-15], tl:'tilt ±15°',  col:c.violet},
+      {k:'brow',  name:'brow',  unit:'',  min:0,   max:.4,  thr:[.25], tl:'click > 0.25',  col:c.iris},
+      {k:'mouth', name:'mouth', unit:'',  min:0,   max:.55, thr:[.35], tl:'right click > 0.35', col:c.rose},
+      {k:'pitch', name:'pitch', unit:'°', min:-24, max:24,  thr:[10,-10], tl:'held up / down = scroll',   col:c.violet},
+      {k:'yaw',   name:'yaw',   unit:'°', min:-24, max:24,  thr:[15,-15], tl:'shake = no', col:c.muted},
     ];
     const lh = (H - top - axisH) / lanes.length;
     const X = t => L + (1 - (now - t)/WINDOW_MS) * (Wd - L - Rp);
@@ -1231,12 +1323,12 @@
       pctx.fillStyle = c.band; pctx.fillRect(L, y0+2, Wd-L-Rp, lh-4);
       pctx.fillStyle = c.ink; pctx.fillText(ln.name, 8, y0 + lh/2 - 11);
       const cur = HIST.length ? HIST[HIST.length-1][ln.k] : 0;
-      pctx.fillStyle = ln.col; pctx.fillText((ln.k==='ear'?cur.toFixed(2):cur.toFixed(0)+ln.unit), 8, y0 + lh/2 + 13);
+      pctx.fillStyle = ln.col; pctx.fillText((ln.unit===''?cur.toFixed(2):cur.toFixed(0)+ln.unit), 8, y0 + lh/2 + 13);
       pctx.setLineDash([6,6]); pctx.strokeStyle = c.muted; pctx.lineWidth = 1.5;
       ln.thr.forEach(tv => { pctx.beginPath(); pctx.moveTo(L, Y(tv)); pctx.lineTo(Wd-Rp, Y(tv)); pctx.stroke(); });
       pctx.setLineDash([]);
       pctx.font = '15px "JetBrains Mono", monospace'; pctx.fillStyle = c.muted; pctx.textAlign = 'right';
-      pctx.fillText(ln.tl, Wd-Rp-6, Y(ln.thr[0]) + (ln.k==='ear' ? 14 : -12)); pctx.textAlign = 'left';
+      pctx.fillText(ln.tl, Wd-Rp-6, Y(ln.thr[0]) + (ln.unit==='' ? -12 : -12)); pctx.textAlign = 'left';
       pctx.font = '600 19px "JetBrains Mono", monospace';
       pctx.strokeStyle = ln.col; pctx.lineWidth = 3; pctx.lineJoin = 'round'; pctx.beginPath();
       HIST.forEach((h, j) => { const x = X(h.t); if (x < L || h[ln.k]===undefined) return; j && X(HIST[j-1].t) >= L ? pctx.lineTo(x, Y(h[ln.k])) : pctx.moveTo(x, Y(h[ln.k])); });
@@ -1245,11 +1337,11 @@
     // detection markers
     EVENTS.forEach(ev => {
       const x = X(ev.t); if (x < L) return;
-      const col = ev.kind==='natural' ? c.muted : ev.kind==='shake' ? c.rose : ev.kind==='nod' ? c.amber : ev.kind.startsWith('tilt') ? c.violet : c.iris;
+      const col = ev.kind==='natural' || ev.kind==='shake' ? c.muted : ev.kind==='mouth' ? c.rose : ev.kind==='nod' ? c.amber : ev.kind.startsWith('tilt') ? c.violet : c.iris;
       pctx.strokeStyle = col; pctx.lineWidth = 2; pctx.setLineDash(ev.kind==='natural'?[4,5]:[]);
       pctx.beginPath(); pctx.moveTo(x, top); pctx.lineTo(x, H-axisH); pctx.stroke(); pctx.setLineDash([]);
-      const lane = {blink:0, natural:0, nod:1, shake:2, tiltL:3, tiltR:3}[ev.kind];
-      const label = ev.kind==='natural' ? 'ignored' : (ev.kind==='shake' || ev.kind==='tiltR') ? 'R-CLICK' : 'CLICK';
+      const lane = {brow:0, natural:0, mouth:1, nod:2, shake:3, tiltL:2, tiltR:2}[ev.kind];
+      const label = {natural:'blink ignored', brow:'CLICK', mouth:'R-CLICK', nod:'YES', shake:'NO', tiltL:'SCROLL ↑', tiltR:'SCROLL ↓'}[ev.kind];
       pctx.font = '700 15px "JetBrains Mono", monospace';
       const tw = pctx.measureText(label).width + 12, lx = Math.min(x+4, Wd-Rp-tw), ly = top + lane*lh + 6;
       pctx.fillStyle = col; pctx.fillRect(lx, ly, tw, 22);
@@ -1292,7 +1384,7 @@
         let p=0;
         if (dwellLock && Math.hypot(G.pos.x-dwellLock.x, G.pos.y-dwellLock.y) > 40) dwellLock = null;
         const locked = !!dwellLock;
-        if (hot && G.dwell && !G.scripted && !locked){ p=clamp((now-hotSince)/G.dwellMs,0,1); if (p>=1 && !dwellFired){ dwellFired=true; dwellLock={act:hot.dataset.act,x:G.pos.x,y:G.pos.y}; ripple('blink'); glabel('GAZE HOLD · CLICK'); log('eye','Gaze hold → click "'+label(hot)+'"'); run(hot.dataset.act,'eye'); } }
+        if (hot && G.dwell && !G.scripted && !locked){ p=clamp((now-hotSince)/G.dwellMs,0,1); if (p>=1 && !dwellFired){ dwellFired=true; dwellLock={act:hot.dataset.act,x:G.pos.x,y:G.pos.y}; ripple('blink'); glabel('DWELL · CLICK'); log('eye','Dwell 1.0 s → click "'+label(hot)+'"'); run(hot.dataset.act,'eye'); } }
         prog.style.strokeDashoffset = C*(1-p);
         if (now-secT>120){ secT=now; $('#gazeXY').textContent = Math.round(G.pos.x/ (screen.clientWidth||1)*1920)+', '+Math.round(G.pos.y/(screen.clientHeight||1)*1080); }
       }

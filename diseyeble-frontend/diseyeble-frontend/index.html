@@ -63,14 +63,14 @@
         <h1>Your eyes, face and voice are the <em>mouse</em>.</h1>
         <p class="lead lead-lines"><span class="lead-name">&ldquo;dis<b>EYE</b>ble&rdquo;</span> turns an ordinary webcam and microphone into a full computer controller.<br>
           Look to move the pointer.<br>
-          Hold your gaze, nod or shake your head.<br>
+          Raise your eyebrows to click, open your mouth to right-click.<br>
           Say what you want, even if your speech is slurred or quiet.</p>
         <div class="modal-row" aria-label="Ways to control">
           <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/><circle cx="13.2" cy="10.8" r=".9" fill="currentColor" stroke="none"/></svg>Eyes</span>
-          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" opacity=".35"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg>Gaze hold</span>
-          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10.5" r="4.5"/><path d="M12 2.5v1.5M10 3.8 12 2l2 1.8"/><path d="M12 18.5V22M10 20.2l2 1.8 2-1.8"/></svg>Nod</span>
-          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="4.5"/><path d="M5 11H2.5M4.2 9 2.4 11l1.8 2"/><path d="M19 11h2.5M19.8 9l1.8 2-1.8 2"/><path d="M8.5 19.5c1-1 2.1-1.5 3.5-1.5s2.5.5 3.5 1.5"/></svg>Head shake</span>
-          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(-20 12 11)"><circle cx="12" cy="10" r="4.5"/><path d="M12 14.5v3"/></g><path d="M18.5 5.5a8 8 0 0 1 1.8 6.5"/><path d="m21.6 10.6-1.3 1.6-1.6-1.4"/></svg>Head tilt</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5c2-2.2 4.6-2.6 7-1.2M13 7.3c2.4-1.4 5-1 7 1.2"/><path d="M3 14s3-4 9-4 9 4 9 4-3 4-9 4-9-4-9-4Z"/><circle cx="12" cy="14" r="2"/><path d="M12 2.5v2M10.5 3.8 12 2.4l1.5 1.4"/></svg>Eyebrow raise</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c2.5-2.5 5.2-3.5 8-3.5s5.5 1 8 3.5c-2.5 3-5.2 4.5-8 4.5S6.5 15 4 12Z"/><path d="M7 12h10"/></svg>Mouth</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M9 6l3-3 3 3M12 21v-7M9 18l3 3 3-3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>Head up / down</span>
+          <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="4.5"/><path d="M5 11H2.5M4.2 9 2.4 11l1.8 2M19 11h2.5M19.8 9l1.8 2-1.8 2"/><path d="M12 2.5v1.8M12 17.7v3.8M10.3 19.9l1.7 1.6 1.7-1.6"/></svg>Nod / shake</span>
           <span class="mod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/><path d="M3 9.5v3M21 9.5v3" opacity=".6"/></svg>Voice</span>
         </div>
         <div class="cta-row">
@@ -93,7 +93,7 @@
       <div class="how-left">
         <div class="sec-head">
           <h2>How eye tracking works with a normal webcam</h2>
-          <p>No special hardware. diseyeble finds your face, measures where each iris sits inside the eye, and maps that to a point on the screen.</p>
+          <p>No special hardware. diseyeble finds your face, measures where each iris sits inside the eye, maps that to a point on the screen, and reads small face gestures like a raised eyebrow.</p>
         </div>
         <div class="lab-viz" id="howLab">
           <span class="label" style="color:inherit;opacity:.7">Try it · move your mouse over this panel</span>
@@ -143,10 +143,10 @@
       <svg class="how-wires" id="howWires" aria-hidden="true"></svg>
       <div class="how-right">
         <div class="steps" id="howSteps">
-          <div class="step"><span class="n">01</span><div><h3>Find the face</h3><p>Each webcam frame is scanned for a face and 478 landmark points, including both irises.</p></div></div>
-          <div class="step"><span class="n">02</span><div><h3>Measure the eyes</h3><p>The iris centre is compared with the eye corners. Head turn and tilt are measured from the nose and face outline.</p></div></div>
-          <div class="step"><span class="n">03</span><div><h3>Calibrate once</h3><p>You follow a short series of dots on the screen. diseyeble learns how your eye positions map to your screen.</p></div></div>
-          <div class="step"><span class="n">04</span><div><h3>Smooth and act</h3><p>A filter removes jitter and tremor. diseyeble moves the real mouse, and a gaze hold, nod or head shake becomes a click at the pointer.</p></div></div>
+          <div class="step"><span class="n">01</span><div><h3>Find the face</h3><p>Each webcam frame is scanned for a face and 478 landmark points, including the eyes, brows and mouth.</p></div></div>
+          <div class="step"><span class="n">02</span><div><h3>Measure the eyes</h3><p>The iris centre is compared with the eye corners. Head movement, brows and mouth are compared with your own resting face.</p></div></div>
+          <div class="step"><span class="n">03</span><div><h3>Calibrate in 2 seconds</h3><p>Look at one dot in the middle of the screen. diseyeble learns where &ldquo;straight ahead&rdquo; is for your eyes.</p></div></div>
+          <div class="step"><span class="n">04</span><div><h3>Point, snap and act</h3><p>A filter removes jitter and tremor, and diseyeble moves the real mouse. Raise your brows and the click snaps onto the nearest button.</p></div></div>
         </div>
         <div class="how-next"><button class="btn btn-ghost" data-page-go="2">Controls →</button></div>
       </div>
@@ -159,17 +159,18 @@
       <span class="ipage-num label">03 / 05 · Controls</span>
 
     <div class="sec-head">
-      <h2>Six ways to control. Zero hands.</h2>
-      <p>Use whichever your body allows. Every input can be switched on or off, and each one has its own sensitivity so tremors and slow movements don't cause false clicks.</p>
+      <h2>Six ways to control.<br>Zero hands.</h2>
+      <p>Use whichever your body allows. Every input can be switched on or off. Clicking by holding still (dwell) is there too, switched off by default.</p>
     </div>
-    <div class="inputs">
-      <article class="inp"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div><h3>Look</h3><span class="does">Moves the pointer</span><p>The pointer follows where you look. Hold your gaze on a button to click it, if you want.</p><span class="spec">iris + head pose · 30 fps</span></article>
-      <article class="inp"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" opacity=".35"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg></div><h3>Hold</h3><span class="does">Left click</span><p>Keep looking at a button. A ring fills around the pointer, and when it is full the button is clicked. Normal blinks never click.</p><span class="spec">gaze held ~0.9 s · adjustable</span></article>
-      <article class="inp"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M12 15v6M9 18l3 3 3-3"/></svg></div><h3>Nod</h3><span class="does">Left click · confirm</span><p>A small nod clicks, or says "yes" when diseyeble asks you to confirm a voice command.</p><span class="spec">pitch ≥ 12° down-up · 600 ms</span></article>
-      <article class="inp a"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="5"/><path d="M3 18h4M17 18h4M5 16l-2 2 2 2M19 16l2 2-2 2"/></svg></div><h3>Shake</h3><span class="does">Right click · cancel</span><p>Shake your head to open the right-click menu, or to say "no" and cancel an action.</p><span class="spec">yaw ≥ 15° left-right-left</span></article>
-      <article class="inp a"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><g transform="rotate(-18 12 10)"><circle cx="12" cy="9" r="5"/><path d="M12 14v3"/></g><path d="M4 20a9 9 0 0 1 3-4M20 20a9 9 0 0 0-3-4"/></svg></div><h3>Tilt</h3><span class="does">Left or right click</span><p>Tilt your head towards your left shoulder to left-click, towards your right shoulder to right-click.</p><span class="spec">roll ≥ 15° and back · 700 ms</span></article>
-      <article class="inp v"><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div><h3>Speak</h3><span class="does">Commands &amp; typing</span><p>"Open YouTube", "search for music", "write an email to Mai". Tuned for unclear speech. Always listening, no button to hold.</p><span class="spec">faster-whisper · dysarthric fine-tune</span></article>
+    <div class="inputs acc" id="ctlAcc">
+      <article class="inp" tabindex="0" data-i="0"><img class="inp-img" alt="" src="assets/ctl-look.jpg"><span class="inp-n">01</span><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/><circle cx="13.2" cy="10.8" r=".9" fill="currentColor" stroke="none"/></svg></div><div class="inp-body"><h3>Look</h3><span class="does">Moves the pointer</span><p>The pointer follows where you look. It doesn't need to be pixel-perfect: the click snaps onto the nearest button.</p><span class="spec">iris + head pose · 30 fps</span></div><div class="inp-idle"><b>Look</b><small>Moves the pointer</small></div><span class="inp-v">Look</span><div class="inp-big" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/><circle cx="13.2" cy="10.8" r=".9" fill="currentColor" stroke="none"/></svg></div></article>
+      <article class="inp" tabindex="0" data-i="1"><img class="inp-img" alt="" src="assets/ctl-brow.jpg"><span class="inp-n">02</span><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5c2-2.2 4.6-2.6 7-1.2M13 7.3c2.4-1.4 5-1 7 1.2"/><path d="M3 14s3-4 9-4 9 4 9 4-3 4-9 4-9-4-9-4Z"/><circle cx="12" cy="14" r="2"/><path d="M12 2.5v2M10.5 3.8 12 2.4l1.5 1.4"/></svg></div><div class="inp-body"><h3>Eyebrow raise</h3><span class="does">Left click</span><p>Point roughly, raise your eyebrows, and the click snaps onto the nearest button. Or just say &ldquo;click&rdquo;.</p><span class="spec">0.25 above resting · 0.25 s · snaps ≤ 150 px</span></div><div class="inp-idle"><b>Eyebrow raise</b><small>Left click</small></div><span class="inp-v">Eyebrow raise</span><div class="inp-big" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5c2-2.2 4.6-2.6 7-1.2M13 7.3c2.4-1.4 5-1 7 1.2"/><path d="M3 14s3-4 9-4 9 4 9 4-3 4-9 4-9-4-9-4Z"/><circle cx="12" cy="14" r="2"/><path d="M12 2.5v2M10.5 3.8 12 2.4l1.5 1.4"/></svg></div></article>
+      <article class="inp a" tabindex="0" data-i="2"><img class="inp-img" alt="" src="assets/ctl-mouth.jpg"><span class="inp-n">03</span><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c2.5-2.5 5.2-3.5 8-3.5s5.5 1 8 3.5c-2.5 3-5.2 4.5-8 4.5S6.5 15 4 12Z"/><path d="M7 12h10"/></svg></div><div class="inp-body"><h3>Mouth</h3><span class="does">Right click</span><p>Open your mouth and close it again, or say &ldquo;right click&rdquo;. Talking and yawning don't count.</p><span class="spec">held 0.3 – 1.5 s</span></div><div class="inp-idle"><b>Mouth</b><small>Right click</small></div><span class="inp-v">Mouth</span><div class="inp-big" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c2.5-2.5 5.2-3.5 8-3.5s5.5 1 8 3.5c-2.5 3-5.2 4.5-8 4.5S6.5 15 4 12Z"/><path d="M7 12h10"/></svg></div></article>
+      <article class="inp" tabindex="0" data-i="3"><img class="inp-img" alt="" src="assets/ctl-updown.jpg"><span class="inp-n">04</span><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M9 6l3-3 3 3M12 21v-7M9 18l3 3 3-3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><div class="inp-body"><h3>Head up / down</h3><span class="does">Scroll</span><p>Lift your chin to scroll up, lower it to scroll down. The further you move, the faster it scrolls. Or say &ldquo;scroll down&rdquo;.</p><span class="spec">head pitch · held 0.4 s</span></div><div class="inp-idle"><b>Head up / down</b><small>Scroll</small></div><span class="inp-v">Head up / down</span><div class="inp-big" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M9 6l3-3 3 3M12 21v-7M9 18l3 3 3-3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div></article>
+      <article class="inp a" tabindex="0" data-i="4"><img class="inp-img" alt="" src="assets/ctl-nod.jpg"><span class="inp-n">05</span><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="4.5"/><path d="M5 11H2.5M4.2 9 2.4 11l1.8 2M19 11h2.5M19.8 9l1.8 2-1.8 2"/><path d="M12 2.5v1.8M12 17.7v3.8M10.3 19.9l1.7 1.6 1.7-1.6"/></svg></div><div class="inp-body"><h3>Nod &amp; shake</h3><span class="does">Yes · no</span><p>Risky actions always ask first. Shake to say no. A nod means yes while you are dictating.</p><span class="spec">nod 12° · shake ±15°</span></div><div class="inp-idle"><b>Nod &amp; shake</b><small>Yes · no</small></div><span class="inp-v">Nod &amp; shake</span><div class="inp-big" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11" r="4.5"/><path d="M5 11H2.5M4.2 9 2.4 11l1.8 2M19 11h2.5M19.8 9l1.8 2-1.8 2"/><path d="M12 2.5v1.8M12 17.7v3.8M10.3 19.9l1.7 1.6 1.7-1.6"/></svg></div></article>
+      <article class="inp v" tabindex="0" data-i="5"><img class="inp-img" alt="" src="assets/ctl-speak.jpg"><span class="inp-n">06</span><div class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/><path d="M3 9.5v3M21 9.5v3" opacity=".6"/></svg></div><div class="inp-body"><h3>Speak</h3><span class="does">Commands &amp; typing</span><p>&ldquo;Click Send&rdquo;, &ldquo;scroll down&rdquo;, &ldquo;start dictation&rdquo;. Always listening, no button to hold. Only your own voice counts.</p><span class="spec">faster-whisper · runs on the laptop</span></div><div class="inp-idle"><b>Speak</b><small>Commands &amp; typing</small></div><span class="inp-v">Speak</span><div class="inp-big" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/><path d="M3 9.5v3M21 9.5v3" opacity=".6"/></svg></div></article>
     </div>
+    <div class="ctl-nav"><button class="btn btn-ghost" data-page-go="1">← Back</button><button class="btn btn-ghost" data-page-go="3">Voice →</button></div>
     </div>
   </section>
 
@@ -182,20 +183,20 @@
         <h2 style="font-size:clamp(28px,4vw,46px);font-weight:800;letter-spacing:0">Understands speech that others find hard to follow</h2>
         <p>Standard voice assistants fail people with slurred speech, a weak voice, or an accent shaped by age or illness. diseyeble listens differently.</p>
         <ul>
-          <li><span><b>Trained on unclear speech.</b> The speech model (faster-whisper large-v3-turbo) is fine-tuned on dysarthric speech, so slurred or quiet words are still understood.</span></li>
-          <li><span><b>Always listening.</b> Just speak. There is no button to hold down.</span></li>
-          <li><span><b>Matches meaning, not perfect words.</b> Unclear words are matched to the closest known command.</span></li>
-          <li><span><b>Confirms before acting.</b> When it isn't sure, it shows what it understood and asks you to confirm first.</span></li>
-          <li><span><b>Dictation preview.</b> When a text box is selected, what you say is shown as a preview, then typed in.</span></li>
-          <li><span><b>English today.</b> Vietnamese is planned next.</span></li>
+          <li><span><b>Tuned for unclear speech (research build).</b> faster-whisper large-v3-turbo, fine-tuned on dysarthric speech: word errors fell from 41% to 19% on dysarthric test speakers.</span></li>
+          <li><span><b>Always listening.</b> Just speak, no button to hold. A sentence ends after a 1.5 s pause.</span></li>
+          <li><span><b>Only your voice.</b> A word counts only if the camera saw your mouth move, so other people talking don't trigger commands.</span></li>
+          <li><span><b>Asks before risky actions.</b> &ldquo;Send it&rdquo;, named clicks and deleting data always ask first. No answer in 12 s counts as no.</span></li>
+          <li><span><b>Dictation preview.</b> A small local model tidies what you dictate. Say &ldquo;use original&rdquo; to get your exact words back.</span></li>
+          <li><span><b>English only for now.</b> Vietnamese is a future goal.</span></li>
         </ul>
       </div>
       <div class="transcripts">
-        <div class="tr"><div class="heard"><small>Heard</small>"oh-peh yoo-choob"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Open YouTube</div><span class="conf">91%</span></div>
-        <div class="tr"><div class="heard"><small>Heard</small>"seh fo… pee-ah-no moo-sic"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Search for piano music</div><span class="conf">84%</span></div>
-        <div class="tr"><div class="heard"><small>Heard</small>"ri' ee-meh to my"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Write an email to Mai</div><span class="conf">78%</span></div>
+        <div class="tr"><div class="heard"><small>Heard</small>"kli' sen'"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Click Send · asks first</div><span class="conf">90%</span></div>
         <div class="tr"><div class="heard"><small>Heard</small>"sco… dow"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Scroll down</div><span class="conf">88%</span></div>
+        <div class="tr"><div class="heard"><small>Heard</small>"staa dic-tay-shun"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Start dictation</div><span class="conf">84%</span></div>
         <div class="tr"><div class="heard"><small>Heard</small>"go bah"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Go back</div><span class="conf">93%</span></div>
+        <div class="tr"><div class="heard"><small>Heard</small>"seh-n it"</div><span class="arrow">→</span><div class="meant"><small>Understood</small>Send it · asks first</div><span class="conf">86%</span></div>
       </div>
     </div>
     </div>
@@ -207,22 +208,23 @@
 
     <div class="sec-head">
       <h2>Gesture map</h2>
-      <p>The default mapping. Every row can be turned off or changed in settings.</p>
+      <p>The default mapping. Everything runs on the laptop: frames, audio and screenshots stay in memory and are never saved.</p>
     </div>
     <div class="gmap-wrap">
       <table class="gmap">
         <thead><tr><th>You do</th><th>Computer does</th><th>How it's detected</th></tr></thead>
         <tbody>
-          <tr><td>Look somewhere</td><td><span class="tag">Move pointer</span></td><td>Iris offset + head pose, mapped by your calibration</td></tr>
-          <tr><td>Hold your gaze</td><td><span class="tag">Left click</span> · open</td><td>Pointer stays within 55 px for 0.9 s</td></tr>
-          <tr><td>Nod</td><td><span class="tag">Left click</span> · confirm</td><td>Head pitch down then up by 12° or more within 600 ms</td></tr>
-          <tr><td>Tilt head left</td><td><span class="tag">Left click</span></td><td>Head roll towards the left shoulder by 15° or more, then back, within 700 ms</td></tr>
-          <tr><td>Tilt head right</td><td><span class="tag r">Right click</span></td><td>Head roll towards the right shoulder by 15° or more, then back, within 700 ms</td></tr>
-          <tr><td>Shake head</td><td><span class="tag r">Right click</span> · cancel</td><td>Head yaw left-right-left by 15° or more within 800 ms</td></tr>
-          <tr><td>Speak a command</td><td><span class="tag v">Open, search, type</span></td><td>faster-whisper, fine-tuned for dysarthric speech. The engine runs the command itself</td></tr>
+          <tr><td>Look somewhere</td><td><span class="tag">Move pointer</span></td><td>Iris offset + head pose, set by a one-look calibration</td></tr>
+          <tr><td>Raise your eyebrows</td><td><span class="tag">Left click</span> · snaps</td><td>0.25 above your resting level for 0.25 s. Lands on the nearest button within 150 px</td></tr>
+          <tr><td>Open and close your mouth</td><td><span class="tag r">Right click</span></td><td>0.35 above resting, held 0.3 – 1.5 s. Ignored while you are talking</td></tr>
+          <tr><td>Move your head up / down</td><td><span class="tag">Scroll</span> · up, down</td><td>Head pitch held for 0.4 s. The further you move, the faster it scrolls</td></tr>
+          <tr><td>Shake / nod</td><td><span class="tag r">No</span> · <span class="tag">Yes</span></td><td>Shake: yaw swing of about 15°. Nod: pitch 12°, means yes while dictating</td></tr>
+          <tr><td>Say &ldquo;click Send&rdquo;</td><td><span class="tag v">Find &amp; click</span> · asks first</td><td>UI-Venus 1.5 finds the button on screen, then you confirm</td></tr>
+          <tr><td>Hold still on a button</td><td><span class="tag">Left click</span> · optional</td><td>Dwell of 1.0 s, off by default</td></tr>
         </tbody>
       </table>
     </div>
+    <p class="gnote"><b>Honest limits:</b> a webcam is less precise than a dedicated eye tracker · English only · Windows only for now.</p>
     <div class="cta-wrap"><div class="cta-band">
       <div class="mascot-slot"></div>
       <h2>Ready? See it open YouTube, search and send an email without a single touch.</h2>
@@ -246,38 +248,41 @@
             <span class="rec">TRACKING · 640×480</span>
             <span class="cam-src" id="camSrc">source: simulated face</span>
           </div>
-          <div class="plot-wrap"><canvas id="plot" width="660" height="420" aria-label="Live signal chart for eyes, pitch, yaw and roll"></canvas></div>
+          <div class="plot-wrap"><canvas id="plot" width="660" height="420" aria-label="Live signal chart for brow, mouth, pitch and yaw"></canvas></div>
           <div class="sim-row">
             <span class="label">Simulate</span>
-                        <button id="sNod" title="Head dips 18° → click">↧ Nod</button>
-            <button id="sShake" title="Head turns ±17° → right click">↔ Shake</button>
-            <button id="sTiltL" title="Head rolls left 20° → left click">↶ Tilt L</button>
-            <button id="sTiltR" title="Head rolls right 20° → right click">↷ Tilt R</button>
+            <button id="sBrow" title="Eyebrows up 0.3 → left click, snapped to the nearest button">⌒ Brow</button>
+            <button id="sMouth" title="Mouth open 0.5 s → right click">◯ Mouth</button>
+            <button id="sTiltL" title="Lift your chin and hold → scroll up">↑ Head up</button>
+            <button id="sTiltR" title="Lower your chin and hold → scroll down">↓ Head down</button>
+            <button id="sShake" title="Head shake ±15° → no / cancel">↔ Shake</button>
+            <button id="sNod" title="Nod 12° → yes (while dictating)">↧ Nod</button>
             <button id="sNat" title="Normal blink → ignored, never clicks">Blink (ignored)</button>
           </div>
           <dl class="cam-legend">
-            <div><dt>yaw</dt><dd>head turn left / right. Large swings = head shake</dd></div>
-            <div><dt>pitch</dt><dd>head tilt up / down. A quick dip = nod</dd></div>
-            <div><dt>roll</dt><dd>head tilt to a shoulder. Left = click, right = right click</dd></div>
-            <div><dt>eyes</dt><dd>open or closed. Blinks are ignored, so you can blink freely</dd></div>
+            <div><dt>brow</dt><dd>eyebrow raise above your resting face. Over 0.25 = click</dd></div>
+            <div><dt>mouth</dt><dd>mouth opening. Open 0.3 – 1.5 s, then close = right click</dd></div>
+            <div><dt>pitch</dt><dd>head up / down. Held = scroll, a quick small nod = yes</dd></div>
+            <div><dt>yaw</dt><dd>head turn left / right. A big swing = shake (no)</dd></div>
           </dl>
         </section>
 
         <section class="card">
           <div class="card-h"><h3>Detected signals</h3><span class="label" id="clock">00:00</span></div>
           <div class="signals">
-            <div class="sig" id="sigGaze"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><b>Gaze</b><small id="gazeXY">0, 0</small></div>
-            <div class="sig" id="sigBlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5" opacity=".35"/><path d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/></svg><b>Hold</b><small>left click</small></div>
-            <div class="sig" id="sigNod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M12 15v6M9 18l3 3 3-3"/></svg><b>Nod</b><small>left click</small></div>
-            <div class="sig r" id="sigShake"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="5"/><path d="M3 18h4M17 18h4M5 16l-2 2 2 2M19 16l2 2-2 2"/></svg><b>Shake</b><small>right click</small></div>
-            <div class="sig" id="sigTilt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><g transform="rotate(-18 12 10)"><circle cx="12" cy="9" r="5"/><path d="M12 14v3"/></g><path d="M4 20a9 9 0 0 1 3-4M20 20a9 9 0 0 0-3-4"/></svg><b>Tilt</b><small>L / R click</small></div>
-            <div class="sig v" id="sigVoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><b>Voice</b><small>command</small></div>
+            <div class="sig" id="sigGaze"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.2"/><circle cx="13.2" cy="10.8" r=".9" fill="currentColor" stroke="none"/></svg><b>Gaze</b><small id="gazeXY">0, 0</small></div>
+            <div class="sig" id="sigBlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5c2-2.2 4.6-2.6 7-1.2M13 7.3c2.4-1.4 5-1 7 1.2"/><path d="M3 14s3-4 9-4 9 4 9 4-3 4-9 4-9-4-9-4Z"/><circle cx="12" cy="14" r="2"/></svg><b>Brow</b><small>left click</small></div>
+            <div class="sig r" id="sigShake"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c2.5-2.5 5.2-3.5 8-3.5s5.5 1 8 3.5c-2.5 3-5.2 4.5-8 4.5S6.5 15 4 12Z"/><path d="M7 12h10"/></svg><b>Mouth</b><small>right click</small></div>
+            <div class="sig" id="sigTilt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v7M9 6l3-3 3 3M12 21v-7M9 18l3 3 3-3"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg><b>Head ↕</b><small>scroll</small></div>
+            <div class="sig" id="sigNod"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="4.5"/><path d="M4 10H2M20 10h2M12 17v4M10 19.5l2 2 2-2"/></svg><b>Nod / shake</b><small>yes / no</small></div>
+            <div class="sig v" id="sigVoice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><b>Voice</b><small>command</small></div>
           </div>
           <div class="gest-btns">
-                        <button id="bNod">Nod<span class="kbd">N</span></button>
+            <button id="bBrow">Brow<span class="kbd">B</span></button>
+            <button id="bMouth">Mouth<span class="kbd">M</span></button>
+            <button id="bTiltL">Up<span class="kbd">↑</span></button>
+            <button id="bTiltR">Down<span class="kbd">↓</span></button>
             <button id="bShake">Shake<span class="kbd">H</span></button>
-            <button id="bTiltL">Tilt left<span class="kbd">←</span></button>
-            <button id="bTiltR">Tilt right<span class="kbd">→</span></button>
           </div>
         </section>
 
@@ -291,17 +296,18 @@
             <div class="ln"><span class="label">Heard</span><span class="heardTxt" id="heardTxt">Listening… just speak (click the mic to try an example).</span></div>
             <div class="ln"><span class="label">Understood</span><span class="meantTxt" id="meantTxt">–</span></div>
           </div>
+          <div class="confirm-q" id="confirmQ" hidden><span class="cq-txt" id="cqTxt">Send the email?</span><span class="cq-t" id="cqT">12 s</span><button type="button" id="cqYes">Yes</button><button type="button" id="cqNo">No</button><small>raise brows or say &ldquo;yes&rdquo; · shake or say &ldquo;no&rdquo;</small></div>
           <form class="vin" id="vform"><input id="vinput" placeholder="Or type what you'd say, slurred is fine" autocomplete="off"><button type="submit">Say</button></form>
           <div class="chips" id="chips"></div>
         </section>
 
         <section class="card set">
-          <div class="card-h" style="margin:0"><h3>Settings</h3><button class="mini-btn" id="calibBtn">Calibrate 9 points</button></div>
-          <div class="tg"><span id="l2">Nod to click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l2" id="swNod"></button></div>
-          <div class="tg"><span id="l3">Shake for right click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l3" id="swShake"></button></div>
-          <div class="tg"><span id="l5">Tilt head for left / right click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l5" id="swTilt"></button></div>
-          <div class="tg"><span id="l4">Click by holding gaze</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l4" id="swDwell"></button></div>
-          <div class="range"><label for="dwellMs">Gaze hold time <output id="dwellOut">900 ms</output></label><input type="range" id="dwellMs" min="400" max="2000" step="100" value="900"></div>
+          <div class="card-h" style="margin:0"><h3>Settings</h3><button class="mini-btn" id="calibBtn">Calibrate · 1 look</button></div>
+          <div class="tg"><span id="l1">Eyebrow raise to click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l1" id="swBrow"></button></div>
+          <div class="tg"><span id="l3">Open mouth for right click</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l3" id="swMouth"></button></div>
+          <div class="tg"><span id="l5">Head up / down to scroll</span><button class="sw" role="switch" aria-checked="true" aria-labelledby="l5" id="swTilt"></button></div>
+          <div class="tg"><span id="l4">Click by holding still (dwell)</span><button class="sw" role="switch" aria-checked="false" aria-labelledby="l4" id="swDwell"></button></div>
+          <div class="range"><label for="dwellMs">Dwell time <output id="dwellOut">1000 ms</output></label><input type="range" id="dwellMs" min="500" max="2000" step="100" value="1000"></div>
           <div class="range"><label for="steady">Pointer steadiness <output id="steadyOut">70%</output></label><input type="range" id="steady" min="0" max="95" step="5" value="70"></div>
         </section>
       </aside>
@@ -309,15 +315,15 @@
       <section class="main">
         <div class="statusbar">
           <span class="pill" id="trackPill"><span class="dot"></span><span id="trackTxt">Tracking</span></span>
-          <span class="pill">Accuracy <b id="accTxt" style="font-family:var(--f-mono)">±3.8°</b></span>
+          <span class="pill">Pointer <b id="accTxt" style="font-family:var(--f-mono)">eyes</b></span>
           <span class="grow"></span>
           <button class="mini-btn" id="pauseBtn">Pause <span class="kbd">P</span></button>
         </div>
         <div class="demos" id="demoBar">
           <span class="label">Guided demos</span>
-          <button class="demo-btn" data-demo="youtube">▶ Open YouTube &amp; search <span class="dur">eyes + nod + voice</span></button>
-          <button class="demo-btn" data-demo="mail">✉ Write an email <span class="dur">voice + gaze hold</span></button>
-          <button class="demo-btn" data-demo="google">🔍 Google search <span class="dur">eye typing</span></button>
+          <button class="demo-btn" data-demo="youtube">▶ Open YouTube &amp; search <span class="dur">eyes + brows + voice</span></button>
+          <button class="demo-btn" data-demo="mail">✉ Write an email <span class="dur">voice + confirm</span></button>
+          <button class="demo-btn" data-demo="google">🔍 Google search <span class="dur">on-screen keys + scroll</span></button>
         </div>
         <div class="running" id="runBar" hidden><span class="label" style="color:inherit;opacity:.7">Demo</span><span class="stepTxt" id="stepTxt">Starting…</span><button id="stopDemo">Stop</button></div>
 
@@ -388,7 +394,7 @@
           </section>
           <section class="card buddy">
             <div class="mascot-slot"></div>
-            <p id="tip">Move your mouse over the screen. The black dot is where your eyes are looking. Hold it on something to open it.</p>
+            <p id="tip">Move your mouse over the screen: the dot is where your eyes look. Raise your brows (B or left click) to click the nearest button.</p>
           </section>
         </div>
       </section>

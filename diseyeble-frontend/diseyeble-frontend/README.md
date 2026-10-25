@@ -5,10 +5,14 @@ Frontend demo cho **disEYEble**: phần mềm giúp **người già và người
 > ⚠️ Đây **chỉ là frontend / prototype giao diện**. Chưa có model nhận diện thật: ánh mắt được **mô phỏng bằng con trỏ chuột**, còn nháy mắt, gật đầu và lắc đầu được **mô phỏng bằng phím hoặc nút**.
 
 
-> **Cập nhật theo engine của Khang (24/10):** frontend đã sửa nội dung cho đúng với backend:
-> không có click bằng nháy mắt, không có nhắm mắt 2 giây để tạm dừng (click chính là **nhìn giữ / dwell**, cùng gật đầu, lắc đầu, nghiêng đầu);
-> giọng nói **luôn nghe** (không push-to-talk), dùng faster-whisper large-v3-turbo fine-tune cho giọng nói khó nghe, hiện chỉ có tiếng Anh;
-> engine tự chạy lệnh; có confirm và dictation preview. Biểu đồ yaw/pitch/roll trong Live demo vẫn là dữ liệu mô phỏng.
+> **Cập nhật theo engine của Khang (24/10, bản mới nhất, branch `eyes`):**
+> - **Con trỏ đi theo mắt** (theo chốt cuối với Khang). Hiệu chỉnh **1 chấm ở giữa**, khoảng 2 s.
+> - **Click trái = nhướn mày** hoặc nói "click", tự bám (snap) vào nút gần nhất trong ~150 px. **Click phải = há miệng rồi ngậm** (0.3–1.5 s) hoặc nói "right click".
+> - **Ngẩng / cúi đầu = cuộn** lên / xuống (giữ 0.4 s), không dùng nghiêng đầu. **Lắc = no / huỷ**, **gật = yes** (chỉ khi đọc chính tả). Gật **không** còn là click. **Dwell tắt mặc định**, 1.0 s khi bật.
+> - Giọng nói: luôn nghe, chỉ tính giọng người dùng (camera thấy miệng mở), bản fine-tune cho giọng khó nghe là **research build** (lỗi 41% → 19%), chỉ tiếng Anh, tiếng Việt là "future".
+> - Lệnh rủi ro ("send it", "click <tên>", xoá dữ liệu) luôn hỏi trước, 12 s không trả lời = no.
+> - Live demo đã đổi theo: phím **B** = nhướn mày, **M** = há miệng, **↑ / ↓** = ngẩng / cúi đầu (cuộn), **H** = lắc, **N** = gật; click chuột trái/phải trên màn hình = nhướn mày / há miệng. Có hộp hỏi xác nhận 12 s, hiệu chỉnh 1 chấm, biểu đồ brow / mouth / pitch / yaw (vẫn là **số mô phỏng**, engine chưa gửi yaw/pitch/roll qua WebSocket).
+> - Khi nối WebSocket: dùng `ws://127.0.0.1:8765` (không dùng `localhost`), toạ độ là pixel vật lý. Hợp đồng message ở `engine/core/messages.py`, test không cần camera bằng `python -m tests.fake_engine`.
 
 ---
 
@@ -67,10 +71,11 @@ Chuyển trang bằng **thanh menu bo góc nổi phía trên**: logo disEYEble b
 |---|---|
 | Di chuột | Ánh mắt |
 | Nhìn giữ ~0.9 s | Click (bật/tắt trong Settings) |
-| `Space` / click chuột | Nháy mắt, tức click |
-| `N` | Gật đầu, tức click |
-| `H` / chuột phải | Lắc đầu, tức click phải |
-| `←` / `→` | Nghiêng đầu trái / phải, tức click trái / phải |
+| `B` / click chuột trái | Nhướn mày = click (snap) |
+| `M` / chuột phải | Há miệng = click phải |
+| `N` | Gật đầu = yes |
+| `H` | Lắc đầu = no / huỷ |
+| `↑` / `↓` | Ngẩng / cúi đầu = cuộn lên / xuống |
 | giữ `V` | Nói lệnh |
 | `P` | Tạm dừng tracking |
 

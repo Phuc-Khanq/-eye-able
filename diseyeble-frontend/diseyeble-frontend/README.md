@@ -139,3 +139,13 @@ Ghi chú: khối `(unused) wavy halftone dot field` là nền chấm cũ, **khô
 - Tên: thử logo vẽ tay, Fontdiner, Black Ops One, rồi chốt **disEYEble – Rubik 800**, chữ thẳng hàng.
 
 Link xem online (artifact, chỉ chủ project mở được trừ khi chia sẻ): https://claude.ai/artifact/9MSaXb4iyvFQ33C3w9fErV
+
+---
+
+## 8. Nối với engine thật (js/engine.js)
+`js/engine.js` kết nối trang với engine của Khang qua WebSocket `ws://127.0.0.1:8765` (các message nằm trong `engine/core/messages.py`).
+- Chạy engine: `.\.venv\Scripts\python.exe -m engine.main` (hoặc `-m tests.fake_engine` để thử không cần camera), rồi mở trang trên **cùng máy**. Góc trên của Live demo hiện **Engine live**.
+- Không có engine thì trang tự chạy mô phỏng như cũ. Địa chỉ khác: mở `index.html?engine=ws://host:port#demo`.
+- Engine → trang: chế độ, cử chỉ, giọng nói (live + preview, nút Type it / Drop it), câu hỏi yes/no, UI-Venus, status, calibration, gaze thật.
+- Trang → engine: nút Pause (hoặc phím P), Calibrate, thanh Gaze hold time, Yes/No, Type it / Drop it.
+- Chưa nối: thanh Pointer steadiness (engine dùng `sensitivity`), bật/tắt dwell (chỉ có lệnh giọng nói "start clicking").

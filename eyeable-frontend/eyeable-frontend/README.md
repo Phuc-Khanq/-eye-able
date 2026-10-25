@@ -12,7 +12,9 @@
 
 **Removed from the live demo page on purpose:** the signal chart, Simulate buttons, Detected signals, Voice commands and Settings. They are hidden, not deleted (`<div id="legacy">`), because `js/app.js` still wires them.
 
-**Still says the old thing (to update to match `Nhi_Landing_Page_Facts.md`):** the intro pages and the simulation talk about "eyebrow raise = click" and "eye tracking moves the cursor". The product today: the head moves the cursor, a long blink clicks.
+**Gestures page (Oct 25):** each gesture has its own picture (`data-img` on its row in `index.html`: `assets/ctl-*.jpg` and `assets/g-*.jpg`) and its own "How it's detected" text (the row's `<template>`). The numbers there come from the engine: blink 0.4 to 1.6 s, eyebrow raise 0.25 s, shake about 14° within 1.2 s, tilt 18° held 0.4 s, snap within 150 px, dwell 1.0 s, a question waits 12 s.
+
+**Older notes below (Vietnamese, Oct 24) are history:** the eyebrow raise is no longer a click (it says yes), and a long blink is the left click.
 
 ---
 

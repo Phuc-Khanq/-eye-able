@@ -718,8 +718,9 @@
       $('#gxRes').innerHTML = r.querySelector('.gr-tag').innerHTML;
       $('#gxHow').innerHTML = r.querySelector('template').innerHTML;
       $('#gxSig').textContent = SIG[i].name;
-      const s = srcs[IMG[i]]; if (s){ if (instant){ img.src = s; } else { img.classList.add('swap'); setTimeout(() => { img.src = s; img.classList.remove('swap'); }, 200); } }
+      const s = r.dataset.img || srcs[IMG[i]]; if (s){ if (instant){ img.src = s; } else { img.classList.add('swap'); setTimeout(() => { img.src = s; img.classList.remove('swap'); }, 200); } }
     }
+    rows.forEach(r => { if (r.dataset.img){ const pre = new Image(); pre.src = r.dataset.img; } });   // each gesture's own picture (data-img), loaded early so a hover swaps at once
     rows.forEach((r,k) => { r.addEventListener('mouseenter', () => pick(k)); r.addEventListener('focus', () => pick(k)); r.addEventListener('click', () => pick(k)); });
     pick(0, true);
     const CYC = 3, WIN = 3;

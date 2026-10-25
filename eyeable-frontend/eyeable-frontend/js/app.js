@@ -934,10 +934,11 @@
 
   const SUG = { gq:['weather today','news','easy recipes','bus times'], yq:['piano music','exercise for seniors','cooking','news'],
     to:['mai@example.com','son@example.com','clinic@example.com'], subj:['Dinner on Sunday','Thank you','Quick question'], body:['Hello,','Thank you so much','See you soon','Love, Grandma'] };
+  const SHOW_OSK = false;   // the on-screen keyboard: off. [eye]able types by voice, so clicking a text box only marks where the words go (set true to bring the keyboard back)
   function renderOSK(){
     const o = $('#osk');
-    screen.classList.toggle('kb', !!W.focus);
-    if (W.focus) requestAnimationFrame(() => { const o = $('#osk'); if (!o.hidden && o.offsetHeight) screen.style.setProperty('--kb-gap', (screen.clientHeight - o.offsetTop + 8) + 'px');
+    screen.classList.toggle('kb', SHOW_OSK && !!W.focus);
+    if (SHOW_OSK && W.focus) requestAnimationFrame(() => { const o = $('#osk'); if (!o.hidden && o.offsetHeight) screen.style.setProperty('--kb-gap', (screen.clientHeight - o.offsetTop + 8) + 'px');
       requestAnimationFrame(() => {                               // a short screen: keep the box you type in visible above the keyboard
         const f = screen.querySelector('.win:not([hidden]) .field.focus'), wb = f && f.closest('.wbody'); if (!wb) return;
         const a = f.getBoundingClientRect(), z = wb.getBoundingClientRect(), inner = f.closest('#bPage');
@@ -946,7 +947,7 @@
           if (a.bottom > z.bottom - 6) { W.browser.scroll = clamp(W.browser.scroll + a.bottom - z.bottom + 14, 0, max); inner.style.transform = `translateY(${-W.browser.scroll}px)`; }
         } else if (a.bottom > z.bottom) wb.scrollTop += a.bottom - z.bottom + 6; else if (a.top < z.top) wb.scrollTop -= z.top - a.top + 6;
       }); });
-    if (!W.focus){ o.hidden = true; return; }
+    if (!SHOW_OSK || !W.focus){ o.hidden = true; return; }
     o.hidden = false;
     const rows = 'qwertyuiopasdfghjkl@zxcvbnm.,?';
     o.innerHTML = `<div class="osk-label"><span>On-screen keyboard · point at a key and click</span><span>typing into: ${{gq:'search',yq:'video search',to:'To',subj:'Subject',body:'Message'}[W.focus]}</span></div>

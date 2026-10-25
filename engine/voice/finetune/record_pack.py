@@ -3,6 +3,8 @@
     python -m engine.voice.finetune.record_pack            # start or continue
     python -m engine.voice.finetune.record_pack --list     # show the phrases
     python -m engine.voice.finetune.record_pack --mic 2    # use mic number 2
+    python -m engine.voice.finetune.record_pack --script engine/voice/finetune/voice_script.txt
+                                                           # read your own script, with how to read each part
 
 PRIVACY: this is an explicit, consented recording session, the ONE place where audio is
 written to disk. The app itself never saves microphone audio. Recordings go to
@@ -110,6 +112,30 @@ SENTENCES = [
     "I don't understand, please explain it slowly.",
 ]
 PHRASES = COMMANDS + SENTENCES
+
+
+def load_script(path: Path) -> list[tuple[str, str]]:
+    """[(text, how to read it)] from a script file. A line "## Title | how to read this part" sets the hint for
+    the lines under it; "#" lines and blank lines are ignored; every other line is one thing to read. Each text
+    must differ from every other (a finished text is skipped), so a second pass of a phrase needs different
+    punctuation, e.g. "Take a break!"."""
+    items: list[tuple[str, str]] = []
+    hint, seen = "", set()
+    for raw in Path(path).read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or (line.startswith("#") and not line.startswith("##")):
+            continue
+        if line.startswith("##"):
+            title, _, how = line.lstrip("#").partition("|")
+            hint = f"{title.strip()}: {how.strip()}" if how.strip() else title.strip()
+            continue
+        if line in seen:
+            raise ValueError(f"{path}: '{line}' appears twice (a finished text is skipped; change its punctuation)")
+        seen.add(line)
+        items.append((line, hint))
+    return items
+
+
 MIN_PEAK = 0.02          # quieter than this: probably not heard; offer a redo
 
 
@@ -179,17 +205,26 @@ def main(argv: list[str] | None = None) -> int:
     common.data_dir_arg(parser)
     parser.add_argument("--mic", type=int, default=None, help="mic number from 'python -m engine.voice.mic'")
     parser.add_argument("--list", action="store_true", help="print the phrases and exit")
+    parser.add_argument("--script", type=Path, default=None,
+                        help="read the phrases in this file (with a hint on how to read each part) instead of "
+                             "the built-in 150")
     args = parser.parse_args(argv)
+    items = load_script(args.script) if args.script else [(p, "") for p in PHRASES]
     if args.list:
-        for i, p in enumerate(PHRASES, 1):
+        last_hint = None
+        for i, (p, h) in enumerate(items, 1):
+            if h != last_hint:
+                print(f"\n  [{h}]" if h else "")
+                last_hint = h
             print(f"{i:3d}. {p}")
         return 0
 
     folder = personal_dir(args.data_dir)
     table = folder / "transcripts.csv"
-    todo = [p for p in PHRASES if p not in done_texts(table)]
+    finished = done_texts(table)
+    todo = [(p, h) for p, h in items if p not in finished]
     print(__doc__.split("For each phrase")[0].strip().split("\n\n", 1)[1])
-    print(f"\n{len(PHRASES) - len(todo)} of {len(PHRASES)} phrases are already recorded.")
+    print(f"\n{len(items) - len(todo)} of {len(items)} phrases are already recorded.")
     if not todo:
         print("All done. Thank you!")
         return 0
@@ -211,9 +246,11 @@ def main(argv: list[str] | None = None) -> int:
     last: str | None = None
     i = 0
     while i < len(todo):
-        text = todo[i]
-        n = len(PHRASES) - len(todo) + i + 1
-        print(f"\n[{n}/{len(PHRASES)}]  Say:  {text}")
+        text, hint = todo[i]
+        n = len(items) - len(todo) + i + 1
+        print(f"\n[{n}/{len(items)}]  Say:  {text}")
+        if hint:
+            print(f"    How:  {hint}")
         try:
             key = input("    Enter = start, s = skip, r = redo the last one, q = quit: ").strip().lower()
         except EOFError:

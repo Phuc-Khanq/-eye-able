@@ -6,6 +6,8 @@ Subscribes: EyeFeatures, HeadPose
 APIs: HeadPointer (Hung's head cursor), PointSmoother (One Euro), GazeModel (calibration)
 
 Modes:
+  head-nose the head mode, plus the nose as a second reading of the head's turn: in the outer part of a turn it carries
+            the cursor on to the edge that turn points at (see NOSE_* below). For a cursor that stops short of an edge.
   head-eyes the default when there is a gaze calibration: the head mode below, plus the eyes. While the head turns
             toward where you look, the cursor is also pulled toward that spot, so a smaller head turn gets there;
             the pull stops at the edge of the gaze's error ellipse around that spot, and the last stretch is the
@@ -35,7 +37,8 @@ from engine.core.types import EyeFeatures, GazePoint, HeadPose
 from engine.eyes.head_pointer import HeadPointer
 from engine.eyes.smoothing import OneEuroFilter, PointSmoother
 
-MODES = ("head", "head-eyes", "head-abs", "hybrid", "gaze")
+MODES = ("head", "head-eyes", "head-nose", "head-abs", "hybrid", "gaze")
+REL_MODES = ("head", "head-eyes", "head-nose")      # the relative "mouse" pointer is in charge
 NEEDS_GAZE = ("head-eyes", "hybrid", "gaze")
 JUMP_PX = 250.0   # hybrid: gaze this far from the cursor moves it; below that the head fine-tunes
 
@@ -87,7 +90,7 @@ GAZE_BETA = 4.0
 # The cursor's dead zone (CursorDriver) per mode: wobble smaller than this doesn't move it.
 # The head mode needs almost none (slow moves are only about 12 px per degree, and a bigger dead zone
 # makes slow moves sticky); the absolute head mode and gaze do.
-STILL_PX = {"head": 2.0, "head-eyes": 2.0, "head-abs": 8.0, "hybrid": 20.0, "gaze": 20.0}
+STILL_PX = {"head": 2.0, "head-eyes": 2.0, "head-nose": 2.0, "head-abs": 8.0, "hybrid": 20.0, "gaze": 20.0}
 
 # head-eyes: how the eyes pull (Oct 24 night, Khang: "head as the macro control, the iris as an add-on")
 EYE_RADIUS_PX = (110.0, 140.0)  # the gaze's error ellipse (x, y) around where the model says you look: no pull inside
@@ -98,6 +101,17 @@ EYE_ALIGN = (0.3, 0.8)          # cosine of the angle between the head's move an
                                 # under the low one (the head goes elsewhere), full pull over the high one
 EYE_PULL_RATE = 5.0             # per second: while it pulls, the gap beyond the ellipse closes like 1 - exp(-5 t)
 EYE_MAX_STEP_PX = 60.0          # at most this much pull per camera frame (25+ fps; scaled for slower frames)
+
+
+# head-nose (Oct 24 night, Khang: "after a while it doesn't reach the far left or right"): the head pointer is
+# relative, so errors pile up and the cursor can stop short of an edge. The nose (engine/eyes/nose.py) gives the head's
+# turn a second time. In the outer part of a turn it carries the cursor to the screen spot that turn points at, and
+# only forward (never back toward the middle), so the middle of the screen feels exactly like "head".
+NOSE_EDGE_DEG = (19.0, 11.0)    # a turn that reaches a side edge (yaw), the top or bottom (pitch): the comfortable
+                                # range measured in tests.pointer_feel (Hung's laptop, Oct 24)
+NOSE_ZONE = 0.7                 # the assist starts at this share of that turn, full at the whole of it
+NOSE_PULL_RATE = 5.0            # per second, like the eye pull: the gap to the edge closes like 1 - exp(-5 t)
+NOSE_MAX_STEP_PX = 45.0         # at most this much assist per camera frame (25+ fps; scaled for slower frames)
 
 
 def _ramp(x: float, lo: float, hi: float) -> float:
@@ -254,6 +268,8 @@ class Pointer:
         self.gaze_shift = (0.0, 0.0)            # px, set by the one-look calibration
         self.gaze_point: tuple[float, float] | None = None   # head-eyes: where the eyes are (smoothed), px
         self.eye_pull_px = 0.0                  # head-eyes: how far the eyes have pulled the cursor in all (tuning)
+        self.nose_assist_px = 0.0               # head-nose: how far the nose has carried the cursor in all (tuning)
+        self._nose_t: float | None = None
         self._eye_t: float | None = None
         self._held: HeadPose | None = None
         self._hold_since: int | None = None     # t_ms the eyes stopped being usable
@@ -284,13 +300,14 @@ class Pointer:
         self.smoother.reset()
         self.rel.center()
         self._eye_t = None
+        self._nose_t = None
         self.gaze_point = None
         self._hold_since = None
         self._was_holding = False
 
     def place(self, x: float, y: float) -> None:
         """Head modes: continue from (x, y), e.g. the button UI-Venus just found. Other modes: nothing."""
-        if self.mode in ("head", "head-eyes"):
+        if self.mode in REL_MODES:
             self.rel.cursor = (float(x), float(y))
             self.rel.rebase()
 
@@ -300,13 +317,13 @@ class Pointer:
             return None
         return self.model.predict(feats, pose)
 
-    def update(self, t_ms: int, feats: EyeFeatures | None, pose: HeadPose) -> GazePoint:
+    def update(self, t_ms: int, feats: EyeFeatures | None, pose: HeadPose, nose=None) -> GazePoint:
         usable = feats is None or feats.usable
         if not usable and self._hold_since is None:
             self._hold_since = t_ms
         holding = (not usable and self._held is not None and t_ms - self._hold_since <= BLINK_MAX_MS)
         if not holding:
-            if self._was_holding and self.mode in ("head", "head-eyes"):
+            if self._was_holding and self.mode in REL_MODES:
                 self.rel.stats.hold_rebases += 1
                 if self._held is not None:
                     self.rel.stats.hold_dropped_deg += math.hypot(pose.yaw - self._held.yaw,
@@ -316,11 +333,13 @@ class Pointer:
                 self._hold_since = None
             self._held = pose
         self._was_holding = holding
-        if self.mode in ("head", "head-eyes"):
+        if self.mode in REL_MODES:
             if holding:
                 self._eye_t = None
                 return GazePoint(t_ms=t_ms, x=self.rel.cursor[0], y=self.rel.cursor[1], confidence=1.0)
             point = self.rel.update(pose)
+            if self.mode == "head-nose":
+                return self._nose_assist(t_ms, nose, pose, point)
             return self._eye_pull(t_ms, feats, pose, point) if self.mode == "head-eyes" else point
         point_pose = pose if not holding else HeadPose(pose.t_ms, self._held.yaw, self._held.pitch, self._held.roll)
         gaze = None
@@ -331,6 +350,42 @@ class Pointer:
                 sx, sy = self.smoother(t_ms / 1000.0, gx / self.W, gy / self.H)
                 gaze = GazePoint(t_ms=t_ms, x=sx * self.W, y=sy * self.H, confidence=1.0)
         return self.head.update(point_pose, gaze)
+
+    def _nose_assist(self, t_ms: int, nose, pose: HeadPose, point: GazePoint) -> GazePoint:
+        """head-nose: when the nose says the head is turned toward an edge (past NOSE_ZONE of the turn that reaches it)
+        and the matrix agrees, carry the cursor toward the spot that turn points at, never backward. Returns the cursor
+        point; the head pointer carries on from it."""
+        last, self._nose_t = self._nose_t, t_ms / 1000.0
+        if nose is None or last is None:
+            return point
+        dt = self._nose_t - last
+        if not 0.0 < dt < 0.5:
+            return point
+        cx, cy = self.rel.cursor
+        out = [cx, cy]
+        size = (self.W, self.H)
+        for axis, (angle, matrix, edge) in enumerate(((nose.yaw, pose.yaw, NOSE_EDGE_DEG[0]),
+                                                      (nose.pitch, pose.pitch, NOSE_EDGE_DEG[1]))):
+            a = angle / edge
+            direction = 1.0 if a > 0 else -1.0
+            m = abs(a)
+            if m <= NOSE_ZONE or matrix * direction < 0.5 * NOSE_ZONE * edge:
+                continue                                  # not far enough, or the matrix doesn't agree
+            if self.rel.step[axis] * direction < -0.5:
+                continue                                  # the head is already coming back
+            mid = (size[axis] - 1) / 2
+            target = min(max(mid + direction * min(m, 1.0) * mid, 0.0), size[axis] - 1.0)
+            gap = (target - out[axis]) * direction
+            if gap <= 0:
+                continue                                  # the cursor is already there or beyond
+            k = (1.0 - math.exp(-NOSE_PULL_RATE * dt)) * _ramp(m, NOSE_ZONE, 1.0)
+            step = min(gap * k, NOSE_MAX_STEP_PX * HeadRelPointer.frame_scale(dt))
+            out[axis] += direction * step
+            self.nose_assist_px += step
+        if (out[0], out[1]) == (cx, cy):
+            return point
+        self.rel.cursor = (out[0], out[1])
+        return GazePoint(t_ms=t_ms, x=out[0], y=out[1], confidence=point.confidence)
 
     def _eye_pull(self, t_ms: int, feats: EyeFeatures | None, pose: HeadPose, point: GazePoint) -> GazePoint:
         """head-eyes: pull the head pointer's cursor toward where the eyes look, but only the part of the way that

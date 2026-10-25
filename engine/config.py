@@ -116,6 +116,12 @@ class Settings:
     refine_wait_s: float = 6.0         # "yes" while it refines waits at most this long, then types what's showing
     refine_max_s: float = 15.0         # a refine that takes longer is cut off and not used
 
+    # Live preview (engine/voice/audio_in.py + dictation.py): while you are still speaking, the card shows what Whisper
+    # hears so far, about once a second, then the finished words replace it. Dictation mode only; never typed.
+    live_preview: bool = True
+    live_every_s: float = 1.0          # how often the audio so far is transcribed
+    live_min_s: float = 0.8            # not before this much speech (a shorter clip is mostly noise)
+
     # Opening apps and sites by voice (engine/voice/launch.py; engine/eyes/os_output.py starts them)
     # "open Chrome" starts an app only if its name is here; any other name stays look-and-say.
     launch_apps: dict = field(default_factory=lambda: {

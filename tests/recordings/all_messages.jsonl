@@ -202,27 +202,29 @@
 {"t": 15.939, "msg": {"type": "listening", "level": 0.0, "speaking": false}}
 {"t": 15.939, "msg": {"type": "listening", "level": 0.0, "speaking": false}}
 {"t": 16.035, "msg": {"type": "listening", "level": 0.0, "speaking": false}}
-{"t": 16.127, "msg": {"type": "dictation_preview", "words": [{"text": "hi", "conf": 0.95}, {"text": "mom", "conf": 0.95}, {"text": "home", "conf": 0.95}, {"text": "at", "conf": 0.95}, {"text": "seven", "conf": 0.95}, {"text": "tonight", "conf": 0.95}], "cleaned": false}}
+{"t": 16.127, "msg": {"type": "dictation_live", "text": "hi mom home"}}
 {"t": 16.193, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 16.292, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 16.292, "msg": {"type": "dictation_preview", "words": [{"text": "hi", "conf": 0.95}, {"text": "mom", "conf": 0.95}, {"text": "home", "conf": 0.95}, {"text": "at", "conf": 0.95}, {"text": "seven", "conf": 0.95}, {"text": "tonight", "conf": 0.95}], "cleaned": false}}
+{"t": 16.292, "msg": {"type": "dictation_live", "text": ""}}
 {"t": 16.391, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 16.457, "msg": {"type": "dictation_preview", "words": [{"text": "Hi", "conf": 0.95}, {"text": "Mom,", "conf": 0.95}, {"text": "home", "conf": 0.95}, {"text": "at", "conf": 0.95}, {"text": "seven", "conf": 0.95}, {"text": "tonight.", "conf": 0.95}], "original": "hi mom home at seven tonight", "cleaned": true}}
 {"t": 16.49, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 16.589, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 16.622, "msg": {"type": "dictation_preview", "words": [{"text": "Hi", "conf": 0.95}, {"text": "Mom,", "conf": 0.95}, {"text": "home", "conf": 0.95}, {"text": "at", "conf": 0.95}, {"text": "seven", "conf": 0.95}, {"text": "tonight.", "conf": 0.95}], "original": "hi mom home at seven tonight", "cleaned": true}}
 {"t": 16.688, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 16.787, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 16.787, "msg": {"type": "confirm", "id": "q2", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "open", "expires_in_s": 12.0}}
 {"t": 16.886, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 16.952, "msg": {"type": "confirm", "id": "q2", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "open", "expires_in_s": 12.0}}
 {"t": 16.985, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 17.084, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 17.117, "msg": {"type": "gesture", "gesture": "shake"}}
-{"t": 17.117, "msg": {"type": "confirm", "id": "q2", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "cancelled", "expires_in_s": 0}}
 {"t": 17.183, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 17.282, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 17.282, "msg": {"type": "gesture", "gesture": "shake"}}
+{"t": 17.282, "msg": {"type": "confirm", "id": "q2", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "cancelled", "expires_in_s": 0}}
 {"t": 17.381, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 17.447, "msg": {"type": "confirm", "id": "q3", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "open", "expires_in_s": 12.0}}
 {"t": 17.48, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 17.579, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 17.612, "msg": {"type": "confirm", "id": "q3", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "open", "expires_in_s": 12.0}}
 {"t": 17.678, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 17.777, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 17.876, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
@@ -347,10 +349,10 @@
 {"t": 29.657, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 29.756, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 29.855, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 29.921, "msg": {"type": "confirm", "id": "q3", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "expired", "expires_in_s": 0}}
-{"t": 29.921, "msg": {"type": "confirm", "id": "q4", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "open", "expires_in_s": 12.0}}
 {"t": 29.954, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 30.053, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 30.086, "msg": {"type": "confirm", "id": "q3", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "expired", "expires_in_s": 0}}
+{"t": 30.086, "msg": {"type": "confirm", "id": "q4", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "open", "expires_in_s": 12.0}}
 {"t": 30.152, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 30.251, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 30.35, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
@@ -358,33 +360,33 @@
 {"t": 30.548, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 30.647, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 30.746, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 30.746, "msg": {"type": "gesture", "gesture": "brow_raise"}}
-{"t": 30.746, "msg": {"type": "confirm", "id": "q4", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "confirmed", "expires_in_s": 0}}
-{"t": 30.746, "msg": {"type": "dictation_preview", "words": [], "cleaned": false}}
 {"t": 30.845, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 30.911, "msg": {"type": "gesture", "gesture": "brow_raise"}}
+{"t": 30.911, "msg": {"type": "confirm", "id": "q4", "prompt": "Insert \"Hi Mom, home at seven tonight.\" and send?", "state": "confirmed", "expires_in_s": 0}}
+{"t": 30.911, "msg": {"type": "dictation_preview", "words": [], "cleaned": false}}
 {"t": 30.944, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 31.043, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 31.142, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 31.241, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 31.34, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 31.439, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 31.472, "msg": {"type": "mode", "mode": "pointer"}}
 {"t": 31.538, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 31.637, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 31.637, "msg": {"type": "mode", "mode": "pointer"}}
 {"t": 31.736, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 31.802, "msg": {"type": "mode", "mode": "menu"}}
-{"t": 31.802, "msg": {"type": "gesture", "gesture": "tilt_right"}}
 {"t": 31.835, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 31.934, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 31.967, "msg": {"type": "mode", "mode": "menu"}}
+{"t": 31.967, "msg": {"type": "gesture", "gesture": "tilt_right"}}
 {"t": 32.033, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 32.132, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 32.132, "msg": {"type": "gesture", "gesture": "tilt_left"}}
 {"t": 32.231, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 32.297, "msg": {"type": "gesture", "gesture": "tilt_left"}}
 {"t": 32.33, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 32.429, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 32.462, "msg": {"type": "gesture", "gesture": "nod"}}
 {"t": 32.528, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 32.627, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 32.627, "msg": {"type": "gesture", "gesture": "nod"}}
 {"t": 32.726, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 32.825, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 32.924, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
@@ -395,72 +397,74 @@
 {"t": 33.419, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 33.518, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 33.617, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 33.617, "msg": {"type": "gesture", "gesture": "brow_raise"}}
 {"t": 33.716, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 33.782, "msg": {"type": "gesture", "gesture": "brow_raise"}}
 {"t": 33.815, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 33.914, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 34.013, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 34.013, "msg": {"type": "gesture", "gesture": "shake"}}
-{"t": 34.013, "msg": {"type": "mode", "mode": "pointer"}}
 {"t": 34.112, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 34.178, "msg": {"type": "gesture", "gesture": "shake"}}
+{"t": 34.178, "msg": {"type": "mode", "mode": "pointer"}}
 {"t": 34.211, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 34.31, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 34.343, "msg": {"type": "mode", "mode": "paused"}}
 {"t": 34.409, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 34.508, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 34.508, "msg": {"type": "mode", "mode": "paused"}}
 {"t": 34.607, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 34.673, "msg": {"type": "mode", "mode": "pointer"}}
 {"t": 34.706, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 34.805, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 34.838, "msg": {"type": "mode", "mode": "pointer"}}
 {"t": 34.904, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 35.003, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 35.003, "msg": {"type": "mode", "mode": "scroll"}}
-{"t": 35.036, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
-{"t": 35.168, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
-{"t": 35.3, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
-{"t": 35.432, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
-{"t": 35.564, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": true}}
-{"t": 35.696, "msg": {"type": "scroll", "rate": 0.0, "offset": 4.1, "ready": true}}
-{"t": 35.828, "msg": {"type": "scroll", "rate": -4.5, "offset": 6.0, "ready": true}}
-{"t": 35.96, "msg": {"type": "scroll", "rate": -7.2, "offset": 6.0, "ready": true}}
-{"t": 36.092, "msg": {"type": "scroll", "rate": -8.3, "offset": 6.0, "ready": true}}
-{"t": 36.224, "msg": {"type": "scroll", "rate": -8.8, "offset": 6.0, "ready": true}}
-{"t": 36.356, "msg": {"type": "scroll", "rate": -9.0, "offset": 6.0, "ready": true}}
-{"t": 36.488, "msg": {"type": "scroll", "rate": -9.0, "offset": 6.0, "ready": true}}
-{"t": 36.62, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
-{"t": 36.752, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
-{"t": 36.884, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
-{"t": 37.016, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
-{"t": 37.148, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
-{"t": 37.148, "msg": {"type": "mode", "mode": "pointer"}}
-{"t": 37.181, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
-{"t": 37.247, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 35.102, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 35.168, "msg": {"type": "mode", "mode": "scroll"}}
+{"t": 35.201, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
+{"t": 35.333, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
+{"t": 35.465, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
+{"t": 35.597, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
+{"t": 35.729, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": true}}
+{"t": 35.861, "msg": {"type": "scroll", "rate": 0.0, "offset": 4.1, "ready": true}}
+{"t": 35.993, "msg": {"type": "scroll", "rate": -4.5, "offset": 6.0, "ready": true}}
+{"t": 36.125, "msg": {"type": "scroll", "rate": -7.2, "offset": 6.0, "ready": true}}
+{"t": 36.257, "msg": {"type": "scroll", "rate": -8.3, "offset": 6.0, "ready": true}}
+{"t": 36.389, "msg": {"type": "scroll", "rate": -8.8, "offset": 6.0, "ready": true}}
+{"t": 36.521, "msg": {"type": "scroll", "rate": -9.0, "offset": 6.0, "ready": true}}
+{"t": 36.653, "msg": {"type": "scroll", "rate": -9.0, "offset": 6.0, "ready": true}}
+{"t": 36.785, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
+{"t": 36.917, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
+{"t": 37.049, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
+{"t": 37.181, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
+{"t": 37.313, "msg": {"type": "scroll", "rate": -9.1, "offset": 6.0, "ready": true}}
+{"t": 37.313, "msg": {"type": "mode", "mode": "pointer"}}
+{"t": 37.346, "msg": {"type": "scroll", "rate": 0.0, "offset": 0.0, "ready": false}}
 {"t": 37.346, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
 {"t": 37.445, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
-{"t": 37.544, "msg": {"type": "gaze", "x": 983.5, "y": 569.0, "confidence": 1.0}}
-{"t": 37.643, "msg": {"type": "gaze", "x": 906.7, "y": 569.0, "confidence": 1.0}}
-{"t": 37.742, "msg": {"type": "gaze", "x": 961.0, "y": 569.0, "confidence": 1.0}}
-{"t": 37.841, "msg": {"type": "gaze", "x": 1105.5, "y": 569.0, "confidence": 1.0}}
-{"t": 37.94, "msg": {"type": "gaze", "x": 1110.0, "y": 569.0, "confidence": 1.0}}
-{"t": 38.039, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 37.544, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 37.643, "msg": {"type": "gaze", "x": 997.0, "y": 569.0, "confidence": 1.0}}
+{"t": 37.742, "msg": {"type": "gaze", "x": 962.9, "y": 569.0, "confidence": 1.0}}
+{"t": 37.841, "msg": {"type": "gaze", "x": 878.0, "y": 569.0, "confidence": 1.0}}
+{"t": 37.94, "msg": {"type": "gaze", "x": 1051.0, "y": 569.0, "confidence": 1.0}}
+{"t": 38.039, "msg": {"type": "gaze", "x": 1108.8, "y": 569.0, "confidence": 1.0}}
 {"t": 38.138, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 38.237, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 38.336, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 38.435, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 38.534, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
-{"t": 38.534, "msg": {"type": "gesture", "gesture": "brow_raise"}}
-{"t": 38.534, "msg": {"type": "target_searching", "label": "here", "snap": true}}
-{"t": 38.534, "msg": {"type": "target_found", "x": 1140, "y": 579, "label": "here", "snap": true}}
 {"t": 38.633, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.699, "msg": {"type": "gesture", "gesture": "brow_raise"}}
+{"t": 38.699, "msg": {"type": "target_searching", "label": "here", "snap": true}}
+{"t": 38.699, "msg": {"type": "target_found", "x": 1140, "y": 579, "label": "here", "snap": true}}
 {"t": 38.732, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 38.831, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 38.864, "msg": {"type": "status", "level": "error", "text": "Couldn't click: PermissionError: the window is run as administrator"}}
 {"t": 38.93, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
-{"t": 38.93, "msg": {"type": "status", "level": "error", "text": "Couldn't click: PermissionError: the window is run as administrator"}}
-{"t": 40.943, "msg": {"type": "status", "level": "warn", "text": "Can't see your face: face the camera, add light"}}
-{"t": 41.933, "msg": {"type": "status", "level": "info", "text": "Face found again"}}
-{"t": 41.999, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 39.029, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 41.108, "msg": {"type": "status", "level": "warn", "text": "Can't see your face: face the camera, add light"}}
+{"t": 42.098, "msg": {"type": "status", "level": "info", "text": "Face found again"}}
 {"t": 42.098, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 42.197, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 42.296, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 42.395, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
 {"t": 42.494, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 42.593, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}
+{"t": 42.692, "msg": {"type": "gaze", "x": 1110.1, "y": 569.0, "confidence": 1.0}}

@@ -33,6 +33,9 @@ LISTENING = "listening"                  # level 0-1, speaking true/false. About
 DICTATION_PREVIEW = "dictation_preview"  # words: [{"text": str, "conf": float}]; [] hides the bubble.
                                          # With the clean-up on, also cleaned: true|false; when true, words holds the
                                          # cleaned text and original the user's own words (a string)
+DICTATION_LIVE = "dictation_live"        # text: what Whisper hears so far of the sentence being spoken, updated about once a
+                                         # second while the user talks (dictation mode only). "" clears it: the final
+                                         # words (dictation_preview) are out, or the user stopped. Show it greyed
 STATUS = "status"                        # level: "info" | "warn" | "error", text (show it, then let it fade)
 COMMAND = "command"                      # label ("Volume up", "New tab", "Brightness 60%"): a voice command just ran.
                                          # The card flashes it for a moment, so the user sees it was heard
@@ -59,6 +62,7 @@ FIELDS: dict[str, tuple[set[str], set[str]]] = {
     CALIB_RESULT: ({"error_px", "ok"}, set()),
     LISTENING: ({"level", "speaking"}, set()),
     DICTATION_PREVIEW: ({"words"}, {"cleaned", "original"}),
+    DICTATION_LIVE: ({"text"}, set()),
     STATUS: ({"level", "text"}, set()),
     CONFIRM: ({"id", "prompt", "state", "expires_in_s"}, set()),
     COMMAND: ({"label"}, set()),

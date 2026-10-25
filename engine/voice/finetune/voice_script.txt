@@ -1,0 +1,192 @@
+# Khang's voice pack script (Oct 24 night). About 160 items, 35 to 45 minutes. Read them in order; you can stop
+# with q at any time and carry on later (finished lines are skipped). Most useful parts come first.
+# Lines starting with ## tell you HOW to read the lines under them. Read exactly the words shown (punctuation is
+# only a guide for how it sounds): the text you see is what the model learns the audio means.
+# Tips: sit where you normally sit, the laptop mic at the usual distance, a quiet room. Press Enter, wait a
+# beat, read, wait a beat, press Enter. If you stumble or cough, press r to redo.
+# Each line must be different from every other line (a finished line is skipped), so the second pass of a
+# command differs in punctuation.
+
+## 1. Warm-up | normal voice, normal speed, like talking to a friend
+Good evening, this is my voice.
+I am testing the microphone before I start.
+Let's get started with the first few sentences.
+It is a quiet night at the university.
+I would like a glass of water, please.
+The coffee shop opens at seven in the morning.
+Thank you very much for your help today.
+I will send you the message in a few minutes.
+
+## 2. Commands | say each one clearly, normal speed, the way you would say it to the computer, one at a time
+scroll down
+scroll up
+click send
+click
+right click
+yes
+no
+send it
+scratch that
+undo
+new line
+start dictation
+stop dictation
+dictation off
+hi Dizzy
+bye
+bye Dizzy
+bye bye
+take a break
+resume
+recenter
+re-center
+reset cursor
+center
+quit
+copy
+paste
+select all
+new tab
+close tab
+switch window
+volume up
+volume down
+mute
+go back
+refresh
+zoom in
+zoom out
+page down
+page up
+escape
+enter
+stop
+done
+cancel
+use original
+pause
+calibrate
+click Compose
+click Search
+click the blue button
+open Chrome
+open Gmail
+open YouTube
+scroll
+go to the top
+
+## 3. Dictation passages | read like you are dictating a message: natural speed, natural rhythm, keep going through the whole passage, pause only at the full stops
+Hi Professor Lee, thank you for meeting with our team yesterday. We have finished the first version of our project, and we would like to show it to you on Monday. Please let me know which time works best for you.
+Hey team, quick update from me. The head tracking is working much better after the latest changes, but we still need to test it on a bigger screen. Can someone bring an extra monitor tomorrow morning, and please remember to charge your laptops tonight?
+Dear neighbors, we are planning a small garden party on Saturday afternoon at around four o'clock. Everyone is welcome, and we will provide drinks and snacks. If you can bring a dessert to share, that would be wonderful. Please reply by Thursday so we know how many chairs to set up.
+Today I need to finish three things. First, pay the electricity bill before noon. Second, call the pharmacy about my prescription. Third, write back to my cousin about the family dinner next weekend.
+The meeting started at ten fifteen and lasted about forty minutes. We agreed to move the deadline to Friday, assign the report to Maria, and review the budget again next week. The next meeting is on Wednesday at two.
+I just got home and I am exhausted, but the trip was amazing. We hiked up to the lake early in the morning, and the water was so clear that we could see the fish. I will send you the pictures tomorrow, and you have to tell me about your week.
+This app lets me use my computer without my hands. I move the cursor with my head, click by blinking for a moment, and type by speaking. It is not perfect yet, but it already saves me a lot of effort every day.
+For this assignment, I will explain how neural networks learn from examples. I will start with a simple story about teaching a child to recognize animals, and then I will describe how the computer adjusts its numbers after every mistake.
+To make the soup, chop two onions, three carrots, and a few cloves of garlic. Cook them slowly in olive oil for about ten minutes, then add the broth and simmer until everything is soft. Season with salt, pepper, and a little lemon juice before serving.
+Our flight leaves Gainesville at six forty five on Thursday morning, so we should arrive at the airport by five. I booked a small hotel near the station for two nights. On Saturday we will take the train to the coast and have lunch by the water.
+Please remember to take a short break every hour, drink some water, and stretch your neck and shoulders. If your eyes feel tired, look at something far away for twenty seconds.
+I am sorry for the late reply. The past few days have been very busy, and I did not see your message until this morning. I have attached the document you asked for, and I am happy to answer any questions you have.
+When I was a child, my grandmother used to tell me stories on the porch every evening. Her voice was slow and warm, and I always fell asleep before the end. Now I try to remember each story and write it down so my children can read them one day.
+The system listens to the microphone and watches the camera at the same time. When the mouth is moving, the words are kept, and when it is not, they are ignored. After a short pause, the whole passage is cleaned up and shown on the card before it is typed.
+
+## 4. Names and project words | slowly and clearly, the way you would say it to someone who has never heard it
+Khoa
+Nhi
+Hung
+Khang
+Diseyeble
+Gator Hack
+UF AI Days
+Gainesville, Florida
+Newell Hall
+the Reitz Union
+Khoa, Nhi, Hung, and Khang are the Diseyeble team.
+We are presenting at Gator Hack in Newell Hall.
+The finals are at the Reitz Union on Monday morning.
+Please send the message to Khoa and Nhi before noon.
+
+## 5. Sound practice | slowly and clearly, finishing every word, including the last sound of each word
+The world's first desks stood next to the thirteen tall trees.
+She thinks the three thin brothers bathe with their mother.
+Please check the six fixed jobs and the last test results.
+He asked, helped, and washed the dishes while she walks, talks, and works hard.
+I wish this sheep could ship fresh cheese across the sea.
+Did you say sheet or seat, and then bit or beat?
+The first and last months of the year were the coldest.
+They thought through the thick, thin theory twice.
+Seven fifteen, nine thirty, and four forty five.
+On October twenty fifth, two thousand twenty six.
+Three thousand six hundred and twenty eight dollars.
+The red rug was left at the little lake by the river.
+Rice, lice, and ice are not the same as rise, lies, and eyes.
+Next week's quiz covers chapters four, five, and six.
+
+## 6. Slow and careful | as if the computer is hard of hearing: slow, very clear, a clear gap between words
+Please open the document I was writing yesterday.
+I would like to schedule a meeting for Friday afternoon.
+Send a message to my sister and tell her I am fine.
+The package should arrive between noon and three.
+Can you find the nearest pharmacy that is open late?
+Remind me to call the dentist tomorrow morning.
+Turn the volume down a little bit, please.
+I need to change my password for this account.
+The train to the airport leaves from platform two.
+Save this file in the folder called projects.
+
+## 7. Fast and relaxed | quick, casual, a little mumbled, like talking to yourself or a close friend
+Yeah, I'll text you when I get there.
+Okay, so I think we should just go with the first one.
+Let me check the schedule real quick.
+I'm gonna grab some food, be right back.
+Sounds good, see you at the lab in ten.
+Wait, did you already send the file to everyone?
+Honestly, I think it works better this way.
+Can you hold on a second, I'm finishing this.
+Right, so the next thing on the list is the slides.
+Alright, that should be everything for tonight.
+
+## 8. Quiet voice | softly, as if someone is sleeping next to you, still pronouncing the words
+Please turn off the light when you leave.
+I will finish this in a few minutes.
+Could you pass me the charger on the desk?
+Let's talk about it in the morning.
+I think everyone is asleep already.
+Send the message after the meeting ends.
+The library is quiet on Sunday afternoons.
+Close the window, it is getting cold.
+
+## 9. Tired voice | low energy, end of a long day, slightly slower, a little flat
+I am really tired, so I am going to bed early.
+It has been a very long day at the lab.
+I can barely keep my eyes open right now.
+Let me rest for a few minutes before I continue.
+I think I need a coffee and a short walk.
+We will finish the rest of the work tomorrow.
+My head feels heavy after all those hours.
+Good night everyone, see you tomorrow.
+
+## 10. A little further from the mic | sit back, lean away from the laptop, and speak at normal volume as if across a small room
+Can you hear me from over here?
+I am sitting back in my chair right now.
+Please read the last message out loud.
+Open the calendar and show me tomorrow.
+Start a new note and call it ideas.
+What is the weather going to be like this weekend?
+Take a picture of the screen and save it.
+Tell the team that I will be there in ten minutes.
+
+## 11. Commands again | second pass, the most important ones, each in a different way: a little faster, a little quieter, a little tired
+Take a break!
+Resume!
+Quit!
+Recenter!
+Hi, Dizzy!
+Bye bye!
+Scroll down!
+Dictation off!
+Send it!
+Scratch that!
+Click!
+Stop dictation!

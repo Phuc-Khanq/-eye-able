@@ -6,7 +6,8 @@ Run:  .\\.venv\\Scripts\\python.exe -m tests.pointer_feel
 
 A full-screen dark window; the real cursor follows your head.
 Keys (this window):
-  1 = head   2 = head-abs (old)   3 = head-eyes (the head, plus the eyes pulling toward where you look while the head
+  1 = head   4 = head-nose (the head, plus the nose carries the cursor the last stretch to an edge; use E to compare
+  with 1: how many edges are reached, and how fast)   2 = head-abs (old)   3 = head-eyes (the head, plus the eyes pulling toward where you look while the head
   turns that way; needs calibration/gaze_model.json)   C = recenter (face the screen center and look at it, then press)
   SPACE = reach test: 8 targets, one at a time, near the corners and edges. Move the cursor onto
           the ring and hold it there for 0.3 s; the time is recorded. Do it once per mode.
@@ -51,6 +52,7 @@ def main() -> None:
     from engine.eyes.eye_features import EyeFeatureExtractor
     from engine.eyes.face_mesh import FaceMesh
     from engine.eyes.head_pose import HeadPoseEstimator
+    from engine.eyes.nose import NoseTracker
     import engine.eyes.pointer as P
     from engine.eyes.pointer import Pointer
 
@@ -59,6 +61,7 @@ def main() -> None:
     cam = Camera(index=args.camera)
     cam.start()
     mesh, feats, head = FaceMesh(), EyeFeatureExtractor(), HeadPoseEstimator()
+    nose = NoseTracker()
     try:
         from engine.eyes.calibration import GazeModel
         model = GazeModel.load()
@@ -76,12 +79,12 @@ def main() -> None:
     scale = min(1.0, 1280 / W)
     w, h = int(W * scale), int(H * scale)
 
-    results: dict[str, list[float]] = {"head": [], "head-abs": [], "head-eyes": []}
-    firsts: dict[str, list[float]] = {"head": [], "head-abs": [], "head-eyes": []}    # time until the cursor first touched the ring
-    entries: dict[str, list[int]] = {"head": [], "head-abs": [], "head-eyes": []}     # times it entered the ring (1 = no overshoot)
+    results: dict[str, list[float]] = {"head": [], "head-nose": [], "head-abs": [], "head-eyes": []}
+    firsts: dict[str, list[float]] = {"head": [], "head-nose": [], "head-abs": [], "head-eyes": []}    # time until the cursor first touched the ring
+    entries: dict[str, list[int]] = {"head": [], "head-nose": [], "head-abs": [], "head-eyes": []}     # times it entered the ring (1 = no overshoot)
     test = None            # {"order": [...], "i": int, "t0": float, "inside_since": float | None}
     edge = None            # {"order": [...], "i": int, "t0": float, "best": px}
-    edge_results: list[tuple[str, float | None, float]] = []   # (edge, seconds or None, closest px)
+    edge_results: list[tuple[str, float | None, float, str]] = []   # (edge, seconds or None, closest px, mode)
     frame_id, face, note = 0, None, "Face the screen center and press C, then move your head."
     log: list[tuple] = []   # (t_ms, mode, yaw, pitch, x, y, target index or -1, eyes usable 0/1)
     try:
@@ -96,7 +99,7 @@ def main() -> None:
                     g = pointer.raw_gaze(ef, pose)
                     if g is not None:
                         recent_gaze.append(g)
-                    pt = pointer.update(face.t_ms, ef, pose)
+                    pt = pointer.update(face.t_ms, ef, pose, nose.update(face, pose))
                     driver.set_target(pt.x, pt.y)
                     log.append((face.t_ms, pointer.mode, round(pose.yaw, 3), round(pose.pitch, 3), round(pt.x, 1),
                                 round(pt.y, 1), test["i"] if test else -1, int(ef.usable)))
@@ -104,7 +107,7 @@ def main() -> None:
 
             img = np.full((h, w, 3), BG, np.uint8)
             mode = pointer.mode
-            cv2.putText(img, f"mode: {mode}   sensitivity {settings.sensitivity:.1f}   (1 head, 2 head-abs, 3 head-eyes, C recenter, "
+            cv2.putText(img, f"mode: {mode}   sensitivity {settings.sensitivity:.1f}   (1 head, 4 head-nose, 2 head-abs, 3 head-eyes, C recenter, "
                              f"SPACE test, +/- speed, [ ] accel, , . aim, Q quit)", (20, 34), cv2.FONT_HERSHEY_SIMPLEX, 0.6, TEXT, 1,
                         cv2.LINE_AA)
             cv2.putText(img, note, (20, 66), cv2.FONT_HERSHEY_SIMPLEX, 0.6, QUIET, 1, cv2.LINE_AA)
@@ -121,8 +124,8 @@ def main() -> None:
                 cv2.rectangle(img, bar[0], bar[1], GOOD if dist <= EDGE_PX else RING, -1)
                 if dist <= EDGE_PX or now - edge["t0"] > TIMEOUT_S:
                     secs = now - edge["t0"] if dist <= EDGE_PX else None
-                    edge_results.append((name, secs, edge["best"]))
-                    print(f"  edge {name:<6}: " + (f"{secs:.2f} s" if secs is not None else
+                    edge_results.append((name, secs, edge["best"], mode))
+                    print(f"  [{mode}] edge {name:<6}: " + (f"{secs:.2f} s" if secs is not None else
                                                   f"missed, closest {edge['best']:.0f} px"))
                     edge["i"] += 1
                     if edge["i"] == len(edge["order"]):
@@ -174,6 +177,10 @@ def main() -> None:
                 pointer.set_mode("head")
                 driver.stable.still_px = pointer.still_px
                 note = "head: quick turns go far, slow turns are precise; no fixed center."
+            elif k == ord("4"):
+                pointer.set_mode("head-nose")
+                driver.stable.still_px = pointer.still_px
+                note = "head-nose: like head, and turning all the way to a side or the top or bottom carries the cursor to that edge."
             elif k == ord("2"):
                 pointer.set_mode("head-abs")
                 driver.stable.still_px = pointer.still_px
@@ -186,6 +193,7 @@ def main() -> None:
                     note = "head-eyes needs a gaze calibration first: python -m tests.gaze_dot"
             elif k == ord("c") and face is not None:
                 head.set_neutral(face)
+                nose.set_neutral()
                 if recent_gaze:                   # you were looking at the center: today's gaze shift
                     xs, ys = sorted(g[0] for g in recent_gaze), sorted(g[1] for g in recent_gaze)
                     pointer.gaze_shift = (W / 2 - xs[len(xs) // 2], H / 2 - ys[len(ys) // 2])
@@ -243,13 +251,15 @@ def main() -> None:
                       f"timed out {sum(x >= TIMEOUT_S for x in r)}")
         if pointer.model is not None:
             print(f"  head-eyes: the eyes pulled the cursor {pointer.eye_pull_px:.0f} px in all")
+        print(f"  head-nose: the nose carried the cursor {pointer.nose_assist_px:.0f} px in all "
+              f"(scale learned from your face: {'yes' if nose.learned else 'not yet'})")
         print(f"  values at the end: sensitivity {settings.sensitivity:.1f}, GAIN_SLOW {P.GAIN_SLOW:.0f}, "
               f"GAIN_FAST {P.GAIN_FAST:.0f}  (send these to Khang to make them the default)")
 
 
 def print_head_report(log, stats, edge_results) -> None:
     """Frame rate, the head's turning range in head mode, and what the head pointer dropped (H2)."""
-    rows = [r for r in log if r[1] in ("head", "head-eyes")]
+    rows = [r for r in log if r[1] in ("head", "head-eyes", "head-nose")]
     if len(rows) < 30:
         return
     dts = [b[0] - a[0] for a, b in zip(rows, rows[1:]) if 0 < b[0] - a[0] < 1000]
@@ -267,11 +277,11 @@ def print_head_report(log, stats, edge_results) -> None:
     print(f"  dropped: {stats.glitch_skips} glitch frames skipped, {stats.glitch_rebases} glitch restarts "
           f"({stats.glitch_dropped_deg:.0f} deg), {stats.hold_rebases} long-blink holds ({stats.hold_dropped_deg:.0f} deg); "
           f"fast throws cut {stats.capped_px:.0f} px, {stats.edge_px:.0f} px of it given back at edges")
-    for name in EDGES:
-        got = [r for r in edge_results if r[0] == name]
+    for mode_name, name in [(m, e) for m in dict.fromkeys(r[3] for r in edge_results) for e in EDGES]:
+        got = [r for r in edge_results if r[0] == name and r[3] == mode_name]
         if got:
             hits = [r[1] for r in got if r[1] is not None]
-            print(f"  edge {name:<6}: reached {len(hits)}/{len(got)}"
+            print(f"  [{mode_name}] edge {name:<6}: reached {len(hits)}/{len(got)}"
                   + (f", median {statistics.median(hits):.2f} s" if hits else "")
                   + (f", closest miss {min(r[2] for r in got if r[1] is None):.0f} px" if len(hits) < len(got) else ""))
 

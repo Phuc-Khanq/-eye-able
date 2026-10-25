@@ -24,6 +24,9 @@ UTTERANCE = "voice.utterance"       # numpy float32 array, 16 kHz mono (audio_in
 SPEECH_SPAN = "voice.speech_span"   # {"start_ms": float, "end_ms": float} (audio_in -> dictation), published
                                     # right before each UTTERANCE on the same thread: time.monotonic() ms of
                                     # the utterance audio's first sample (pre-roll included) and of its end
+PARTIAL_AUDIO = "voice.partial_audio"  # {"audio": float32 array, "start_ms", "end_ms"} (audio_in -> dictation): the
+                                    # audio of the utterance so far, about once a second while the user is still
+                                    # speaking (live preview only; the final UTTERANCE follows)
 TRANSCRIPT = "voice.transcript"     # {"text": str, "words": [{"text", "conf"}], "ms": float}
 DELETE_VOICE_DATA = "voice.delete_data"  # {} (mode manager -> voice_data, after a confirm)
 

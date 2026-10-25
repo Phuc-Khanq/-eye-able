@@ -327,5 +327,33 @@ class TestPersonalRun(unittest.TestCase):
         self.assertEqual(len(typical), 1)
 
 
+class TestVoiceScript(unittest.TestCase):
+    def test_parse_hints_comments_and_blank_lines(self):
+        from engine.voice.finetune.record_pack import load_script
+
+        with tempfile.TemporaryDirectory() as tmp:
+            f = Path(tmp) / "s.txt"
+            f.write_text("# a comment\n\n## One | slowly\nhello there\nsecond line\n## Two\nthird line\n",
+                         encoding="utf-8")
+            self.assertEqual(load_script(f), [("hello there", "One: slowly"), ("second line", "One: slowly"),
+                                              ("third line", "Two")])
+            f.write_text("same line\nsame line\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                load_script(f)
+
+    def test_the_real_script_is_usable(self):
+        from engine.voice.finetune.record_pack import load_script
+
+        items = load_script(common.HERE / "voice_script.txt")
+        self.assertGreater(len(items), 120)
+        keys = [prepare.text_key(common.whisper_style(t)) for t, _ in items]
+        # two items with the same words (ignoring case and punctuation) would be split together: fine, but
+        # exact copies are refused above; the second pass of a command may repeat words
+        self.assertGreater(len(set(keys)), 120)
+        for text, hint in items:
+            self.assertTrue(hint, text)                          # every line says how to read it
+            self.assertLessEqual(len(text.split()), 70, text)   # about 25 s: under Whisper's 30 s limit
+
+
 if __name__ == "__main__":
     unittest.main()

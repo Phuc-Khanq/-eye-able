@@ -39,6 +39,8 @@ SPEECH_PAD_MS = 150         # keep a little audio around speech so first/last so
 PRE_ROLL_S = 0.3            # audio kept from before VAD noticed speech
 MIN_SPEECH_S = 0.25         # shorter blips (a cough, a click) are dropped
 MAX_UTTERANCE_S = 28.0
+LIVE_VOICE_RMS = 0.015      # a block this loud (after gain) counts as voice for the live preview, so a pause isn't re-transcribed
+LIVE_NEW_VOICE_S = 0.25     # a new partial needs this much new voice since the last one
 LEVEL_EVERY = 3             # send a listening level every 3 blocks (about 10 per second)
 RAW_QUEUE_MAX = 200         # about 6 s of mic chunks; if we fall that far behind, drop audio
 TIME_HISTORY_S = 35.0       # sample times kept for SPEECH_SPAN (longer than any utterance plus pre-roll)
@@ -211,6 +213,10 @@ class AudioIn:
         self.dropped_chunks = 0
         self.chunks = 0                 # mic chunks received (live_check warns if this stalls)
         self.level = 0.0                # last block's 0-1 level, after gain
+        # live preview: the audio so far goes out as topics.PARTIAL_AUDIO every live_every_s while speaking
+        self.live = bool(getattr(settings, "live_preview", False))
+        self.live_every_s = max(0.3, float(getattr(settings, "live_every_s", 1.0)))
+        self.live_min_s = float(getattr(settings, "live_min_s", 0.8))
         self._reset_stream_state()
         bus.subscribe(topics.from_ui(messages.SETTINGS), self.on_settings)
 
@@ -227,6 +233,9 @@ class AudioIn:
         self._voice_start = 0                          # sample index where VAD heard speech
         self._vad_offset = 0                           # our sample index when the VAD clock was 0
         self._times: deque = deque()                   # (16 kHz samples produced after a chunk, its time ms)
+        self._partial_at = 0                           # samples of _speech when the last partial audio went out
+        self._voiced = 0                               # voiced samples in this utterance so far (live preview)
+        self._voiced_at = 0                            # ... when the last partial audio went out
         self.speaking = False
 
     # ------------------------------------------------------------------ control
@@ -346,6 +355,8 @@ class AudioIn:
         return getattr(model, "last", -1.0)
 
     def _block(self, block) -> None:
+        import numpy as np
+
         block = self._gain(block)
         self.level = level_0_1(block)
         start_sample = self._blocks * BLOCK
@@ -363,6 +374,7 @@ class AudioIn:
             first = self._pre[0][0] if self._pre else start_sample
             self._speech_start = first
             self._speech = [b for _, b in self._pre]
+            self._partial_at = self._voiced = self._voiced_at = 0
             self._pre.clear()
         elif event and "end" in event and self.speaking:
             self._finish(end_sample=int(event["end"]) + self._vad_offset)
@@ -372,9 +384,30 @@ class AudioIn:
                 self._vad.reset_states()
                 self._vad_offset = self._blocks * BLOCK
 
+        if self.live and self.speaking:
+            if float(np.sqrt(np.mean(block * block))) >= LIVE_VOICE_RMS:
+                self._voiced += BLOCK
+            self._partial()
+
         if self._blocks % LEVEL_EVERY == 0:
             self.bus.publish(topics.TO_UI, messages.make(
                 messages.LISTENING, level=self.level, speaking=self.speaking))
+
+    def _partial(self) -> None:
+        """The audio of this utterance so far, for the live preview (the dictation worker transcribes it
+        when it is idle and drops it if the finished utterance gets there first)."""
+        import numpy as np
+
+        n = len(self._speech) * BLOCK
+        if (self._voiced < self.live_min_s * RATE or n - self._partial_at < self.live_every_s * RATE
+                or self._voiced - self._voiced_at < LIVE_NEW_VOICE_S * RATE):
+            return                      # too little voice, too soon, or only a pause since the last one
+        self._partial_at, self._voiced_at = n, self._voiced
+        audio = np.concatenate(self._speech).astype(np.float32)
+        self.bus.publish(topics.PARTIAL_AUDIO, {
+            "audio": audio,
+            "start_ms": round(self._sample_time_ms(self._speech_start, "start"), 1),
+            "end_ms": round(self._sample_time_ms(self._speech_start + len(audio), "end"), 1)})
 
     def _finish(self, end_sample: int | None) -> None:
         import numpy as np

@@ -37,6 +37,7 @@ WANTED = {
     messages.STATUS: {"level": {"info", "warn", "error"}},
     messages.DICTATION_PREVIEW: {"cleaned": {True, False}},
     messages.LISTENING: {"speaking": {True, False}},
+    messages.DICTATION_LIVE: {},
     messages.CALIB_RESULT: {"ok": {True, False}},
     messages.SCROLL: {}, messages.GAZE: {}, messages.CALIB_TARGET: {},
 }
@@ -137,7 +138,10 @@ def session() -> list[tuple[float, dict]]:
         r.clock.t += len(part) / rate
         r.t_ms += int(len(part) / rate * 1000)
         audio.process(part, r.clock.t * 1000)
+    r.bus.publish(topics.TO_UI, messages.make(messages.DICTATION_LIVE, text="hi mom home"))   # the live text, as the
+    r.frames(5)                                      # dictation worker sends it while the user is still speaking
     r.say("hi mom home at seven tonight")              # what Whisper heard in that clip
+    r.bus.publish(topics.TO_UI, messages.make(messages.DICTATION_LIVE, text=""))   # and the worker clears the live text
     rid = r.bus.of(topics.REWRITE_REQUEST)[-1]["id"]
     r.frames(10)
     r.bus.publish(topics.REWRITE_RESULT, {"id": rid, "used": True, "clean": "Hi Mom, home at seven tonight."})

@@ -103,6 +103,8 @@ class EyesService:
             from engine.eyes.head_pose import HeadPoseEstimator
             head_pose = HeadPoseEstimator()
         self.features, self.head = features, head_pose
+        from engine.eyes.nose import NoseTracker
+        self.nose = NoseTracker()          # the nose as a second reading of the head's turn (pointer "head-nose")
 
         self.model, model_note = None, ""
         try:
@@ -328,6 +330,10 @@ class EyesService:
             self._no_face_said = False
         self._last_face = now
         feats, pose = self.features.compute(face), self.head.compute(face)
+        try:
+            nose = self.nose.update(face, pose)
+        except Exception:                  # a landmark glitch must never stop the pointer
+            nose = None
         # for the voice route: words count only while the user's own mouth moves (engine/eyes/mouth.py)
         self.bus.publish(topics.MOUTH, MouthSample(t_ms=face.t_ms, open=float((face.blendshapes or {}).get("jawOpen", 0.0))))
 
@@ -347,7 +353,7 @@ class EyesService:
             return
         if self._scrolling:
             self._end_scroll()
-        point = self.pointer.update(face.t_ms, feats, pose)
+        point = self.pointer.update(face.t_ms, feats, pose, nose)
         brow = self.brows.update(face.t_ms, face.blendshapes or {})
         mouth = self.jaw.update(face.t_ms, face.blendshapes or {}) if self.jaw is not None else None
         blink = self.blink.update(face.t_ms, face.blendshapes or {}, pose.pitch) if self.blink is not None else None
@@ -496,6 +502,7 @@ class EyesService:
         if elapsed < CALIB_SETTLE_S + CALIB_COLLECT_S:
             return
         self.head.set_neutral()   # median of the last frames, all spent looking at the dot
+        self.nose.set_neutral()
         shift_px = 0.0
         if calib["gaze"]:
             mx = statistics.median(p[0] for p in calib["gaze"])

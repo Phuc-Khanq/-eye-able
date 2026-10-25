@@ -3,7 +3,9 @@
 Route: Khoi and Khoa (Khoi leads)
 Publishes: topics.TRANSCRIPT {"text", "words": [{"text", "conf"}], "ms"}
 Subscribes: topics.UTTERANCE (float32 audio from audio_in) and topics.SPEECH_SPAN (when it was
-            spoken, for the mouth gate: only the user's voice counts; see DictationWorker)
+            spoken, for the mouth gate: only the user's voice counts; see DictationWorker), and
+            topics.PARTIAL_AUDIO (the utterance so far, for the live preview)
+Also sends: a dictation_live UI message (what Whisper hears so far) while the user is still speaking
 APIs: faster-whisper WhisperModel("large-v3-turbo", device="cuda", compute_type="float16"),
       transcribe(word_timestamps=True, hotwords=...)
 
@@ -174,11 +176,19 @@ class DictationWorker:
         self._last_warning = float("-inf")    # ... and of the last "tracker failed" warning
         self._queue: queue.Queue = queue.Queue(maxsize=MAX_QUEUED)
         self._mode = ""                       # the mode manager's mode, from the UI messages
+        # live preview: the newest audio-so-far (older ones are skipped), what the card shows now, and a counter
+        # that a finished utterance bumps so a partial transcribed meanwhile is thrown away
+        self.live = bool(getattr(settings, "live_preview", False))
+        self._partial: tuple | None = None
+        self._partial_lock = threading.Lock()
+        self._partial_gen = 0
+        self._live_text = ""
         bus.subscribe(topics.TO_UI, self.on_ui)
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         bus.subscribe(topics.SPEECH_SPAN, self.on_speech_span)
         bus.subscribe(topics.UTTERANCE, self.on_utterance)
+        bus.subscribe(topics.PARTIAL_AUDIO, self.on_partial)
 
     def start(self, warm_up: bool = True) -> None:
         self._thread = threading.Thread(target=self._run, args=(warm_up,),
@@ -193,8 +203,18 @@ class DictationWorker:
         with self._span_lock:
             self._span = span
 
+    def on_partial(self, payload: dict) -> None:
+        """Called on audio_in's thread: keep the newest audio-so-far for the live preview (Dictation mode only)."""
+        if not self.live or self._mode != "dictation":
+            return
+        with self._partial_lock:
+            self._partial = (payload["audio"], {"start_ms": payload["start_ms"], "end_ms": payload["end_ms"]},
+                             self._partial_gen)
+
     def on_utterance(self, audio) -> None:
         """Called on audio_in's thread: queue the audio with its span and return immediately."""
+        with self._partial_lock:
+            self._partial, self._partial_gen = None, self._partial_gen + 1   # the finished words are coming
         with self._span_lock:
             item, self._span = (audio, self._span), None
         try:
@@ -215,8 +235,9 @@ class DictationWorker:
                 return
         while not self._stop.is_set():
             try:
-                audio, span = self._queue.get(timeout=0.2)
+                audio, span = self._queue.get(timeout=0.05 if self.live else 0.2)
             except queue.Empty:
+                self._live_step()
                 continue
             try:
                 self.process(audio, span)
@@ -228,6 +249,53 @@ class DictationWorker:
 
     def process(self, audio, span: dict | None = None) -> None:
         """Transcribe one utterance and publish it. Tests call this directly."""
+        try:
+            self._process(audio, span)
+        finally:
+            self._set_live("")                 # the finished words (or nothing) replace the live text
+
+    # ---------------------------------------------------------- live preview
+    def _live_step(self) -> None:
+        """Idle: transcribe the newest audio-so-far and show it. It never delays a finished utterance by
+        more than one partial (a Whisper call can't be interrupted), and a partial that was overtaken by
+        the finished utterance, or by leaving Dictation mode, is dropped, never shown."""
+        with self._partial_lock:
+            item, self._partial = self._partial, None
+        if item is None:
+            return
+        audio, span, gen = item
+        try:
+            words = self.dictation.transcribe(audio)
+        except Exception:
+            return                             # the live text is a courtesy: the final transcription reports errors
+        with self._partial_lock:
+            stale = gen != self._partial_gen
+        if stale or not self._queue.empty() or self._mode != "dictation":
+            return
+        if words and self.mouth is not None and self.gate and not self._partial_mouth_ok(words, span):
+            words = []
+        self._set_live(words_to_text(words) if words else "")
+
+    def _partial_mouth_ok(self, words: list[dict], span: dict) -> bool:
+        """The mouth gate for live text (quiet: it only decides whether to show it)."""
+        start = float(span["start_ms"])
+        f = self._fraction(start + words[0]["start"] * 1000 - self.pad_ms,
+                           start + words[-1]["end"] * 1000 + self.pad_ms)
+        return f is None or f >= self.min_moving
+
+    def _set_live(self, text: str) -> None:
+        text = text.strip()
+        if text == self._live_text:
+            return
+        self._live_text = text
+        try:
+            from engine.core import messages
+
+            self.bus.publish(topics.TO_UI, messages.make(messages.DICTATION_LIVE, text=text))
+        except Exception:
+            pass
+
+    def _process(self, audio, span: dict | None = None) -> None:
         t0 = time.perf_counter()
         try:
             words = self.dictation.transcribe(audio)
@@ -253,6 +321,10 @@ class DictationWorker:
     def on_ui(self, msg: dict) -> None:
         if msg.get("type") == "mode":
             self._mode = str(msg.get("mode", ""))
+            if self._mode != "dictation":
+                with self._partial_lock:
+                    self._partial = None
+                self._set_live("")
 
     def _resume_while_paused(self, words: list[dict]) -> bool:
         """While paused, "resume" always gets through: everything else is ignored in that mode anyway, so

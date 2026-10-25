@@ -337,12 +337,13 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Diseyeble engine")
     p.add_argument("--wav", help="use this recording instead of the mic")
     p.add_argument("--no-eyes", action="store_true", help="no camera, cursor, clicks or typing (voice only)")
-    p.add_argument("--pointer", choices=["head-eyes", "head", "head-abs", "hybrid", "gaze"],
+    p.add_argument("--pointer", choices=["head-eyes", "head", "head-nose", "head-abs", "hybrid", "gaze"],
                    default=str(getattr(settings, "pointer_mode", "head")),
                    help="head-eyes = the head moves the cursor and the eyes pull it toward where you look while the "
                         "head turns that way (default, pointer_mode in settings; needs a gaze calibration, "
                         "tests.gaze_dot, else it is head); head = head only, as a mouse with acceleration; head-abs = "
-                        "fixed head angle per screen spot; hybrid and gaze need a gaze calibration")
+                        "fixed head angle per screen spot; head-nose = head, plus the nose carries the cursor the last stretch to an "
+                        "edge when the head is turned that way; hybrid and gaze need a gaze calibration")
     p.add_argument("--dwell", action=argparse.BooleanOptionalAction, default=False,
                    help="resting the cursor dwell_ms (settings, 1 s) also left-clicks; off by default (the left click "
                         "is an eyebrow raise or \"click\", snapped onto the nearest button by UI-Venus)")

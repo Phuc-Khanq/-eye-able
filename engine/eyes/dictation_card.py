@@ -6,7 +6,7 @@ an action row, and a hint field with key caps.
 
 Route: Khang (Nhi's Electron bubble can replace it later: dictation_card false in settings)
 Publishes: nothing
-Subscribes: topics.TO_UI, read only: listening, mode, dictation_preview, confirm; topics.TRANSCRIPT (what was heard);
+Subscribes: topics.TO_UI, read only: listening, mode, dictation_preview, dictation_live, confirm; topics.TRANSCRIPT (what was heard);
             topics.OS_TYPE (so it can say "Typed" rather than "Dropped")
 APIs: tkinter Canvas, as a Toplevel on the click ring's Tk thread (engine/eyes/dwell_meter.py), so the engine
       has one Tk thread; Windows ctypes for click-through, never focused, out of the taskbar, and out of
@@ -19,6 +19,9 @@ States, first match wins:
   preview    "Will type": the words waiting to be typed (unsure words in amber, underlined), your own words in
              the chip, "Type it / Drop it / Use original", and "blink or say yes" in the hint field. Stays until
              it is typed or dropped.
+  live       "Hearing": what Whisper hears so far of the sentence being spoken, in grey, about once a second. With
+             a preview waiting it follows the preview's words ("Will type"), so you see everything at once; the
+             finished words replace it (refined text later replaces those). Dictation mode only.
   done       "Typed" or "Dropped" for a moment after a preview closes; "Done" or "Cancelled" after a question
   heard      for HEARD_S after anything is heard: your words in the chip, so every command gets feedback
   listening  the pill only, with a moving waveform, as soon as the mic hears speech (before Whisper finishes)
@@ -39,6 +42,7 @@ from dataclasses import dataclass, field
 
 from engine.core import messages, topics
 
+LIVE_STALE_S = 4.0        # live text with no update this long is dropped (the engine sends one about every second)
 HEARD_S = 2.5             # your words stay in the chip this long after a command
 DONE_S = 1.2              # "Typed" / "Dropped" stays this long
 FLASH_S = 1.2             # a command's name ("Volume up") stays in the pill this long
@@ -87,14 +91,15 @@ MODE_HINTS = {"dictation": "say “dictate off” to stop", "scroll": "tilt your
 
 @dataclass
 class View:
-    kind: str                                  # "confirm" | "preview" | "done" | "command" | "heard" | "listening" |
+    kind: str                                  # "confirm" | "preview" | "live" | "done" | "command" | "heard" | "listening" |
                                                # "mode" | "hidden" ("command": the pill alone, with the command's name)
     pill: str = ""                             # the pill's text (the mode)
     pill_hint: str = ""
     listening: bool = False                    # the pill shows the waveform
     label: str = ""                            # small gray line at the top of the panel
     chip: str = ""                             # your own words, in the blue chip
-    words: list = field(default_factory=list)  # [(text, shaky)]: the text that will be typed
+    words: list = field(default_factory=list)  # [(text, shaky)]: the text that will be typed; shaky True = unsure
+                                               # (amber), "live" = still being heard (grey)
     body: str = ""                             # plain large text (done)
     actions: list = field(default_factory=list)  # ["type", "drop", "original"]
     keys: bool = False                         # the hint field with "yes" / "no" key caps
@@ -105,7 +110,7 @@ class View:
 
     @property
     def panel(self) -> bool:
-        return self.kind in ("confirm", "preview", "done", "heard")
+        return self.kind in ("confirm", "preview", "live", "done", "heard")
 
 
 def shorten(text: str, n: int = CHIP_MAX_CHARS) -> str:
@@ -146,6 +151,7 @@ class CardModel:
         self.original = ""
         self.mode = "pointer"
         self.heard, self._heard_at = "", float("-inf")
+        self.live, self._live_at = "", float("-inf")     # what is being heard right now (dictation_live)
         self._listening_until = float("-inf")
         self.level = 0.0
         self.levels: deque[float] = deque([0.0] * WAVE_BARS, maxlen=WAVE_BARS)
@@ -162,6 +168,8 @@ class CardModel:
                 self._listening_until = now + LISTEN_HOLD_S
         elif kind == messages.MODE:
             before, self.mode = self.mode, str(msg.get("mode", "pointer"))
+            if self.mode != "dictation":
+                self.live = ""
             if self.mode == "pointer" and before in LEAVE_FLASH:
                 self._set_flash(LEAVE_FLASH[before], now)   # back home: say what just ended
         elif kind == messages.COMMAND:
@@ -173,8 +181,16 @@ class CardModel:
             self.preview = words
             self.original = str(msg.get("original", "")) if msg.get("cleaned") else ""
             self._last_typed = False
+        elif kind == messages.DICTATION_LIVE:
+            self.live, self._live_at = " ".join(str(msg.get("text", "")).split()), now
         elif kind == messages.CONFIRM:
             self._on_confirm(msg, now)
+
+    def _live_words(self, now: float) -> list:
+        """[(word, "live")] for the text being heard now; none outside Dictation or when it went stale."""
+        if not self.live or self.mode != "dictation" or now - self._live_at > LIVE_STALE_S:
+            return []
+        return [(w, "live") for w in self.live.split()]
 
     def _set_flash(self, label: str, now: float) -> None:
         if self.command_flash and label.strip():
@@ -228,8 +244,12 @@ class CardModel:
         if self.preview:
             chip = self.original or (self.heard if now - self._heard_at <= 30 else "")
             return View("preview", label="Will type", chip=shorten(chip),
-                        words=[(w["text"], float(w.get("conf", 1.0)) < SHAKY_CONF) for w in self.preview],
+                        words=[(w["text"], float(w.get("conf", 1.0)) < SHAKY_CONF) for w in self.preview]
+                        + self._live_words(now),
                         actions=["type", "drop"] + (["original"] if self.original else []), keys=True, **base)
+        live = self._live_words(now)
+        if live:
+            return View("live", label="Hearing", words=live, **base)
         if now - self._done_at <= DONE_S:
             return View("done", body=self._done, **base)
         if now - self._flash_at <= FLASH_S and self._flash:
@@ -365,7 +385,7 @@ def layout_words(words, font, shaky_font, max_w):
     lines, line, x = [], [], 0
     space = font.measure(" ")
     for text, shaky in words:
-        w = (shaky_font if shaky else font).measure(text)
+        w = (shaky_font if shaky is True else font).measure(text)
         if line and x + w > max_w:
             lines.append(line)
             line, x = [], 0
@@ -444,8 +464,9 @@ def draw(c, v: View, levels, fonts) -> int:
             y += fonts["hint"].metrics("linespace") + 4
         for line in lines:
             for text, shaky, wx in line:
-                c.create_text(x0 + PAD + wx, y, text=text, fill=SHAKY if shaky else TEXT,
-                              font=fonts["shaky" if shaky else "body"], anchor="nw")
+                c.create_text(x0 + PAD + wx, y, text=text,
+                              fill=SHAKY if shaky is True else MUTED if shaky == "live" else TEXT,
+                              font=fonts["shaky" if shaky is True else "body"], anchor="nw")
             y += line_h
         y += 10
     if v.body:                  # wraps to the panel; a long one adds lines (the model keeps it short)

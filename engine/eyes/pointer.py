@@ -19,6 +19,12 @@ Modes:
             moves about 400 px), a slow turn moves it precisely (10 px per degree). There is
             no fixed center, so leaning or shifting in the chair doesn't drift it: like lifting a mouse,
             a slow turn back re-centers the head without moving the cursor much.
+  head-push the head mode, but only a turn AWAY from your resting head angle (home) moves the cursor. Turning back
+            toward home leaves the cursor where it is, like lifting a mouse to put it back in the middle of the pad:
+            push right, come back to the middle, push right again to go further. To go the other way, turn past
+            home to that side. Home is the angle the head had when the pointer started or "recenter" was said, and
+            it follows a resting head very slowly (HOME_FOLLOW_S) so a change of posture doesn't build up.
+            (Oct 25, Khang: "push the cursor left or right, recenter, push it where you want".)
   head-abs  head angles map to fixed spots: about 15 degrees reaches a side edge, 10 the top or bottom.
             Predictable, but reaching edges is tiring and the center drifts as posture changes.
   hybrid  gaze jumps the cursor when it lands more than jump_px away; small head turns fine-tune it.
@@ -37,8 +43,8 @@ from engine.core.types import EyeFeatures, GazePoint, HeadPose
 from engine.eyes.head_pointer import HeadPointer
 from engine.eyes.smoothing import OneEuroFilter, PointSmoother
 
-MODES = ("head", "head-eyes", "head-nose", "head-abs", "hybrid", "gaze")
-REL_MODES = ("head", "head-eyes", "head-nose")      # the relative "mouse" pointer is in charge
+MODES = ("head", "head-eyes", "head-nose", "head-push", "head-abs", "hybrid", "gaze")
+REL_MODES = ("head", "head-eyes", "head-nose", "head-push")      # the relative "mouse" pointer is in charge
 NEEDS_GAZE = ("head-eyes", "hybrid", "gaze")
 JUMP_PX = 250.0   # hybrid: gaze this far from the cursor moves it; below that the head fine-tunes
 
@@ -90,7 +96,13 @@ GAZE_BETA = 4.0
 # The cursor's dead zone (CursorDriver) per mode: wobble smaller than this doesn't move it.
 # The head mode needs almost none (slow moves are only about 12 px per degree, and a bigger dead zone
 # makes slow moves sticky); the absolute head mode and gaze do.
-STILL_PX = {"head": 2.0, "head-eyes": 2.0, "head-nose": 2.0, "head-abs": 8.0, "hybrid": 20.0, "gaze": 20.0}
+STILL_PX = {"head": 2.0, "head-eyes": 2.0, "head-nose": 2.0, "head-push": 2.0, "head-abs": 8.0, "hybrid": 20.0,
+            "gaze": 20.0}
+
+# head-push: only a turn away from home moves the cursor (see the docstring).
+HOME_FOLLOW_S = 20.0    # while the head rests, home drifts toward its angle with this time constant: slow enough that
+                        # holding a push for a few seconds doesn't make the way back count, quick enough that a new
+                        # sitting posture becomes the new home within a minute ("recenter" sets it at once)
 
 # head-eyes: how the eyes pull (Oct 24 night, Khang: "head as the macro control, the iris as an add-on")
 EYE_RADIUS_PX = (110.0, 140.0)  # the gaze's error ellipse (x, y) around where the model says you look: no pull inside
@@ -114,6 +126,14 @@ NOSE_PULL_RATE = 5.0            # per second, like the eye pull: the gap to the 
 NOSE_MAX_STEP_PX = 45.0         # at most this much assist per camera frame (25+ fps; scaled for slower frames)
 
 
+def _away(before: float, after: float) -> float:
+    """head-push, one axis, angles measured from home: the part of a move from `before` to `after` that goes away
+    from home. A move back toward home counts as nothing; a move that crosses home counts only from home on."""
+    if before * after < 0:
+        return after                     # crossed home: the stretch past it is a push the other way
+    return after - before if abs(after) > abs(before) else 0.0
+
+
 def _ramp(x: float, lo: float, hi: float) -> float:
     """0 at or under lo, 1 at or over hi, smooth (smoothstep) in between."""
     k = min(max((x - lo) / (hi - lo), 0.0), 1.0)
@@ -135,12 +155,15 @@ class HeadRelPointer:
         self.speed = 0.0
         self.step = (0.0, 0.0)     # how far the cursor moved on the last frame (head-eyes: which way the head goes)
         self.rest_gate = True
+        self.push = False          # head-push: only turns away from home move the cursor
+        self.home: tuple[float, float] | None = None   # head-push: resting yaw and pitch (filtered), degrees
         self.stats = PointerStats()
         self.center()
 
     def center(self) -> None:
         """Cursor to the screen center; the next frame starts a new relative movement."""
         self.cursor = ((self.W - 1) / 2, (self.H - 1) / 2)
+        self.home = None           # head-push: the next frame's angle is the new home
         self.rebase()
 
     def rebase(self) -> None:
@@ -194,9 +217,17 @@ class HeadRelPointer:
         self._raw = (pose.yaw, pose.pitch, pose.t_ms)
         t = pose.t_ms / 1000.0
         yaw, pitch = self._fy(t, pose.yaw), self._fp(t, pose.pitch)
+        if self.push and self.home is None:
+            self.home = (yaw, pitch)
         if self._last is not None:
             dt = max((pose.t_ms - self._last[0]) / 1000.0, 1e-3)
             dyaw, dpitch = yaw - self._last[1], pitch - self._last[2]
+            if self.push:                                    # only the part of the move that goes away from home
+                hy, hp = self.home
+                pyaw = _away(self._last[1] - hy, yaw - hy)
+                ppitch = _away(self._last[2] - hp, pitch - hp)
+            else:
+                pyaw, ppitch = dyaw, dpitch
             if dt < 0.5:
                 k = self.frame_scale(dt)
                 inst = math.hypot(dyaw, dpitch) / dt
@@ -205,9 +236,10 @@ class HeadRelPointer:
                 self.speed += rate * (inst - self.speed)
                 g = self.gain(self.speed) * max(settings.sensitivity, 0.1)
                 kx, ky = self.gate(pose.t_ms, yaw, pitch)
-                mx, my = dyaw * g * kx, dpitch * g * VERTICAL_BOOST * ky   # chin down = cursor down
+                mx, my = pyaw * g * kx, ppitch * g * VERTICAL_BOOST * ky   # chin down = cursor down
+                rx, ry = dyaw * g * kx, dpitch * g * VERTICAL_BOOST * ky   # the head's own move (= mx, my unless head-push)
                 cx, cy = self._carry
-                if mx * cx + my * cy < 0 and math.hypot(dyaw, dpitch) > REVERSE_DEG * k:
+                if rx * cx + ry * cy < 0 and math.hypot(dyaw, dpitch) > REVERSE_DEG * k:
                     cx = cy = 0.0                            # turning back: forget the throw's cut part
                 step, limit = math.hypot(mx, my), MAX_STEP_PX * k
                 if step > limit:                             # cut to the limit, as always; remember the cut part
@@ -238,6 +270,9 @@ class HeadRelPointer:
                 self._carry = (cx, cy)
                 self.step = (nx - self.cursor[0], ny - self.cursor[1])
                 self.cursor = (nx, ny)
+                if self.push and self.speed < SPEED_SLOW:    # resting: home slowly follows the head (posture)
+                    a = 1.0 - math.exp(-dt / HOME_FOLLOW_S)
+                    self.home = (self.home[0] + a * (yaw - self.home[0]), self.home[1] + a * (pitch - self.home[1]))
         else:
             self.gate(pose.t_ms, yaw, pitch)     # the first frame starts the rest gate's window
         self._last = (pose.t_ms, yaw, pitch)
@@ -285,6 +320,7 @@ class Pointer:
         if mode in NEEDS_GAZE and self.model is None:
             return False
         self.mode = mode
+        self.rel.push = mode == "head-push"
         self.head.jump_px = 0.0 if mode == "gaze" else self.jump_px
         self.reset()
         return True

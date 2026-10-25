@@ -42,9 +42,10 @@ def find_engine_dir() -> Path | None:
 
 
 class Engine:
-    def __init__(self, engine_dir: Path, python: str | None, module: str) -> None:
+    def __init__(self, engine_dir: Path, python: str | None, module: str, extra: list[str] | None = None) -> None:
         self.dir = engine_dir
         self.module = module
+        self.extra = list(extra or [])     # more engine.main options, e.g. ["--pointer", "head-push"]
         venv = engine_dir / (".venv/Scripts/python.exe" if sys.platform == "win32" else ".venv/bin/python")
         self.python = python or (str(venv) if venv.exists() else sys.executable)
         self.proc: subprocess.Popen | None = None
@@ -53,7 +54,7 @@ class Engine:
         if engine_listening() or (self.proc and self.proc.poll() is None):
             return "already running"
         kwargs = {"creationflags": subprocess.CREATE_NEW_CONSOLE} if sys.platform == "win32" else {}
-        self.proc = subprocess.Popen([self.python, "-m", self.module], cwd=self.dir, **kwargs)
+        self.proc = subprocess.Popen([self.python, "-m", self.module, *self.extra], cwd=self.dir, **kwargs)
         return "started"
 
     def stop(self) -> None:
@@ -106,12 +107,14 @@ def main() -> None:
     parser.add_argument("--python", help="Python that runs the engine (default: the .venv in the engine folder)")
     parser.add_argument("--module", default="engine.main", help="what to run with -m (for tests)")
     parser.add_argument("--no-browser", action="store_true", help="don't open the page in your browser")
+    parser.add_argument("--pointer", help="the engine's pointer mode, e.g. head-push (default: the engine's own)")
     args = parser.parse_args()
 
     engine_dir = args.engine_dir or find_engine_dir()
     if not engine_dir or not (engine_dir / "engine").is_dir():
         sys.exit("Give the folder that holds engine/main.py:  python serve_demo.py --engine-dir C:\\path\\to\\eyeable")
-    engine = Engine(engine_dir.resolve(), args.python, args.module)
+    engine = Engine(engine_dir.resolve(), args.python, args.module,
+                    ["--pointer", args.pointer] if args.pointer else [])
     server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(engine, args.port))
     url = f"http://localhost:{args.port}/#demo"
     print(f"Demo page: {url}   engine folder: {engine.dir}")

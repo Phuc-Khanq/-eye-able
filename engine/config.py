@@ -105,7 +105,7 @@ class Settings:
     scroll_idle_s: float = 10.0         # scroll mode ends by itself after this long with no scrolling
     # Dictation clean-up: a small local model tidies the preview before it's typed (engine/voice/rewrite.py)
     rewrite_dictation: bool = True
-    rewrite_model: str = "Qwen/Qwen2.5-3B-Instruct"     # Apache 2.0; about 6 GB, downloaded once (was 1.5B until
+    rewrite_model: str = "Qwen/Qwen2.5-3B-Instruct"     # Qwen Research License; about 6 GB, downloaded once (was 1.5B until
                                                         # Oct 24 night: too small to fix words from context)
     rewrite_device: str = "cuda"       # "cpu" works but is slow (seconds per sentence)
     rewrite_wait_s: float = 1.5        # "yes" waits at most this long for the clean-up, then types what's showing

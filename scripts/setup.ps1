@@ -123,7 +123,8 @@ if (-not $NoShortcuts) {
         $lnk.TargetPath = Join-Path $root "EYEable.bat"
         $lnk.WorkingDirectory = $root
         $lnk.Description = "Hands-free computer control with your head, eyes and voice"
-        $lnk.IconLocation = "$env:SystemRoot\System32\shell32.dll,22"
+        $ico = Join-Path $root "docs\brand\eyeable.ico"     # the [eye]able icon; the stock Windows one if it is missing
+        $lnk.IconLocation = if (Test-Path $ico) { "$ico,0" } else { "$env:SystemRoot\System32\shell32.dll,22" }
         $lnk.Save()
         Write-Host "Shortcut: $(Join-Path $dir 'EYEable.lnk')"
     }
